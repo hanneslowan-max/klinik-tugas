@@ -316,8 +316,54 @@ begin
 end;
 $$;
 
+-- ---------------------------------------------------------------- rujukan (ID / URL)
+-- (perbaikan P6) Urai rujukan → (tipe, id). tipe null = ID polos (jenisnya dicari pemanggil).
+--   URL tugas   : …/t/<id>, …/t/<team>/<id> (ClickUp & app)                         → task
+--   URL ClickUp : /<team>/v/li/<list>, /v/f/<folder>[/…], /v/s/<space>               → list / folder / space
+--                 tampilan /v/<l|b|c|g|t|…>/<induk>-<id>-<n> (mis. /v/l/6-<list>-1 list, /v/b/6-<list>-2 board):
+--                 induk 6 = list, 5 = folder, 4 = space, 7 = workspace (tipe 'workspace', tidak dirujuk)
+--                 /v/l/<list> (tanpa pola induk-id-n) → list
+--   URL app     : /l/<list>                                                          → list
+-- Query string & fragmen (?pr=…, #…) dan garis miring akhir dibuang.
+create or replace function public.rujukan_urai(p_ref text, out tipe text, out id text)
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v text := rtrim(regexp_replace(btrim(coalesce(p_ref, '')), '[?#].*$', ''), '/');
+  m text[];
+begin
+  m := regexp_match(v, '/v/[A-Za-z]+/([4-7])-([0-9A-Za-z_]+)-[0-9A-Za-z_]+(?:/|$)');
+  if v ~ '/t/' then
+    tipe := 'task';
+    id := substring(v from '/t/(?:[0-9]+/)?([0-9A-Za-z_-]+)$');
+  elsif m is not null then
+    tipe := case m[1] when '6' then 'list' when '5' then 'folder' when '4' then 'space' else 'workspace' end;
+    id := m[2];
+  elsif v ~ '/v/(li|l)/' then
+    tipe := 'list';
+    id := substring(v from '/v/(?:li|l)/([0-9A-Za-z_-]+)');
+  elsif v ~ '/v/f/' then
+    tipe := 'folder';
+    id := substring(v from '/v/f/([0-9A-Za-z_-]+)');
+  elsif v ~ '/v/s/' then
+    tipe := 'space';
+    id := substring(v from '/v/s/([0-9A-Za-z_-]+)');
+  elsif v ~ '/l/' then
+    tipe := 'list';
+    id := substring(v from '/l/([0-9A-Za-z_-]+)$');
+  else
+    tipe := null;
+    id := nullif(v, '');
+  end if;
+end;
+$$;
+
 -- ---------------------------------------------------------------- pencarian
 -- Cocok: ID/URL (app.clickup.com/t/<id>, <app>/t/<id>) → kode di awal nama (Y7, FX-PM-…) → nama → isi.
+-- (perbaikan P6) URL list/folder/space (ClickUp /v/li|l|b|f|s/…, app /l/<id>) yang terlihat aktor → kartu di
+-- wadah itu (tidak diarsip; selesai hanya dengan p_include_closed) berperingkat 1, plus cocok teks biasa.
 create or replace function public.cari_tugas(p_q text, p_space text, p_include_closed boolean, p_limit integer)
 returns table (task_id text, peringkat integer)
 language plpgsql
@@ -330,17 +376,35 @@ declare
   v_like  text;
   v_kode  text;
   v_tutup text[] := public.tugas_tertutup();            -- (review R2) privasi space
+  v_r     record;
+  v_wtipe text;                                          -- (P6) wadah dari URL: list | folder | space
+  v_wid   text;
 begin
   if v_q = '' then
     perform public.lempar('PT400', 'Kata kunci pencarian kosong', 'INPUT_001');
   end if;
   v_id := coalesce(substring(v_q from '/t/(?:[0-9]+/)?([0-9A-Za-z_-]+)'), v_q);
+  if v_q ~ '/' then
+    select * into v_r from public.rujukan_urai(v_q);
+    if v_r.tipe in ('list', 'folder', 'space') and v_r.id is not null
+       and ((v_r.tipe = 'list' and public.list_terlihat(v_r.id))
+            or (v_r.tipe = 'folder' and exists (select 1 from public.folders f
+                                                  where f.id = v_r.id and public.space_terlihat(f.space_id)))
+            or (v_r.tipe = 'space' and exists (select 1 from public.spaces sp where sp.id = v_r.id)
+                and public.space_terlihat(v_r.id))) then
+      v_wtipe := v_r.tipe;
+      v_wid := v_r.id;
+    end if;
+  end if;
   v_like := '%' || replace(replace(replace(v_q, '\', '\\'), '%', '\%'), '_', '\_') || '%';
   v_kode := '^' || regexp_replace(v_q, '([.^$*+?(){}|\[\]\\-])', '\\\1', 'g') || '([^[:alnum:]]|$)';
   return query
     select x.id, x.p
       from (select t.id, t.updated_at,
                    case when t.id = v_id or t.clickup_id = v_id or t.id = v_q then 1
+                        when v_wtipe is not null and not t.archived
+                             and ((v_wtipe = 'list' and l.id = v_wid) or (v_wtipe = 'folder' and l.folder_id = v_wid)
+                                  or (v_wtipe = 'space' and l.space_id = v_wid)) then 1
                         when t.name ~* v_kode then 2
                         when t.name ilike v_like then 3
                         else 4 end as p
@@ -352,6 +416,9 @@ begin
                and (coalesce(p_include_closed, false) or t.status_type not in ('closed', 'done')
                     or t.id = v_id or t.clickup_id = v_id)                   -- ID/URL persis selalu tampil
                and (t.id = v_id or t.clickup_id = v_id or t.id = v_q
+                    or (v_wtipe is not null and not t.archived                -- (P6) isi wadah dari URL
+                        and ((v_wtipe = 'list' and l.id = v_wid) or (v_wtipe = 'folder' and l.folder_id = v_wid)
+                             or (v_wtipe = 'space' and l.space_id = v_wid)))
                     or t.name ilike v_like
                     or coalesce(t.markdown, '') ilike v_like
                     or coalesce(t.description_plain, '') ilike v_like
@@ -420,7 +487,7 @@ $$;
 
 -- ---------------------------------------------------------------- TENGGAT B10 + beban B5
 -- Cakupan: list di folder cakupan (app_settings.tenggat_folder_ids, [] = semua; p_folder menimpa), list tidak
--- diarsip & bukan tidak_ditagih; tugas belum selesai, tidak diarsip/dihapus, punya due. Nama berisi
+-- diarsip (termasuk folder/space diarsip, perbaikan P5) & bukan tidak_ditagih; tugas belum selesai, tidak diarsip/dihapus, punya due. Nama berisi
 -- BERSYARAT/CADANGAN/DITUNDA → menunggu_keputusan (bukan telat). Telat = hari kalender. tiga_hk = due > hari ini
 -- dan hari_kerja(hari ini, due) ≤ 3. h1 = hari ini < due ≤ h1_sampai (Jumat → Senin).
 create or replace function public.tenggat_hitung(p_tanggal date, p_folder text)
@@ -436,6 +503,7 @@ declare
   v_folder text[];
   v_hasil  jsonb;
   v_tutup  text[] := public.tugas_tertutup();           -- (review R2) privasi space
+  v_arsip  text[] := public.list_diarsip();             -- (perbaikan P5) list/folder/space diarsip
 begin
   v_h1 := case when extract(isodow from v_hari) = 5 then v_hari + 3 else v_hari + 1 end;
   if p_folder is not null then
@@ -452,7 +520,7 @@ begin
       from public.tasks t
       join public.lists l on l.id = t.list_id
      where (cardinality(v_folder) = 0 or l.folder_id = any (v_folder))
-       and not l.archived and not l.tidak_ditagih
+       and not l.archived and not (l.id = any (v_arsip)) and not l.tidak_ditagih
        and t.deleted_at is null and not t.archived
        and not (t.id = any (v_tutup))
        and t.status_type not in ('closed', 'done')

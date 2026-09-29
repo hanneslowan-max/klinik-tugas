@@ -88,6 +88,7 @@ begin
 end;
 $$;
 
+-- (perbaikan P5) kartu di list/folder/space yang diarsip tidak ikut (list_diarsip()).
 -- Tugas Saya: kartu terbuka milik anggota (default diri sendiri), dikelompokkan Telat (hari kalender, paling lama
 -- di atas) · Hari ini · ≤3 hari kerja (sisa_hk) · Nanti · Tanpa due · (review R5) Menunggu keputusan (nama
 -- BERSYARAT/CADANGAN/DITUNDA) · Tidak ditagih (list tidak ditagih). Dua grup terakhir TIDAK pernah masuk Telat
@@ -103,6 +104,7 @@ declare
   v_m     bigint;
   v_hari  date := public.hari_ini_wib();
   v_tutup text[];
+  v_arsip text[];
 begin
   v_m := coalesce(p_member, public.mulai_web());
   if p_member is not null then
@@ -112,6 +114,7 @@ begin
     end if;
   end if;
   v_tutup := public.tugas_tertutup();
+  v_arsip := public.list_diarsip();                     -- (perbaikan P5) list/folder/space diarsip
   return (
     with k as (
       select t.id, t.due_wib, t.name,
@@ -120,6 +123,7 @@ begin
         join public.task_assignees ta on ta.task_id = t.id and ta.member_id = v_m
         join public.lists l on l.id = t.list_id
        where t.deleted_at is null and not t.archived and not l.archived
+         and not (l.id = any (v_arsip))
          and t.status_type not in ('closed', 'done')
          and not (t.id = any (v_tutup)))
     select jsonb_build_object(
@@ -813,6 +817,10 @@ $$;
 
 -- Ganti seluruh status list: [{status, type, color, orderindex, nama_lama?}]. nama_lama = ganti nama (tugas ikut).
 -- Wajib ≥1 open & ≥1 closed. Status yang dibuang tapi masih dipakai tugas → PT409.
+-- (perbaikan P4) Nama status yang DIBUAT atau DIUBAH lewat Admin dinormalkan: trim + huruf kecil. Status lama yang
+-- dikirim dengan nama persis sama (tanpa nama_lama, atau nama_lama = nama) dipertahankan verbatim, supaya status
+-- impor ClickUp (mis. "BACKLOG", "Closed") tidak berubah (paritas ClickUp). Nama ganda tanpa beda huruf besar
+-- (sesudah normalisasi) → PT400.
 create or replace function public.web_admin_status_simpan(p_list text, p_statuses jsonb)
 returns jsonb
 language plpgsql
@@ -822,7 +830,11 @@ as $$
 declare
   e       jsonb;
   i       integer := 0;
+  v_rows  jsonb := '[]'::jsonb;         -- elemen + kunci "_nama" (nama akhir)
   v_nama  text[] := '{}'::text[];
+  v_in    text;
+  v_lama  text;
+  v_akhir text;
   v_pakai integer;
   d       record;
 begin
@@ -834,13 +846,23 @@ begin
     perform public.lempar('PT400', 'Daftar status wajib array tidak kosong', 'INPUT_001');
   end if;
   for e in select x from jsonb_array_elements(p_statuses) a(x) loop
-    if nullif(btrim(e ->> 'status'), '') is null or coalesce(e ->> 'type', '') not in ('open', 'custom', 'done', 'closed') then
+    if jsonb_typeof(e) <> 'object' or nullif(btrim(e ->> 'status'), '') is null
+       or coalesce(e ->> 'type', '') not in ('open', 'custom', 'done', 'closed') then
       perform public.lempar('PT400', 'Tiap status wajib punya nama dan type open/custom/done/closed', 'INPUT_001');
     end if;
-    if lower(btrim(e ->> 'status')) = any (select lower(x) from unnest(v_nama) x) then
-      perform public.lempar('PT400', format('Nama status ganda: %s', e ->> 'status'), 'INPUT_001');
+    v_in := btrim(e ->> 'status');
+    v_lama := nullif(e ->> 'nama_lama', '');
+    if (v_lama is null or v_lama = v_in)
+       and exists (select 1 from public.list_statuses s where s.list_id = p_list and s.status = v_in) then
+      v_akhir := v_in;                    -- status lama, tidak diubah → verbatim
+    else
+      v_akhir := lower(v_in);             -- status baru / ganti nama → normal
     end if;
-    v_nama := v_nama || btrim(e ->> 'status');
+    if lower(v_akhir) = any (select lower(x) from unnest(v_nama) x) then
+      perform public.lempar('PT400', format('Nama status ganda (tanpa beda huruf besar): %s', v_akhir), 'INPUT_001');
+    end if;
+    v_nama := v_nama || v_akhir;
+    v_rows := v_rows || jsonb_build_array(e || jsonb_build_object('_nama', v_akhir));
   end loop;
   if not exists (select 1 from jsonb_array_elements(p_statuses) a(x) where x ->> 'type' = 'open')
      or not exists (select 1 from jsonb_array_elements(p_statuses) a(x) where x ->> 'type' = 'closed') then
@@ -848,18 +870,21 @@ begin
   end if;
 
   -- ganti nama dulu (FK ON UPDATE CASCADE memindahkan tugas ke nama baru)
-  for e in select x from jsonb_array_elements(p_statuses) a(x)
-            where nullif(x ->> 'nama_lama', '') is not null and x ->> 'nama_lama' <> btrim(x ->> 'status') loop
-    if exists (select 1 from public.list_statuses s where s.list_id = p_list and s.status = btrim(e ->> 'status')) then
-      perform public.lempar('PT400', format('Status "%s" sudah ada', e ->> 'status'), 'INPUT_001');
+  for e in select x from jsonb_array_elements(v_rows) a(x)
+            where nullif(x ->> 'nama_lama', '') is not null and x ->> 'nama_lama' <> x ->> '_nama' loop
+    if not exists (select 1 from public.list_statuses s where s.list_id = p_list and s.status = e ->> 'nama_lama') then
+      continue;                           -- nama lama tidak ada → diperlakukan sebagai status baru di bawah
     end if;
-    update public.list_statuses set status = btrim(e ->> 'status')
+    if exists (select 1 from public.list_statuses s where s.list_id = p_list and s.status = e ->> '_nama') then
+      perform public.lempar('PT400', format('Status "%s" sudah ada', e ->> '_nama'), 'INPUT_001');
+    end if;
+    update public.list_statuses set status = e ->> '_nama'
      where list_id = p_list and status = e ->> 'nama_lama';
   end loop;
 
-  for e in select x from jsonb_array_elements(p_statuses) a(x) loop
+  for e in select x from jsonb_array_elements(v_rows) a(x) loop
     insert into public.list_statuses (list_id, status, type, orderindex, color)
-    values (p_list, btrim(e ->> 'status'), e ->> 'type', coalesce(nullif(e ->> 'orderindex', '')::numeric::integer, i),
+    values (p_list, e ->> '_nama', e ->> 'type', coalesce(nullif(e ->> 'orderindex', '')::numeric::integer, i),
             coalesce(nullif(e ->> 'color', ''), '#d3d3d3'))
     on conflict (list_id, status) do update
       set type = excluded.type, orderindex = excluded.orderindex, color = excluded.color

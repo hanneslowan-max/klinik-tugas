@@ -50,7 +50,8 @@ end;
 $$;
 
 -- Terima ID (tugas/list/folder/space/komentar/anggota/lampiran), URL app (/t/<id>, /l/<id>),
--- URL app.clickup.com/t/<id>, /t/<team>/<id>, /<team>/v/li|l/<list>, /v/f/<folder>, /v/s/<space>.
+-- URL app.clickup.com/t/<id>, /t/<team>/<id>, /<team>/v/li|l/<list>, /v/f/<folder>, /v/s/<space>, dan (P6) URL
+-- tampilan list/board /v/l/6-<list>-1, /v/b/6-<list>-2 (induk 5 = folder, 4 = space).
 create or replace function public.x_resolve(p_aktor bigint, p_ref text)
 returns jsonb
 language plpgsql
@@ -68,28 +69,10 @@ begin
   if v_ref = '' then
     perform public.lempar('PT400', 'ref kosong', 'INPUT_001');
   end if;
-  v_ref := regexp_replace(v_ref, '[?#].*$', '');
-  v_ref := rtrim(v_ref, '/');
-
-  if v_ref ~ '/t/' then
-    v_id := substring(v_ref from '/t/(?:[0-9]+/)?([0-9A-Za-z_-]+)$');
-    v_tipe := 'task';
-  elsif v_ref ~ '/v/(li|l)/' then
-    v_id := substring(v_ref from '/v/(?:li|l)/([0-9A-Za-z_-]+)');
-    v_tipe := 'list';
-  elsif v_ref ~ '/v/f/' then
-    v_id := substring(v_ref from '/v/f/([0-9A-Za-z_-]+)');
-    v_tipe := 'folder';
-  elsif v_ref ~ '/v/s/' then
-    v_id := substring(v_ref from '/v/s/([0-9A-Za-z_-]+)');
-    v_tipe := 'space';
-  elsif v_ref ~ '/l/' then
-    v_id := substring(v_ref from '/l/([0-9A-Za-z_-]+)$');
-    v_tipe := 'list';
-  else
-    v_id := v_ref;
-  end if;
-  if v_id is null then
+  -- (perbaikan P6) pengurai bersama pencarian: termasuk URL tampilan ClickUp /v/l/6-<list>-1, /v/b/6-<list>-2,
+  -- /v/<x>/5-<folder>-<n>, /v/<x>/4-<space>-<n> (lihat rujukan_urai).
+  select u.tipe, u.id into v_tipe, v_id from public.rujukan_urai(v_ref) u;
+  if v_id is null or v_tipe = 'workspace' then
     perform public.lempar('PT404', 'Rujukan tidak dikenali', 'ITEM_013');
   end if;
 
@@ -428,28 +411,33 @@ $$;
 
 -- (review R2) Anggota space dari payload ClickUp `members` ([{user:{id}}] / [{id}] / [id]) → space_anggota
 -- sumber 'clickup', himpunan penuh (baris sumber 'app' dari owner tidak disentuh). ID yang belum diimpor
--- dilewati. Hasil: true bila ada perubahan.
+-- (atau rentang anggota buatan app) dilewati. Hasil: {"ditambah","dibuang","dilewati":[id]} (null = payload
+-- bukan array → anggota tidak disentuh). (perbaikan P2) dipakai juga jenis impor 'space_anggota'.
 create or replace function public.set_space_anggota_impor(p_space text, p_members jsonb)
-returns boolean
+returns jsonb
 language plpgsql
 security definer
 set search_path = ''
 as $$
 declare
-  v_ids bigint[];
-  n1    integer;
-  n2    integer;
+  v_ids   bigint[];
+  v_lewat bigint[];
+  n1      integer;
+  n2      integer;
 begin
   if p_members is null or jsonb_typeof(p_members) <> 'array' then
-    return false;
+    return null;
   end if;
-  select coalesce(array_agg(distinct y.id), '{}') into v_ids
-    from (select case when z.s ~ '^[0-9]{1,18}$' then z.s::bigint end as id
-            from (select case when jsonb_typeof(e) = 'object' then coalesce(e -> 'user' ->> 'id', e ->> 'id')
-                              else e #>> '{}' end as s
-                    from jsonb_array_elements(p_members) a(e)) z) y
-   where y.id is not null
-     and exists (select 1 from public.members m where m.id = y.id and m.id < 900000000000);
+  with y as (
+    select distinct case when z.s ~ '^[0-9]{1,18}$' then z.s::bigint end as id
+      from (select case when jsonb_typeof(e) = 'object' then coalesce(e -> 'user' ->> 'id', e ->> 'id')
+                        else e #>> '{}' end as s
+              from jsonb_array_elements(p_members) a(e)) z)
+  select coalesce(array_agg(y.id order by y.id) filter (where ok), '{}'),
+         coalesce(array_agg(y.id order by y.id) filter (where not ok), '{}')
+    into v_ids, v_lewat
+    from (select y.id, exists (select 1 from public.members m where m.id = y.id and m.id < 900000000000) as ok
+            from y where y.id is not null) y;
   delete from public.space_anggota sa
    where sa.space_id = p_space and sa.sumber = 'clickup' and not (sa.member_id = any (v_ids));
   get diagnostics n1 = row_count;
@@ -457,7 +445,66 @@ begin
   select p_space, x, 'clickup' from unnest(v_ids) u(x)
   on conflict (space_id, member_id) do nothing;
   get diagnostics n2 = row_count;
-  return n1 + n2 > 0;
+  return jsonb_build_object('ditambah', n2, 'dibuang', n1, 'dilewati', to_jsonb(v_lewat));
+end;
+$$;
+
+-- (perbaikan P2) Jenis impor 'space_anggota': ClickUp v2 tidak punya endpoint anggota space, jadi importer
+-- menurunkan anggota space PRIVAT dari gabungan GET /list/{id}/member semua list di space itu + owner/admin
+-- workspace (role 1/2 di /team). Baris {space_id, member_ids:[…]} (atau members:[{user:{id}}|{id}|id]) = himpunan
+-- penuh sumber 'clickup' per space; anggota sumber 'app' (ditambah owner di Admin) tidak pernah dihapus.
+-- Space wajib sudah diimpor dan bersumber clickup (R1). Idempoten: himpunan sama → unchanged.
+-- Hasil per space: inserted (space belum punya anggota clickup lalu mendapat ≥1), updated (himpunan berubah),
+-- unchanged; + total "ditambah"/"dibuang" dan "dilewati":[{space_id, ids}] (anggota belum diimpor).
+create or replace function public.muat_space_anggota(p_rows jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  r jsonb; v_space text; v_sumber text; v_ada boolean; x jsonb;
+  n_ins int := 0; n_upd int := 0; n_sama int := 0; n_tambah int := 0; n_buang int := 0;
+  v_lewat jsonb := '[]'::jsonb; v_gagal jsonb := '[]'::jsonb; v_msg text;
+begin
+  for r in select e from jsonb_array_elements(p_rows) as a(e) loop
+    begin
+      v_space := nullif(coalesce(r ->> 'space_id', r -> 'space' ->> 'id'), '');
+      if v_space is null then
+        perform public.lempar('PT400', 'space_id wajib', 'INPUT_001');
+      end if;
+      select s.sumber into v_sumber from public.spaces s where s.id = v_space;
+      if not found then
+        perform public.lempar('PT404', format('Space %s belum diimpor', v_space), 'ITEM_013');
+      end if;
+      if v_sumber <> 'clickup' then
+        perform public.lempar('PT409', format('Space %s buatan app; anggotanya diatur Admin, bukan impor', v_space),
+                              'KONFLIK_001');
+      end if;
+      if jsonb_typeof(coalesce(r -> 'member_ids', r -> 'members')) is distinct from 'array' then
+        perform public.lempar('PT400', 'member_ids wajib array (himpunan penuh; [] = kosongkan anggota clickup)', 'INPUT_001');
+      end if;
+      v_ada := exists (select 1 from public.space_anggota sa where sa.space_id = v_space and sa.sumber = 'clickup');
+      x := public.set_space_anggota_impor(v_space, coalesce(r -> 'member_ids', r -> 'members'));
+      n_tambah := n_tambah + (x ->> 'ditambah')::int;
+      n_buang := n_buang + (x ->> 'dibuang')::int;
+      if jsonb_array_length(x -> 'dilewati') > 0 then
+        v_lewat := v_lewat || jsonb_build_array(jsonb_build_object('space_id', v_space, 'ids', x -> 'dilewati'));
+      end if;
+      if (x ->> 'ditambah')::int + (x ->> 'dibuang')::int = 0 then
+        n_sama := n_sama + 1;
+      elsif not v_ada then
+        n_ins := n_ins + 1;
+      else
+        n_upd := n_upd + 1;
+      end if;
+    exception when others then
+      get stacked diagnostics v_msg = message_text;
+      v_gagal := v_gagal || jsonb_build_array(jsonb_build_object('id', coalesce(v_space, r ->> 'space_id'), 'err', v_msg));
+    end;
+  end loop;
+  return jsonb_build_object('inserted', n_ins, 'updated', n_upd, 'unchanged', n_sama, 'ditambah', n_tambah,
+                            'dibuang', n_buang, 'dilewati', v_lewat, 'gagal', v_gagal);
 end;
 $$;
 
@@ -534,7 +581,7 @@ as $$
 declare
   r jsonb; v_id text; v_lama jsonb; v_baru jsonb; v_space text; v_folder text; v_induk text;
   n_ins int := 0; n_upd int := 0; n_sama int := 0; v_gagal jsonb := '[]'::jsonb; v_msg text;
-  v_anggota boolean;
+  v_anggota boolean; v_x jsonb;
 begin
   for r in select e from jsonb_array_elements(p_rows) as a(e) loop
     begin
@@ -613,7 +660,11 @@ begin
         end if;
       elsif (v_lama - 'sumber') = v_baru then
         -- (review R2) anggota space privat ikut disinkron; berubah → dihitung updated
-        v_anggota := p_jenis = 'spaces' and public.set_space_anggota_impor(v_id, coalesce(r -> 'members', r -> 'anggota'));
+        v_anggota := false;
+        if p_jenis = 'spaces' then
+          v_x := public.set_space_anggota_impor(v_id, coalesce(r -> 'members', r -> 'anggota'));
+          v_anggota := coalesce((v_x ->> 'ditambah')::int + (v_x ->> 'dibuang')::int > 0, false);
+        end if;
         if p_jenis = 'spaces' then update public.spaces set synced_at = now() where id = v_id;
         elsif p_jenis = 'folders' then update public.folders set synced_at = now() where id = v_id;
         else update public.lists set synced_at = now() where id = v_id;
@@ -1201,9 +1252,10 @@ $$;
 -- ================================================================ impor_* publik (service_role)
 -- p_mode 'impor' (muat awal: assignee bukan kejadian) | 'sinkron' (perubahan dicatat lengkap=false, aktor null).
 -- p_at_awal = started_at sinkron sebelumnya (app.at_awal); null → synced_at lama baris itu.
--- Urutan batch: workspace → members → spaces → folders → lists → list_statuses → tasks → task_assignees →
--- comments → comment_mentions → attachments → sync_raw. Hasil {jenis, mode, inserted, updated, unchanged, gagal[],
--- (+ tertunda[] untuk tasks/comments, dihapus/dipertahankan untuk list_statuses/task_assignees)}.
+-- Urutan batch: workspace → members → spaces → folders → lists → space_anggota (P2) → list_statuses → tasks →
+-- task_assignees → comments → comment_mentions → attachments → sync_raw. Hasil {jenis, mode, inserted, updated,
+-- unchanged, gagal[], (+ tertunda[] untuk tasks/comments, dihapus/dipertahankan untuk list_statuses/task_assignees,
+-- ditambah/dibuang/dilewati untuk space_anggota)}.
 create or replace function public.impor_batch(p_aktor bigint, p_jenis text, p_rows jsonb, p_mode text default 'impor',
                                               p_at_awal timestamptz default null)
 returns jsonb
@@ -1226,6 +1278,7 @@ begin
          when 'workspace'        then public.muat_workspace(p_rows)
          when 'members'          then public.muat_members(p_rows)
          when 'spaces'           then public.muat_struktur('spaces', p_rows)
+         when 'space_anggota'    then public.muat_space_anggota(p_rows)          -- (perbaikan P2)
          when 'folders'          then public.muat_struktur('folders', p_rows)
          when 'lists'            then public.muat_struktur('lists', p_rows)
          when 'list_statuses'    then public.muat_list_statuses(p_rows)

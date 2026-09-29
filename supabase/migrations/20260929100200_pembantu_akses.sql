@@ -120,8 +120,26 @@ as $$
   end
 $$;
 
+-- (perbaikan P5) List yang diarsip EFEKTIF: list diarsip, ATAU folder-nya diarsip, ATAU space-nya diarsip
+-- (ClickUp menyembunyikan isi folder/space arsip). Kartu di dalamnya tidak ikut Tugas Saya, TENGGAT, maupun beban B5.
+-- Internal (tanpa EXECUTE untuk role API); dipanggil fungsi SECURITY DEFINER.
+create or replace function public.list_diarsip()
+returns text[]
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(array_agg(l.id), '{}')
+    from public.lists l
+    join public.spaces s on s.id = l.space_id
+    left join public.folders f on f.id = l.folder_id
+   where l.archived or s.archived or coalesce(f.archived, false)
+$$;
+
 -- Beban B5: jumlah kartu terbuka milik p_member dengan due_wib = p_tanggal.
--- Cakupan: belum selesai, tidak diarsip, tidak dihapus, list tidak diarsip & bukan tidak_ditagih.
+-- Cakupan: belum selesai, tidak diarsip, tidak dihapus, list tidak diarsip (termasuk folder/space arsip, P5) &
+-- bukan tidak_ditagih.
 -- Kartu multi-assignee dihitung +1 untuk tiap assignee. Batas (7) diterapkan pemanggil.
 -- Pemanggil authenticated yang bukan member → null.
 create or replace function public.beban(p_member bigint, p_tanggal date)
@@ -143,6 +161,7 @@ as $$
         and t.deleted_at is null
         and not t.archived
         and not l.archived
+        and not (l.id = any ((select public.list_diarsip())::text[]))
         and not l.tidak_ditagih)
   end
 $$;

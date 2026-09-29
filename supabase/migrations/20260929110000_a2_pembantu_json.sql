@@ -528,14 +528,23 @@ as $$
                          from public.members m where m.id = t.creator_id),
            'assignees', (select coalesce(jsonb_agg(public.j_member(ta.member_id) order by ta.added_at, ta.member_id), '[]'::jsonb)
                            from public.task_assignees ta where ta.task_id = t.id),
-           'group_assignees', '[]'::jsonb, 'watchers', '[]'::jsonb, 'checklists', '[]'::jsonb, 'tags', '[]'::jsonb,
+           'group_assignees', '[]'::jsonb, 'watchers', '[]'::jsonb,
+           -- (perbaikan P1 / PR-1) kartu impor: tags/checklists/custom_fields verbatim dari tasks.extra (bentuk
+           -- payload ClickUp, disimpan norm_impor_tugas). Kartu app & kartu tanpa isi → [].
+           'checklists', case when t.sumber = 'clickup' and jsonb_typeof(t.extra -> 'checklists') = 'array'
+                              then t.extra -> 'checklists' else '[]'::jsonb end,
+           'tags', case when t.sumber = 'clickup' and jsonb_typeof(t.extra -> 'tags') = 'array'
+                        then t.extra -> 'tags' else '[]'::jsonb end,
            'parent', t.parent_id,
            'top_level_parent', case when t.parent_id is null then null
                                     else (select n.id from naik n order by n.d desc limit 1) end,
            'priority', public.j_prioritas(t.priority),
            'due_date', public.ms(t.due_at), 'due_date_time', t.due_has_time,
            'start_date', public.ms(t.start_at), 'start_date_time', t.start_has_time,
-           'points', null, 'time_estimate', null, 'custom_fields', '[]'::jsonb, 'dependencies', '[]'::jsonb,
+           'points', null, 'time_estimate', null,
+           'custom_fields', case when t.sumber = 'clickup' and jsonb_typeof(t.extra -> 'custom_fields') = 'array'
+                                 then t.extra -> 'custom_fields' else '[]'::jsonb end,
+           'dependencies', '[]'::jsonb,
            'linked_tasks', '[]'::jsonb, 'locations', '[]'::jsonb,
            'team_id', public.team_id(),
            'url', public.app_url() || '/t/' || t.id,
