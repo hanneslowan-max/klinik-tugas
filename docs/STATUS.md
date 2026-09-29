@@ -81,6 +81,19 @@ Daftar lengkap 15 butir di `docs/KONTRAK-DB.md` §8 dan tabel review R1–R5 §9
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)
 Prasyarat dari Hannes: project Supabase baru `rhj-tugas` (akun/org baru, Singapore, Free); env cloud `SUPABASE_ACCESS_TOKEN` (PAT akun baru) + `SUPABASE_PROJECT_REF`; `CLICKUP_API_TOKEN` (sudah ada); sesi baru supaya env terbaca. Semua langkah ke ClickUp **GET saja**. Tidak memakai MCP Supabase (itu ERP).
 
+### 0. Pagar & alat (PALING AWAL, sebelum apa pun)
+1. **Supabase lama (akun/org palletmeshindonesia: ERP `rhj-tracker` + `rhj-tacker.dev`) = BACA-SAJA, perintah Hannes 29/9.** Pengaman di sesi build tinggal di container lama, jadi pasang ulang di `~/.claude/`:
+   - `~/.claude/hooks/supabase-readonly.sh`: PreToolUse untuk `mcp__Supabase__execute_sql`. Tolak query yang cocok dengan `\b(insert|update|delete|merge|upsert|alter|create|drop|truncate|grant|revoke|vacuum|reindex|cluster|copy|call|refresh|lock|comment\s+on|security\s+label|set\s+role|reset\s+role|nextval|setval|set_config|pg_terminate_backend|pg_cancel_backend|lo_import|lo_unlink|dblink)\b|\bdo\s*\$`. Keluarannya `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny",...}}`.
+   - `~/.claude/settings.json`: `permissions.deny` untuk semua tool MCP Supabase yang bisa menulis (`apply_migration`, `create_project`, `pause_project`, `restore_project`, `deploy_edge_function`, `create_branch`, `delete_branch`, `merge_branch`, `reset_branch`, `rebase_branch`) + hook di atas.
+   - Uji dengan query SELECT yang berisi kata `drop` di komentar: harus ditolak.
+   - Project baru `rhj-tugas` dikerjakan lewat Supabase CLI/Management API dengan `SUPABASE_ACCESS_TOKEN` (PAT akun baru), **tidak** lewat MCP Supabase.
+2. Alat:
+   - Supabase CLI: `mkdir -p /tmp/sbcli && cd /tmp/sbcli && npm i supabase` → `/tmp/sbcli/node_modules/.bin/supabase`.
+   - Deno: `npm i -g deno@2`.
+   - Docker (untuk stack lokal/tes): `dockerd &` bila daemon belum jalan, lalu `supabase start -x studio,imgproxy,vector,logflare,supavisor,mailpit,realtime`.
+   - `npm ci` di repo.
+3. Mode multi-agent: Hannes membuka sesi dengan kata `ultracode`.
+
 ### 1. Cek target (wajib sebelum menulis apa pun)
 ```
 supabase projects list                       # PAT harus hanya melihat project akun baru
@@ -111,13 +124,13 @@ Periksa env Edge: `SUPABASE_SERVICE_ROLE_KEY` terisi (JWT lama atau `sb_secret_`
 Endpoint Management API di atas (`/database/query` body `{query}`, `/config/auth` field `disable_signup`/`site_url`/`uri_allow_list`/`password_min_length`/`external_email_enabled`, `/cli/login-role`) sudah dicocokkan dengan spesifikasi OpenAPI `api.supabase.com/api/v1-json` per 29 Sep.
 
 ### 3. Bootstrap owner (Hannes) + bot
-a. Buat user Auth Hannes lewat GoTrue admin (service role/secret key, jangan disimpan di repo): `POST https://$REF.supabase.co/auth/v1/admin/users` `{"email":"hanneslowan@gmail.com","password":"<acak sementara>","email_confirm":true}` → catat `id` (uuid). Password sementara diserahkan ke Hannes sekali; UI memaksa ganti password saat login pertama.
+a. User Auth Hannes **dibuat Hannes sendiri** di dashboard project baru (Authentication → Users → Add user, email `hanneslowan@gmail.com`, password pilihannya, Auto Confirm), sesuai instruksi 29/9. Ambil UUID-nya lewat GoTrue admin (service/secret key, jangan disimpan di repo): `GET https://$REF.supabase.co/auth/v1/admin/users` → cari email itu. Password sudah dipilih Hannes sendiri, jadi set `harus_ganti_password=false` di SQL b. Bila user belum ada, jangan membuat password untuk Hannes; minta dia menambahkannya dulu di dashboard.
 b. SQL (Management API query; satu transaksi):
 ```sql
 begin;
 insert into public.members (id, username, email, clickup_email, nama, initials, role, aktif, auth_user_id, harus_ganti_password)
 values (312823267, 'hannes lowan', 'hanneslowan@gmail.com', 'hanneslowan@gmail.com', 'Hannes Lowan', 'HL', 'owner', true,
-        '<UUID_AUTH_HANNES>', true);
+        '<UUID_AUTH_HANNES>', false);
 insert into public.members (username, nama, initials, role) values ('claude (agent)', 'Claude (agent)', 'CA', 'bot') returning id;  -- 900000000000
 commit;
 ```
