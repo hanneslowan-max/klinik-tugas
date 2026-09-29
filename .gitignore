@@ -1,0 +1,11 @@
+node_modules/
+.env
+.env.*
+tools/.env
+*.log
+impor/laporan/
+impor/.cache/
+uji/web/hasil/
+test-results/
+playwright-report/
+.DS_Store
