@@ -151,12 +151,9 @@ export function buatAturan({ appBase, anggotaLuar }) {
 }
 
 // Temuan yang SUDAH diketahui (permintaan perubahan). Tidak dinormalisasi; hanya diberi label di laporan.
-export const DIKETAHUI = [
-  {
-    id: "PR-1", pola: /\.(tags|checklists)(\[|\.length|$)/,
-    ringkas: "tags/checklists kartu impor selalu [] di API app (j_task memakai konstanta; isi ada di tasks.extra)",
-  },
-];
+// Beda yang sudah diketahui & diterima sementara (dipakai --izinkan-diketahui). Kosong: PR-1 (tags/checklists kartu
+// impor) sudah diperbaiki 29 Sep (j_task mengisi dari tasks.extra, perbaikan P1).
+export const DIKETAHUI = [];
 
 // Beda struktural: urutan kunci objek diabaikan (jsonb), urutan array dipertahankan, tipe dibedakan ("1" ≠ 1).
 export function beda(a, b, jalur = "$", out = []) {

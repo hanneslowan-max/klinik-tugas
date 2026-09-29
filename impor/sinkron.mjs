@@ -32,19 +32,33 @@ export const KUNCI_SENSUS = [
   "tasks_total", "open", "closed", "archived", "subtasks", "comments_top", "replies", "reply_count_sum",
   "attachments_task", "attachments_comment", "assignee_links", "sha_ids_tasks", "sha_ids_comments",
 ];
-// Allowlist bucket 'lampiran' (migrasi 20260929100400) + batas 25 MB.
+// Allowlist bucket 'lampiran' (migrasi 20260929100400) + batas 25 MB. WAJIB sama dengan bucket (diuji
+// impor/uji/jalankan.mjs terhadap storage.buckets). (perbaikan P3) + xls/CSV Windows, tsv, doc, pptx, heic, heif.
 export const MIME_IZIN = new Set([
-  "image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf",
+  "image/png", "image/jpeg", "image/webp", "image/gif", "image/heic", "image/heif", "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "text/csv", "text/plain",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/msword", "application/vnd.ms-excel", "text/csv", "text/plain", "text/tab-separated-values",
 ]);
 export const MAKS_LAMPIRAN = 25 * 1024 * 1024;
 const MIME_EKST = {
   png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif", pdf: "application/pdf",
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", csv: "text/csv", txt: "text/plain",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation", doc: "application/msword",
+  xls: "application/vnd.ms-excel", tsv: "text/tab-separated-values", heic: "image/heic", heif: "image/heif",
   svg: "image/svg+xml", html: "text/html", zip: "application/zip", mp4: "video/mp4",
 };
+// Alasan lampiran tidak disalin (status_salin 'tautan_saja'; clickup_url tetap tersimpan → tetap bisa dibuka).
+export function alasanTautanSaja(a, maks = MAKS_LAMPIRAN) {
+  const mime = String(a.mimetype || "").toLowerCase().split(";")[0].trim();
+  if (!a.url) return "tanpa URL";
+  if (!mime) return "MIME tidak diketahui";
+  if (!MIME_IZIN.has(mime)) return `MIME di luar allowlist (${mime})`;
+  if (a.size && a.size > maks) return `ukuran ${a.size} byte > 25 MB`;
+  return null;
+}
 
 // ---------------------------------------------------------------- util
 export const tidur = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -405,6 +419,7 @@ export async function tarik(cu, { only = null, teamId = null, log = () => {} } =
     team: null, timMentah: null, anggota: new Map(), spaces: new Map(), folders: new Map(), lists: new Map(), listMentah: new Map(),
     tugas: new Map(), komentar: new Map(), lampiran: new Map(), tis: null, galat: [], info: [],
     ok: { listTugas: new Set(), tugasKomentar: new Set(), tugasLampiran: new Set() }, cakupan: [], strukturLengkap: true,
+    spaceAnggota: new Map(), anggotaListMentah: new Map(),
   };
   const catat = (fase, id, e) => {
     p.galat.push({ fase, id, status: e.status ?? null, err: String(e.message).slice(0, 300) });
@@ -421,7 +436,7 @@ export async function tarik(cu, { only = null, teamId = null, log = () => {} } =
     const u = mb.user || mb;
     if (u?.id === undefined) continue;
     p.anggota.set(Number(u.id), { id: Number(u.id), username: u.username ?? null, email: u.email || null, color: u.color ?? null,
-      initials: u.initials ?? null, aktif: true, tim: true });
+      initials: u.initials ?? null, aktif: true, tim: true, role: Number(u.role ?? mb.role) || null });
   }
   log(`workspace ${p.team.id}: ${p.anggota.size} anggota`);
 
@@ -467,21 +482,54 @@ export async function tarik(cu, { only = null, teamId = null, log = () => {} } =
   }
   log(`struktur: ${p.spaces.size} space, ${p.folders.size} folder, ${p.lists.size} list`);
 
-  // 5. email anggota yang kosong di /team → /list/{id}/member (berhenti begitu lengkap; maks 5 list)
+  // GET /list/{id}/member (sekali per list per run; galat dicatat sekali lalu dilempar ke pemanggil)
+  const cacheAnggota = new Map();
+  const anggotaList = async (lid) => {
+    if (!cacheAnggota.has(lid)) {
+      cacheAnggota.set(lid, cu.get(`/list/${lid}/member`).then((j) => j.members || []).catch((e) => { catat("anggota_list", lid, e); throw e; }));
+    }
+    return cacheAnggota.get(lid);
+  };
+  const isiEmail = (members) => {
+    for (const u of members) {
+      const a = p.anggota.get(Number(u.id));
+      if (a && !a.email && u.email) a.email = u.email;
+    }
+  };
+
+  // 5. (perbaikan P2) anggota space PRIVAT. ClickUp v2 tidak punya endpoint anggota space: turunkan dari gabungan
+  //    GET /list/{id}/member SEMUA list (aktif + arsip) di space itu + owner/admin workspace (role 1/2 di /team; di
+  //    app mereka anggota biasa, R1). ASUMSI yang wajib diprobe (impor/README.md): /list/{id}/member di space privat
+  //    = orang yang punya akses ke list itu. Satu list gagal dibaca, atau struktur tidak tersapu lengkap (daftar list
+  //    bisa kurang) → anggota space itu tidak dikirim (anggota lama tidak disentuh).
+  const pengelola = [...p.anggota.values()].filter((a) => a.tim && (a.role === 1 || a.role === 2)).map((a) => a.id);
+  for (const s of p.spaces.values()) {
+    if (!s.private) continue;
+    const ids = new Set(pengelola);
+    let ok = p.strukturLengkap, nList = 0;
+    for (const l of p.lists.values()) {
+      if (l.space_id !== s.id) continue;
+      nList++;
+      try {
+        const members = await anggotaList(l.id);
+        p.anggotaListMentah.set(l.id, members);
+        isiEmail(members);
+        for (const u of members) if (/^\d{1,18}$/.test(String(u?.id ?? ""))) ids.add(Number(u.id));
+      } catch { ok = false; }
+    }
+    p.spaceAnggota.set(s.id, { space_id: s.id, ids: [...ids].sort((a, b) => a - b), list: nList, ok });
+    if (!ok) p.info.push({ fase: "space_anggota", id: s.id, pesan: `anggota space privat ${s.id} tidak dikirim (list/struktur gagal dibaca)` });
+  }
+
+  // 6. email anggota yang masih kosong di /team → /list/{id}/member (berhenti begitu lengkap; maks 5 list)
   const tanpaEmail = () => [...p.anggota.values()].filter((a) => a.tim && !a.email);
   for (const l of [...p.lists.values()].slice(0, 5)) {
     if (!tanpaEmail().length) break;
-    try {
-      const j = await cu.get(`/list/${l.id}/member`);
-      for (const u of j.members || []) {
-        const a = p.anggota.get(Number(u.id));
-        if (a && !a.email && u.email) a.email = u.email;
-      }
-    } catch (e) { catat("anggota_list", l.id, e); }
+    try { isiEmail(await anggotaList(l.id)); } catch { /* dicatat anggotaList */ }
   }
   if (tanpaEmail().length) p.info.push({ fase: "email_anggota", pesan: `${tanpaEmail().length} anggota tanpa email ClickUp` });
 
-  // 6. tugas per list (archived false/true, include_closed, subtasks, semua halaman)
+  // 7. tugas per list (archived false/true, include_closed, subtasks, semua halaman)
   if (only) {
     const takAda = [...only].filter((id) => !p.lists.has(id));
     if (takAda.length) throw new Error(`--only: list tidak ada di ClickUp: ${takAda.join(",")}`);
@@ -504,7 +552,7 @@ export async function tarik(cu, { only = null, teamId = null, log = () => {} } =
   }
   log(`tugas: ${p.tugas.size} dari ${p.cakupan.length} list`);
 
-  // 7. detail tugas (lampiran, creator, markdown) + komentar (paginasi start/start_id) + balasan
+  // 8. detail tugas (lampiran, creator, markdown) + komentar (paginasi start/start_id) + balasan
   let n = 0;
   for (const id of [...p.tugas.keys()]) {
     let detailOk = true;
@@ -526,7 +574,7 @@ export async function tarik(cu, { only = null, teamId = null, log = () => {} } =
     if (++n % 50 === 0) log(`  detail+komentar ${n}/${p.tugas.size}`);
   }
 
-  // 8. lampiran: task.attachments + part komentar (attachment/image). Yang muncul di keduanya = lampiran komentar.
+  // 9. lampiran: task.attachments + part komentar (attachment/image). Yang muncul di keduanya = lampiran komentar.
   for (const t of p.tugas.values()) {
     for (const a of t.attachments || []) if (a?.id) p.lampiran.set(String(a.id), barisLampiran(a, t.id, null));
   }
@@ -542,7 +590,7 @@ export async function tarik(cu, { only = null, teamId = null, log = () => {} } =
     }
   }
 
-  // 9. user di payload yang bukan anggota tim (sudah keluar) → anggota nonaktif
+  // 10. user di payload yang bukan anggota tim (sudah keluar) → anggota nonaktif
   for (const t of p.tugas.values()) {
     anggotaDari(p, t.creator, "creator");
     for (const u of t.assignees || []) anggotaDari(p, u, "assignee");
@@ -555,7 +603,7 @@ export async function tarik(cu, { only = null, teamId = null, log = () => {} } =
   }
   for (const t of p.tugas.values()) for (const a of t.attachments || []) anggotaDari(p, a.user, "pengunggah");
 
-  // 10. time_in_status (dicoba; ditolak → dicatat sebagai info, bukan galat)
+  // 11. time_in_status (dicoba; ditolak → dicatat sebagai info, bukan galat)
   p.tis = { ditolak: false, data: {} };
   for (const k of potong([...p.tugas.keys()], 100)) {
     try {
@@ -675,19 +723,22 @@ const barisAnggota = (a) => ({
 // ---------------------------------------------------------------- tulis ke app
 async function tulis(tg, cu, p, o, log) {
   const r = { batch: {}, tertunda: [], gagal: [], hilang: {}, lampiran: { ok: 0, sudah_ada: 0, gagal: 0, tautan_saja: 0, dilewati: 0 },
-    lampiran_gagal: [], induk_luar: [], peringatan: [] };
+    lampiran_gagal: [], lampiran_tautan: [], induk_luar: [], peringatan: [] };
   const tambah = (jenis, h) => {
     const x = (r.batch[jenis] ??= { inserted: 0, updated: 0, unchanged: 0, gagal: 0 });
     x.inserted += h?.inserted || 0;
     x.updated += h?.updated || 0;
     x.unchanged += h?.unchanged || 0;
-    for (const k of ["dihapus"]) if (typeof h?.[k] === "number") x[k] = (x[k] || 0) + h[k];
+    for (const k of ["dihapus", "ditambah", "dibuang"]) if (typeof h?.[k] === "number") x[k] = (x[k] || 0) + h[k];
     for (const g of h?.gagal || []) {
       x.gagal++;
       r.gagal.push({ jenis, id: g.id, err: String(g.err).slice(0, 300) });
     }
     if (Array.isArray(h?.dipertahankan) && h.dipertahankan.length) {
       r.peringatan.push(`list_statuses dipertahankan (masih dipakai tugas): ${JSON.stringify(h.dipertahankan).slice(0, 300)}`);
+    }
+    if (jenis === "space_anggota" && Array.isArray(h?.dilewati) && h.dilewati.length) {
+      r.peringatan.push(`space_anggota: ID belum diimpor sebagai anggota (dilewati): ${JSON.stringify(h.dilewati).slice(0, 300)}`);
     }
   };
   const kirim = async (jenis, rows, ukuran) => {
@@ -707,6 +758,9 @@ async function tulis(tg, cu, p, o, log) {
     archived: f.archived, orderindex: f.orderindex })), 200);
   await kirim("lists", [...p.lists.values()].map((l) => ({ id: l.id, space_id: l.space_id, folder_id: l.folder_id, name: l.name,
     content: l.content, archived: l.archived, orderindex: l.orderindex })), 200);
+  // (P2) anggota space privat = himpunan penuh sumber clickup per space (anggota tambahan Admin/app tidak disentuh)
+  const rowsSA = [...p.spaceAnggota.values()].filter((x) => x.ok).map((x) => ({ space_id: x.space_id, member_ids: x.ids }));
+  if (rowsSA.length) await kirim("space_anggota", rowsSA, 100);
   await kirim("list_statuses", [...p.lists.values()].filter((l) => l.statuses?.length).map((l) => ({ list_id: l.id, statuses: l.statuses })), 50);
   log(`struktur ditulis (muat=${o.muat})`);
 
@@ -759,10 +813,12 @@ async function tulis(tg, cu, p, o, log) {
     barisL.push(row);
     if (o.tanpaLampiran) { r.lampiran.dilewati++; continue; } // tanpa storage_path/status_salin → nilai lama dipertahankan
     const mime = String(a.mimetype || "").toLowerCase().split(";")[0].trim();
-    if (!MIME_IZIN.has(mime) || (a.size && a.size > MAKS_LAMPIRAN) || !a.url) {
+    const alasan = alasanTautanSaja(a);
+    if (alasan) {
       row.storage_path = null;
       row.status_salin = "tautan_saja"; // tipe di luar allowlist bucket / terlalu besar / tanpa URL → tautan ClickUp saja
       r.lampiran.tautan_saja++;
+      r.lampiran_tautan.push({ id: a.id, task_id: a.task_id, alasan }); // dilaporkan, bukan diam-diam
       continue;
     }
     const jalur = `t/${a.task_id}/${namaObjek(a.id, a.title)}`;
@@ -792,6 +848,7 @@ async function tulis(tg, cu, p, o, log) {
   // payload mentah (owner-only di app) untuk uji golden & forensik
   const mentah = [{ entity: "team", id: p.team.id, payload: p.timMentah }];
   for (const [id, d] of p.listMentah) mentah.push({ entity: "list", id, payload: d });
+  for (const [id, m] of p.anggotaListMentah) mentah.push({ entity: "list_member", id, payload: m }); // (P2) bahan probe
   for (const t of p.tugas.values()) mentah.push({ entity: "task", id: String(t.id), payload: t });
   for (const [id, rows] of p.komentar) mentah.push({ entity: "komentar", id: String(id), payload: rows });
   if (p.tis && !p.tis.ditolak) for (const [id, v] of Object.entries(p.tis.data || {})) mentah.push({ entity: "time_in_status", id, payload: v });
@@ -863,6 +920,7 @@ function tulisLaporan(dir, h) {
   L();
   L(`- Durasi: ${h.durasi_detik} dtk. ClickUp: ${h.clickup.permintaan} permintaan (${h.clickup.r429}× 429, ${h.clickup.unduh} unduhan). App: ${h.app?.permintaan ?? 0} permintaan.`);
   L(`- Cakupan: ${h.cakupan.length} list${h.only ? ` (--only ${[...h.only].join(",")})` : ""}. Tugas ${h.jumlah.tugas}, komentar ${h.jumlah.komentar}, lampiran ${h.jumlah.lampiran}, anggota ${h.jumlah.anggota}.`);
+  if (h.space_privat?.length) L(`- Space privat: ${h.space_privat.map((s) => `${s.space_id} ${s.ok ? `${s.anggota} anggota dari ${s.list} list` : "TIDAK dikirim (list/struktur gagal dibaca)"}`).join("; ")}`);
   if (h.tulis) {
     L(`- Tulis: ${Object.entries(h.tulis.batch).map(([k, v]) => `${k} +${v.inserted}/~${v.updated}/=${v.unchanged}${v.gagal ? `/gagal ${v.gagal}` : ""}`).join("; ")}`);
     L(`- Lampiran: ${Object.entries(h.tulis.lampiran).map(([k, v]) => `${k} ${v}`).join(", ")}`);
@@ -891,6 +949,7 @@ function tulisLaporan(dir, h) {
     ...(h.tulis?.gagal || []).map((g) => `gagal ${g.jenis} ${g.id}: ${g.err}`),
     ...(h.tulis?.tertunda || []).map((g) => `tertunda ${g.jenis} ${g.id} (induk ${g.parent_id})`),
     ...(h.tulis?.lampiran_gagal || []).map((g) => `lampiran gagal ${g.id} (tugas ${g.task_id}): ${g.err}`),
+    ...(h.tulis?.lampiran_tautan || []).map((g) => `lampiran tautan_saja ${g.id} (tugas ${g.task_id}): ${g.alasan}`),
     ...(h.tulis?.peringatan || []), ...h.peringatan, ...h.info.map((i) => `info ${i.fase}: ${i.pesan ?? i.id}`),
   ];
   if (catatan.length) {
@@ -924,7 +983,7 @@ export async function jalankan(argv, env = process.env) {
   }
   const h = {
     mulai, mode: o.mode, dry_run: o.dryRun, only: o.only, muat: null, run_id: null, cakupan: [], galat: [], info: [], peringatan: [],
-    clickup: {}, app: null, jumlah: {}, tulis: null, sensus: null, tis: "-", durasi_detik: 0,
+    clickup: {}, app: null, jumlah: {}, space_privat: [], tulis: null, sensus: null, tis: "-", durasi_detik: 0,
   };
   let cu, tg = null, run = null, p = null, kode = 0;
   try {
@@ -942,6 +1001,7 @@ export async function jalankan(argv, env = process.env) {
     h.tis = p.tis?.ditolak ? `ditolak (HTTP ${p.tis.status ?? "?"})` : `ok (${Object.keys(p.tis?.data || {}).length} tugas)`;
     h.jumlah = { tugas: p.tugas.size, komentar: [...p.komentar.values()].reduce((n, r) => n + r.length, 0), lampiran: p.lampiran.size,
       anggota: p.anggota.size, anggota_nonaktif: [...p.anggota.values()].filter((a) => !a.aktif).length, list: p.lists.size };
+    h.space_privat = [...p.spaceAnggota.values()].map((x) => ({ space_id: x.space_id, list: x.list, anggota: x.ids.length, ok: x.ok }));
     if (!p.strukturLengkap) h.peringatan.push("struktur ClickUp tidak tersapu lengkap (lihat galat)");
 
     const dbAwal = tg ? await tg.sensus() : null;
@@ -987,7 +1047,7 @@ export async function jalankan(argv, env = process.env) {
     if (run && tg) {
       try {
         await tg.runSelesai(run.id, {
-          counts: { ...h.jumlah, tulis: h.tulis?.batch ?? null, lampiran: h.tulis?.lampiran ?? null, hilang: h.tulis?.hilang ?? null,
+          counts: { ...h.jumlah, space_privat: h.space_privat, tulis: h.tulis?.batch ?? null, lampiran: h.tulis?.lampiran ?? null, hilang: h.tulis?.hilang ?? null,
             clickup: h.clickup, muat: h.muat, only: o?.only ? [...o.only] : null, durasi_detik: h.durasi_detik },
           census: h.sensus ? { lists: h.sensus.baris.map((b) => ({ list_id: b.list_id, clickup: b.clickup, db: b.db })) } : null,
           diffs: h.sensus ? { selisih: h.sensus.selisih, rinci: h.sensus.rinci ?? [] } : null,
@@ -1009,7 +1069,7 @@ export async function jalankan(argv, env = process.env) {
   const ringkas = {
     kode, mode: h.mode, dry_run: h.dry_run, muat: h.muat, run_id: h.run_id, durasi_detik: h.durasi_detik,
     clickup: { permintaan: h.clickup.permintaan, r429: h.clickup.r429, unduh: h.clickup.unduh, rpm: h.clickup.rpm },
-    jumlah: h.jumlah, tulis: h.tulis?.batch ?? null, lampiran: h.tulis?.lampiran ?? null,
+    jumlah: h.jumlah, space_privat: h.space_privat, tulis: h.tulis?.batch ?? null, lampiran: h.tulis?.lampiran ?? null,
     hilang: h.tulis ? Object.fromEntries(Object.entries(h.tulis.hilang).map(([k, v]) => [k, v?.ditandai ?? v])) : null,
     hilang_verifikasi: h.tulis?.hilang_verifikasi ? { kandidat: h.tulis.hilang_verifikasi.kandidat, hilang_404: h.tulis.hilang_verifikasi.hilang,
       pindah: h.tulis.hilang_verifikasi.pindah.length, tak_pasti: h.tulis.hilang_verifikasi.tak_pasti.length } : null,

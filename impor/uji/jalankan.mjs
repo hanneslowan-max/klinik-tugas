@@ -10,10 +10,10 @@ import os from "node:os";
 import path from "node:path";
 import { mulaiMock } from "./mock-clickup.mjs";
 import {
-  BOT_ID, MOCK_PORT, SINKRON, Token, bagian, cek, edgeSiap, hasil, jalankanNode, konfigurasi, psql, psqlJson,
+  BOT_ID, MOCK_PORT, SINKRON, Token, bagian, cek, edgeSiap, hasil, jalankanNode, konfigurasi, login, psql, psqlJson, rpcWeb,
 } from "./_bantu.mjs";
 import {
-  KlienClickUp, bacaArgumen, hanyaGet, namaObjek, shaIds, urutId, urutKedalaman,
+  KlienClickUp, MIME_IZIN, alasanTautanSaja, bacaArgumen, hanyaGet, namaObjek, shaIds, urutId, urutKedalaman,
 } from "../sinkron.mjs";
 
 const cfg = konfigurasi();
@@ -36,6 +36,11 @@ async function sinkron(args, envTambah = {}, { harapGagal = false } = {}) {
   return r;
 }
 const semuaBatch = (j, k) => Object.values(j?.tulis || {}).reduce((n, v) => n + (v[k] || 0), 0);
+// (P2) space privat fixture: anggota = /list/{id}/member list-nya (88200002, 88200003) + owner/admin /team (88200001, 88200004)
+const SPACE_PRIVAT = "901822000002";
+const anggotaSpace = () => psqlJson(`select member_id, sumber from public.space_anggota where space_id = '${SPACE_PRIVAT}' order by member_id`)
+  .map((x) => `${x.member_id}:${x.sumber}`);
+const APP_ANGGOTA = 100000002; // anggota seed (citra) yang ditambah owner lewat Admin (sumber app) → tak boleh dihapus impor
 
 let mock, tok, tokImpor;
 
@@ -90,6 +95,22 @@ async function utama() {
     cek("namaObjek aman untuk path Storage", /^[A-Za-z0-9_-]+-[A-Za-z0-9._-]+$/.test(n) && !n.includes("/") && !n.includes(".."), n);
   }
 
+  bagian("Unit: allowlist MIME lampiran (P3)");
+  {
+    const bucket = JSON.parse(psql("select coalesce(json_agg(x order by x), '[]') from storage.buckets b, unnest(b.allowed_mime_types) x where b.id = 'lampiran'"));
+    const js = [...MIME_IZIN].sort();
+    cek("MIME_IZIN importer = allowed_mime_types bucket 'lampiran' (sama persis)", JSON.stringify(js) === JSON.stringify(bucket), { js, bucket });
+    cek("CSV Windows, tsv, doc, pptx, heic, heif diizinkan; SVG/HTML/zip tidak",
+      ["application/vnd.ms-excel", "text/tab-separated-values", "application/msword", "image/heic", "image/heif",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation"].every((m) => MIME_IZIN.has(m))
+      && !["image/svg+xml", "text/html", "application/zip"].some((m) => MIME_IZIN.has(m)));
+    const a = (o) => alasanTautanSaja({ url: "https://x/y", size: 10, ...o });
+    cek("alasanTautanSaja: allowlist → null; di luar allowlist/tanpa MIME/tanpa URL/> 25 MB → alasan tertulis",
+      a({ mimetype: "application/vnd.ms-excel" }) === null && a({ mimetype: "Text/CSV; charset=utf-8" }) === null
+      && /allowlist \(image\/svg\+xml\)/.test(a({ mimetype: "image/svg+xml" })) && a({ mimetype: null }) === "MIME tidak diketahui"
+      && a({ mimetype: "text/csv", url: null }) === "tanpa URL" && /25 MB/.test(a({ mimetype: "text/csv", size: 26214401 })));
+  }
+
   bagian("Unit: throttle & 429 (klien ClickUp)");
   {
     const cu = new KlienClickUp({ base: mock.base, token: mock.token, rpm: 120 });
@@ -117,10 +138,10 @@ async function utama() {
   cek("kode 0", r1.code === 0, { code: r1.code, err: r1.stderr.slice(-600) });
   cek("sensus: 9 list, selisih 0", j1?.sensus?.list === 9 && j1?.sensus?.selisih === 0, j1?.sensus);
   cek("gagal 0, tertunda 0, galat 0", j1?.gagal === 0 && j1?.tertunda === 0 && j1?.galat === 0, j1);
-  cek("jumlah payload: 143 tugas, 46 komentar, 6 lampiran, 6 anggota (1 nonaktif)",
-    j1?.jumlah?.tugas === 143 && j1?.jumlah?.komentar === 46 && j1?.jumlah?.lampiran === 6 && j1?.jumlah?.anggota === 6 && j1?.jumlah?.anggota_nonaktif === 1, j1?.jumlah);
-  cek("lampiran: 4 tersalin (ok/sudah_ada), 1 gagal (URL 404), 1 tautan_saja (SVG)",
-    (j1?.lampiran?.ok ?? 0) + (j1?.lampiran?.sudah_ada ?? 0) === 4 && j1?.lampiran?.gagal === 1 && j1?.lampiran?.tautan_saja === 1, j1?.lampiran);
+  cek("jumlah payload: 143 tugas, 46 komentar, 7 lampiran, 6 anggota (1 nonaktif)",
+    j1?.jumlah?.tugas === 143 && j1?.jumlah?.komentar === 46 && j1?.jumlah?.lampiran === 7 && j1?.jumlah?.anggota === 6 && j1?.jumlah?.anggota_nonaktif === 1, j1?.jumlah);
+  cek("lampiran: 5 tersalin (ok/sudah_ada, termasuk CSV Windows), 1 gagal (URL 404), 1 tautan_saja (SVG)",
+    (j1?.lampiran?.ok ?? 0) + (j1?.lampiran?.sudah_ada ?? 0) === 5 && j1?.lampiran?.gagal === 1 && j1?.lampiran?.tautan_saja === 1, j1?.lampiran);
   cek("time_in_status ditolak → dicatat, run tetap sukses", /^ditolak/.test(j1?.time_in_status ?? ""), j1?.time_in_status);
   cek("mock: 0 permintaan non-GET", mock.stat.nonGet.length === 0, mock.stat.nonGet);
   cek("komentar kartu >25 dipaginasi (halaman start/start_id diminta)", mock.stat.komentarLanjut >= 1 && (mock.stat.perJalur["/task/:id/comment"] ?? 0) === 143 + mock.stat.komentarLanjut, mock.stat);
@@ -147,8 +168,27 @@ async function utama() {
     const l = Object.fromEntries(lp.map((x) => [x.id, x]));
     cek("lampiran komentar (attachment & image) → comment_id terisi",
       l["b2a00303-0000-4000-8000-000000000003.pdf"]?.comment_id === "90182200000301" && l["b2b00601-0000-4000-8000-000000000004.png"]?.comment_id === "90182200000603", lp);
-    const obj = psqlJson(`select name, metadata->>'size' as size from storage.objects where bucket_id = 'lampiran' and name like 't/86b2%' order by name`);
-    cek("objek Storage ada untuk 4 lampiran ok (ukuran = berkas)", obj.length === 4 && obj.every((o) => Number(o.size) > 0), obj);
+    const obj = psqlJson(`select name, metadata->>'size' as size, metadata->>'mimetype' as mime from storage.objects where bucket_id = 'lampiran' and name like 't/86b2%' order by name`);
+    cek("objek Storage ada untuk 5 lampiran ok (ukuran = berkas)", obj.length === 5 && obj.every((o) => Number(o.size) > 0), obj);
+    const win = l["b2a00304-0000-4000-8000-000000000007.csv"];
+    cek("P3 CSV dari Windows (application/vnd.ms-excel) tersalin: status ok + objek Storage bertipe sama",
+      win?.status_salin === "ok" && !!win?.storage_path && obj.some((o) => o.name === win.storage_path && o.mime === "application/vnd.ms-excel"
+        && Number(o.size) === fs.statSync(new URL("./fixture/berkas/ekspor-windows.csv", import.meta.url)).size), { win, obj });
+    const svg = psqlJson(`select status_salin, storage_path, clickup_url from public.attachments where id = 'b2f00202-0000-4000-8000-000000000006.svg'`)[0];
+    cek("P3 lampiran di luar allowlist (SVG): tautan_saja + clickup_url tersimpan (bukan gagal diam-diam)",
+      svg?.status_salin === "tautan_saja" && svg?.storage_path === null && String(svg?.clickup_url).startsWith(mock.base.replace(/\/api\/v2$/, "")), svg);
+    const lapJ = JSON.parse(fs.readFileSync(j1.laporan_json, "utf8"));
+    cek("P3 alasan tautan_saja dicatat di laporan (id + alasan)",
+      lapJ.tulis?.lampiran_tautan?.some((x) => x.id === "b2f00202-0000-4000-8000-000000000006.svg" && /allowlist \(image\/svg\+xml\)/.test(x.alasan))
+      && fs.readFileSync(j1.laporan, "utf8").includes("lampiran tautan_saja b2f00202"), lapJ.tulis?.lampiran_tautan);
+    cek("P2 anggota space privat = gabungan /list/{id}/member + owner/admin /team (sumber clickup)",
+      JSON.stringify(anggotaSpace()) === JSON.stringify(["88200001:clickup", "88200002:clickup", "88200003:clickup", "88200004:clickup"]), anggotaSpace());
+    cek("P2 ringkasan space_privat: 1 space, 1 list, 4 anggota, terkirim",
+      JSON.stringify(j1?.space_privat) === JSON.stringify([{ space_id: SPACE_PRIVAT, list: 1, anggota: 4, ok: true }]), j1?.space_privat);
+    cek("P2 mock: GET /list/{id}/member diminta untuk list space privat", (mock.stat.perJalur["/list/:id/member"] ?? 0) >= 1, mock.stat.perJalur);
+    cek("P2 batch space_anggota terkirim (1 space) tanpa gagal",
+      (j1?.tulis?.space_anggota?.inserted ?? 0) + (j1?.tulis?.space_anggota?.updated ?? 0) + (j1?.tulis?.space_anggota?.unchanged ?? 0) === 1
+      && (j1?.tulis?.space_anggota?.gagal ?? 0) === 0, j1?.tulis?.space_anggota);
     const men = psqlJson(`select comment_id, member_id from public.comment_mentions where comment_id in ('90182200000101','90182200000601') order by 1`);
     cek("mention dari part tag → comment_mentions", men.length === 2, men);
     const run = psqlJson(`select mode, finished_at is not null as selesai, census is not null as ada_census, jsonb_array_length(diffs->'selisih') as selisih
@@ -177,7 +217,35 @@ async function utama() {
   cek("kode 0, muat=sinkron", r2.code === 0 && j2?.muat === "sinkron", { code: r2.code, muat: j2?.muat });
   cek("semua jenis: inserted 0, updated 0", semuaBatch(j2, "inserted") === 0 && semuaBatch(j2, "updated") === 0, j2?.tulis);
   cek("activity baru = 0", jumlahActivity() === aktSebelum, { sebelum: aktSebelum, sesudah: jumlahActivity() });
-  cek("lampiran tidak diunggah ulang (sudah_ada 4, ok 0)", j2?.lampiran?.sudah_ada === 4 && j2?.lampiran?.ok === 0, j2?.lampiran);
+  cek("lampiran tidak diunggah ulang (sudah_ada 5, ok 0)", j2?.lampiran?.sudah_ada === 5 && j2?.lampiran?.ok === 0, j2?.lampiran);
+  cek("P2 space_anggota idempoten (unchanged 1)", j2?.tulis?.space_anggota?.unchanged === 1, j2?.tulis?.space_anggota);
+
+  bagian("P2 space privat: akses lewat API + anggota tambahan Admin tidak dihapus impor");
+  {
+    const jwt = await login(cfg);
+    const setAnggota = (ids) => rpcWeb(cfg, jwt, "web_admin_struktur_simpan", { p: { jenis: "space", id: SPACE_PRIVAT, anggota: ids } });
+    await setAnggota([88200001, 88200002, 88200003, 88200004, APP_ANGGOTA]);
+    cek("owner menambah anggota app (Admin → Struktur) di space privat impor",
+      anggotaSpace().includes(`${APP_ANGGOTA}:app`) && anggotaSpace().length === 5, anggotaSpace());
+    const r = await sinkron(["--mode", "penuh"]);
+    cek("sinkron ulang: anggota app tetap, anggota clickup tetap, space_anggota unchanged",
+      r.code === 0 && anggotaSpace().includes(`${APP_ANGGOTA}:app`) && anggotaSpace().length === 5 && r.json?.tulis?.space_anggota?.unchanged === 1,
+      { code: r.code, a: anggotaSpace(), sa: r.json?.tulis?.space_anggota });
+    const tAnggota = await tok.buat(88200002, "baca", "anggota-privat");
+    const tLuar = await tok.buat(88200005, "baca", "bukan-anggota");
+    const spaces = async (t) => ((await (await fetch(`${cfg.api}/team/1100340000004525/space?archived=true`, { headers: { Authorization: t } })).json()).spaces || [])
+      .map((x) => x.id);
+    const [sa, sl] = [await spaces(tAnggota), await spaces(tLuar)];
+    cek("API app: anggota list privat (88200002) melihat space privat; anggota lain (88200005) tidak", sa.includes(SPACE_PRIVAT) && !sl.includes(SPACE_PRIVAT), { sa, sl });
+    // list space privat gagal dibaca → anggota space TIDAK dikirim (tidak dikosongkan), run berkode 2 + galat tercatat
+    const sebelum = anggotaSpace();
+    mock.setel({ tolakJalur: /^\/list\/901822000201\/member$/ });
+    const rg = await sinkron(["--mode", "uji"]);
+    mock.setel({ tolakJalur: null });
+    cek("P2 /list/{id}/member gagal (403) → space_anggota tidak dikirim, anggota tetap, kode 2",
+      rg.code === 2 && rg.json?.space_privat?.[0]?.ok === false && !rg.json?.tulis?.space_anggota && JSON.stringify(anggotaSpace()) === JSON.stringify(sebelum)
+      && rg.json?.galat >= 1, { code: rg.code, sp: rg.json?.space_privat, sa: rg.json?.tulis?.space_anggota, a: anggotaSpace() });
+  }
   cek("hilang 0 dan sensus selisih 0", j2?.hilang?.tasks === 0 && j2?.hilang?.comments === 0 && j2?.sensus?.selisih === 0, j2?.hilang);
 
   bagian("--dry-run tidak menulis apa pun");
@@ -241,6 +309,8 @@ async function utama() {
       st.find((x) => x.id === "86b2b0002")?.status === "sedang dikerjakan" && !ada("86b2b0002", "status"), st);
     const z = psqlJson(`select aktif from public.members where id = 88200007`)[0];
     cek("anggota baru di /team → masuk aktif", z?.aktif === true, z);
+    cek("P2 akses list privat dicabut di ClickUp (88200003) → dibuang dari space_anggota; anggota app tetap",
+      JSON.stringify(anggotaSpace()) === JSON.stringify(["88200001:clickup", "88200002:clickup", "88200004:clickup", `${APP_ANGGOTA}:app`]), anggotaSpace());
     const a2 = maksActivity();
     const r2b = await sinkron(["--mode", "penuh"]);
     cek("idempoten di varian ubah: 0 activity baru, updated 0", r2b.code === 0 && maksActivity() === a2 && semuaBatch(r2b.json, "updated") === 0,
@@ -259,6 +329,8 @@ async function utama() {
     const ada = (t, jenis) => akt.some((x) => x.task_id === t && x.jenis === jenis);
     cek("tugas yang muncul lagi → pulih; arsip dibuka → pulih_arsip; complete dibuka → buka_ulang; U1 kembali ke list 106",
       ada("86b2a0012", "pulih") && ada("86b2a0013", "pulih_arsip") && ada("86b2a0002", "buka_ulang") && ada("86b2f0001", "pindah_list"), akt.map((x) => `${x.task_id}:${x.jenis}`));
+    cek("P2 kembali ke awal: 88200003 masuk lagi (sumber clickup), anggota app tetap",
+      JSON.stringify(anggotaSpace()) === JSON.stringify(["88200001:clickup", "88200002:clickup", "88200003:clickup", "88200004:clickup", `${APP_ANGGOTA}:app`]), anggotaSpace());
     cek("tugas baru varian ubah + pasangan lintas list → hilang_di_clickup",
       ada("86b2a0016", "hilang_di_clickup") && ada(`86b2p${RUN}`, "hilang_di_clickup") && ada(`86b2q${RUN}`, "hilang_di_clickup"));
     cek("time_in_status aktif → tersimpan di sync_raw", /^ok/.test(j?.time_in_status ?? "") && Number(psql("select count(*) from public.sync_raw where entity='time_in_status' and id like '86b2%'")) >= 100, j?.time_in_status);
@@ -330,7 +402,7 @@ async function utama() {
     const milikFixture = sumber.filter((a) => a.task_id.startsWith("86b2"));
     const f = path.join(dir, "lampiran", "t/86b2a0003/b2a00301-0000-4000-8000-000000000001-grafik-rekap.png");
     cek("lampiran fixture: semua tersalin lewat /x/file (302 → signed URL), isi = berkas fixture",
-      [0, 2].includes(rl.code) && milikFixture.length === 4 && milikFixture.every((a) => fs.existsSync(path.join(dir, "lampiran", a.storage_path)))
+      [0, 2].includes(rl.code) && milikFixture.length === 5 && milikFixture.every((a) => fs.existsSync(path.join(dir, "lampiran", a.storage_path)))
       && fs.readFileSync(f).equals(fs.readFileSync(new URL("./fixture/berkas/grafik.png", import.meta.url))), { code: rl.code, j: rl.json, err: rl.stderr.slice(-200) });
     // DB bersama: baris lampiran seed/agen lain bisa punya storage_path tanpa objek → harus dilaporkan gagal (kode 2), bukan diam
     const tanpaObjek = (rl.json?.galat || []).map((g) => g.id);
@@ -363,6 +435,13 @@ try {
 } catch (e) {
   cek("tanpa galat tak terduga", false, e.stack);
 } finally {
+  // (P2) kembalikan anggota space privat fixture ke himpunan ClickUp (buang anggota app uji)
+  try {
+    if (psql(`select count(*) from public.space_anggota where space_id = '${SPACE_PRIVAT}' and sumber = 'app'`) !== "0") {
+      const ids = anggotaSpace().filter((x) => x.endsWith(":clickup")).map((x) => Number(x.split(":")[0]));
+      await rpcWeb(cfg, await login(cfg), "web_admin_struktur_simpan", { p: { jenis: "space", id: SPACE_PRIVAT, anggota: ids } });
+    }
+  } catch (e) { console.log(`  (bersihkan anggota app gagal: ${e.message})`); }
   if (tok) {
     const n = await tok.bersihkan().catch((e) => { console.log(`  (bersihkan token gagal: ${e.message})`); return -1; });
     console.log(`\ntoken uji dibersihkan: ${n}`);

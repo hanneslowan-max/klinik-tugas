@@ -1,7 +1,7 @@
 // Service worker: cache ASET STATIS saja (HTML/CSS/JS/vendor/ikon), bukan data. Permintaan ke Supabase
 // (lintas-origin) tidak disentuh sama sekali, jadi data tugas/komentar/lampiran tidak pernah disimpan di HP.
 // Strategi: network-first (selalu versi terbaru saat online), cadangan cache saat offline.
-const VERSI = 'rhj-tugas-aset-v2';
+const VERSI = 'rhj-tugas-aset-v3';
 const ASET = [
   '/', '/index.html', '/config.js', '/css/app.css', '/manifest.webmanifest', '/ikon.svg', '/ikon-192.png',
   '/js/app.js', '/js/api.js', '/js/sesi.js', '/js/util.js', '/js/md.js', '/js/komponen.js', '/js/penyusun.js',

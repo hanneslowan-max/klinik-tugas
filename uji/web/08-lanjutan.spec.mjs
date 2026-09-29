@@ -69,12 +69,12 @@ test('komentar: lampiran di komentar, edit (penulis), hapus', async ({ page }) =
   await expect(k.locator('li.lampiran')).toContainText('bukti-komentar.png');
   await expect(k.locator('[data-uji=unduh-lampiran]')).toHaveAttribute('href', /object\/sign\/lampiran/);
 
-  await k.locator(':scope > .komentar-badan > .komentar-aksi').getByRole('button', { name: 'Edit', exact: true }).click();
+  await k.locator(':scope > .komentar-badan > .komentar-aksi').getByRole('button', { name: 'Ubah', exact: true }).click();
   const ed = page.locator('form.penyusun[data-penyusun^=edit-]');
   await ed.locator('textarea').fill('Bukti terlampir (revisi).');
   await ed.getByRole('button', { name: 'Simpan' }).click();
   await expect(k.locator('.komentar-teks')).toHaveText('Bukti terlampir (revisi).');
-  await expect(k).toContainText('(diedit)');
+  await expect(k).toContainText('(diubah)');
 
   await k.locator(':scope > .komentar-badan > .komentar-aksi').getByRole('button', { name: 'Hapus', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Hapus' }).click();

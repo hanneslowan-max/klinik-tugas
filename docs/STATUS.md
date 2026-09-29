@@ -1,9 +1,11 @@
 # STATUS rhj-tugas (Fase 1)
 
-Diperbarui 29 Sep 2026 (verifikasi akhir sesi build). Kontrak: `docs/ARSITEKTUR.md` + rincian DB `docs/KONTRAK-DB.md`.
+Diperbarui 29 Sep 2026 (verifikasi akhir sesudah putaran poles DB P1–P6 + poles web W1–W8, sekitar 11.00 UTC). Kontrak: `docs/ARSITEKTUR.md` + rincian DB `docs/KONTRAK-DB.md`.
 
 ## Verdict
-- Kode Fase 1 (F1–F4 + kode F5: sinkron, backup, workflow) **jadi dan lulus semua suite lokal** dari `supabase db reset`: DB 942 cek, kontrak Edge+CLI 450 cek, importer 102 cek, web 48 tes Playwright. Banding `clickup.mjs` ↔ `tugas.mjs`: kode keluar identik di 340/340 (awal) dan 344/344 (ubah) perintah; sisa beda hanya PR-1 (tags/checklists).
+- Kode Fase 1 (F1–F4 + kode F5: sinkron, backup, workflow) **jadi dan lulus semua suite lokal** dari `supabase db reset` (verifikasi akhir 29 Sep): DB 1016 cek (16 berkas), kontrak Edge+CLI 469 cek, importer 119 cek, web 69 tes Playwright, vendor cocok. Banding `clickup.mjs` ↔ `tugas.mjs`: kode keluar identik di 340/340 (awal) dan 344/344 (ubah) perintah, **sisa beda 0** (exit 0 tanpa `--izinkan-diketahui`; PR-1 selesai).
+- Putaran perbaikan poles DB (P1–P6) selesai: tags/checklists kartu impor (PR-1), anggota space privat dari impor, allowlist lampiran (CSV Windows dll.), normalisasi nama status Admin, wadah diarsip keluar dari Tugas Saya/TENGGAT/beban, URL tampilan ClickUp di resolve/cari. Rincian `docs/KONTRAK-DB.md` §10.
+- Putaran poles web (W1–W8) selesai: input ≥16px (tidak zoom di iOS), sisa bahasa Inggris diganti, angka lonceng langsung turun, Admin › Sinkron jadi tabel berbahasa Indonesia, dialog "Tugas baru" di HP dengan tombol aksi selalu terlihat (juga saat keyboard virtual), target sentuh ≥44px, board desktop memakai lebar layar, dan layar mengikuti P1/P3/P5/P6 (chip tag + checklist hanya-baca, wadah diarsip hilang dari Tugas Saya, Cari membuka list dari URL ClickUp, allowlist lampiran web = bucket).
 - **Belum ada di cloud.** Belum ada project Supabase, belum deploy, belum probe/impor ClickUp asli, belum ada akun anggota. Semua angka di bawah = stack lokal + data sintetis.
 
 ## Yang sudah jadi
@@ -16,7 +18,7 @@ Diperbarui 29 Sep 2026 (verifikasi akhir sesi build). Kontrak: `docs/ARSITEKTUR.
 | Importer/sinkron | `impor/sinkron.mjs` | ClickUp (GET saja) → `/x/impor/*`, sensus selisih 0, tandai hilang dengan pengaman, salin lampiran. `impor/README.md` |
 | Backup | `impor/cadangan.mjs` | `/x/export` + salin lampiran, dienkripsi `age` di workflow |
 | Workflow | `.github/workflows/sinkron.yml`, `backup.yml` | Sinkron 05:45 WIB, backup 03:15 WIB (+ lampiran mingguan). Hanya jalan bila variable `SINKRON_AKTIF`/`BACKUP_AKTIF` = `1` |
-| Web | `web/` | Statis tanpa build, PWA. Layar: masuk, ganti password, Tugas Saya, Jelajah, List/Board, Detail (komentar, @mention, lampiran, riwayat, B5), Cari, Notifikasi, Admin (anggota, status, struktur, libur, token, mode, sinkron), Sampah. `.htaccess` untuk Hostinger |
+| Web | `web/` | Statis tanpa build, PWA (cache service worker `v3`). Layar: masuk, ganti password, Tugas Saya, Jelajah, List/Board, Detail (komentar, @mention, lampiran, riwayat, B5, tag + checklist impor hanya-baca), Cari (URL list ClickUp/aplikasi langsung membuka list), Notifikasi, Admin (anggota, status, struktur, libur, token, mode, sinkron), Sampah. `.htaccess` untuk Hostinger |
 | Tes | `uji/db`, `uji/kontrak`, `impor/uji`, `uji/banding.mjs`, `uji/web` | Lihat hasil di bawah |
 
 ## Menjalankan lokal
@@ -35,32 +37,64 @@ npm run web:serve                        # web di http://127.0.0.1:4173 (config.
 
 Suite (urutan yang dipakai verifikasi ini):
 ```
-bash uji/db/jalankan.sh                  # psql, 15 berkas
+bash uji/db/jalankan.sh                  # psql, 16 berkas
 node uji/kontrak/jalankan.mjs            # Edge + CLI, butuh functions serve
 node impor/uji/jalankan.mjs              # importer vs mock ClickUp (port 54399)
-node uji/banding.mjs                     # varian awal; juga --varian ubah; --izinkan-diketahui untuk mengabaikan PR-1
+node uji/banding.mjs                     # varian awal; juga --varian ubah (target sisa beda 0, exit 0)
 npx playwright test -c uji/web/playwright.config.mjs
 node uji/web/salin-vendor.mjs --cek      # integritas pustaka vendor
 ```
 
-## Hasil tes (29 Sep 2026, dijalankan 2 putaran, masing-masing dari `supabase db reset`)
-| Suite | Putaran 1 | Putaran 2 |
-|---|---|---|
-| `uji/db/jalankan.sh` | 15 berkas, 942 cek lulus, 0 gagal | 15 berkas, 942 cek lulus, 0 gagal |
-| `uji/kontrak/jalankan.mjs` | 450 lulus, 0 gagal | 450 lulus, 0 gagal |
-| `impor/uji/jalankan.mjs` | 102 lulus, 0 gagal | 102 lulus, 0 gagal |
-| `uji/banding.mjs` (awal) | sebelum perbaikan: exit 1, 7 perintah beda kode keluar (space privat, lihat bawah) + PR-1. Sesudah: kode keluar sama 340/340, lampiran 6/6 ok, sisa 4 entri di 2 perintah = PR-1 saja (exit 1; `--izinkan-diketahui` → exit 0) | kode keluar sama 340/340, lampiran 6/6 ok, sisa = PR-1 saja (exit 1); `--lewati-impor --izinkan-diketahui` → exit 0 |
-| `uji/banding.mjs --varian ubah` | kode keluar sama 344/344, lampiran 5/5 ok, sisa = PR-1 saja; DB dipulihkan ke varian awal | kode keluar sama 344/344, lampiran 5/5 ok, sisa = PR-1 saja; DB dipulihkan ke awal (impor kode 0, selisih 0) |
-| Playwright `uji/web` | 48 lulus, 0 gagal (1,3 menit) | 48 lulus, 0 gagal (1,4 menit) |
-| `uji/db` diulang di DB kotor (sesudah semua suite) | 942 lulus, 0 gagal | 942 lulus, 0 gagal |
-| `salin-vendor.mjs --cek` | 4 pustaka cocok | — |
+## Hasil verifikasi akhir (29 Sep 2026, ±10.57–11.07 UTC, kode akhir poles DB + web, 1 putaran dari `supabase db reset`)
+`supabase db reset` menerapkan 13 migrasi + seed; `supabase functions serve` tetap jalan dan menjawab `401 OAUTH_017` sebelum suite kontrak. Urutan = urutan suite di atas.
+| Suite | Hasil |
+|---|---|
+| `uji/db/jalankan.sh` | 16 berkas, 1016 cek lulus, 0 berkas gagal. Diulang di DB kotor sesudah semua suite: 1016 lulus, 0 gagal |
+| `uji/kontrak/jalankan.mjs` | 469 cek lulus, 0 gagal (exit 0) |
+| `impor/uji/jalankan.mjs` | 119 lulus, 0 gagal (exit 0) |
+| `uji/banding.mjs` (awal, tanpa `--izinkan-diketahui`) | kode keluar sama 340/340, kasus galat 1, isi lampiran 7 ok / 0 gagal, **sisa beda 0 entri di 0 perintah**, exit 0 (56 dtk) |
+| `uji/banding.mjs --varian ubah` (tanpa `--izinkan-diketahui`) | 344/344, kasus galat 1, lampiran 6 ok / 0 gagal, **sisa beda 0**, exit 0 (59 dtk); pulihkan ke awal: impor kode 0, sensus selisih 0 |
+| Playwright `uji/web` | 69 lulus, 0 gagal (2,6 menit), exit 0 |
+| `uji/web/salin-vendor.mjs --cek` | 4 berkas ok, "vendor cocok", exit 0 |
+| Sisa data sesudah suite | tugas/list/space `uji-b3` = 0/0/0; notifikasi Dodi belum dibaca = 3 (sama dengan seed) |
 
-**Perbaikan saat verifikasi (1 baris kode + 1 baris komentar):** `uji/banding.mjs` sebelum membuat token baca. Token baca banding milik pemilik token ClickUp tiruan (role ClickUp 1), yang diimpor sebagai `member` (review R1). Space privat fixture tidak punya `space_anggota` karena importer belum mengirim `members` (review R2), jadi app menjawab 404 sementara ClickUp tiruan menyajikannya. Perbaikan: beri pemilik token keanggotaan space privat fixture (`sumber app`, `on conflict do nothing`). Bukan perubahan perilaku app.
+Perubahan kode di verifikasi ini: tidak ada (hanya dokumen ini).
 
-**Pemindaian secret** (137 berkas yang akan di-commit sebelum STATUS.md ditambahkan, `git ls-files -co --exclude-standard`): pola JWT, `sb_secret_`/`sb_publishable_`, `sbp_`, `pk_<angka>_`, `rtk_`, `ghp_`/`github_pat_`, `sk-ant-`, token Telegram, `AGE-SECRET-KEY`, kunci privat PEM, `AKIA`, serta nilai kunci lokal dari `supabase status` (service role, secret, JWT secret, S3). Hasil: tidak ada secret. Temuan yang aman: anon key DEMO bawaan Supabase CLI di `web/config.js` (blok LOKAL, `iss: supabase-demo`, kunci publik), token palsu `rtk_salah…`/`rtk_tiruan`/`pk_salah` di tes. Email asli hanya ada di `docs/riset/*` dan `docs/RENCANA-FASE1.md` (sudah ter-commit sebelumnya; repo private). Folder yang di-ignore: `uji/web/hasil/`, `impor/laporan/`, `uji/banding/hasil/`, `node_modules/`.
+## Hasil putaran poles web W1–W8 (29 Sep 2026, tanpa db reset, di atas DB hasil putaran DB)
+| Suite | Hasil |
+|---|---|
+| Playwright `uji/web` (69 tes = 48 lama + 21 baru di `13-poles.spec.mjs`) | Putaran 1: 68 lulus, 1 gagal (`12-tinjau` board 360: remah setinggi 44px mendorong kolom ke bawah nav; diperbaiki dengan mencadangkan tinggi remah). Putaran 2–5: 69 lulus, 0 gagal (±2,7 menit) |
+| `uji/db/jalankan.sh`, `uji/kontrak/jalankan.mjs` (cek efek samping) | 1016 / 0 dan 469 / 0 |
+| `salin-vendor --cek` | vendor cocok |
+
+Catatan putaran web:
+- Tes web kini juga **menulis ke DB lokal** lewat pembantu baru `sqlUbahLokal` (`uji/web/bantu.mjs`; psql, `app.sumber = sistem`): mengisi `tasks.extra` tag/checklist kartu uji dan memulihkan `read_at` notifikasi seed Dodi di blok `finally`. Butuh psql + DB lokal 54322, sama seperti suite DB.
+- Screenshot `uji/web/hasil/poles-*.png` (17 berkas; folder di-ignore).
+- Label yang diubah memaksa penyesuaian `06-admin`, `08-lanjutan`; `11-sentuh` tidak lagi mengecualikan `.remah`.
+
+## Hasil tes putaran poles DB P1–P6 (29 Sep 2026 sore, 3 putaran, masing-masing dari `supabase db reset`)
+| Suite | Putaran 1 | Putaran 2 | Putaran 3 (akhir) |
+|---|---|---|---|
+| `uji/db/jalankan.sh` | 16 berkas, 1016 cek lulus, 0 gagal (baru: `16_poles.sql` 74 cek) | 1016 lulus, 0 gagal; diulang di DB kotor: 1016 | 1016 lulus, 0 gagal; diulang di DB kotor sesudah semua suite: 1016 |
+| `uji/kontrak/jalankan.mjs` | 469 lulus, 0 gagal | 469 / 0 | 469 / 0 |
+| `impor/uji/jalankan.mjs` | 118 lulus, 0 gagal | 118 / 0 | 119 / 0 (+1 cek jalur gagal `/list/{id}/member`) |
+| `uji/banding.mjs` (awal) | kode keluar sama 340/340, lampiran 7/7 ok, **sisa beda 0**, exit 0 | 340/340, 7/7, sisa 0, exit 0; juga di DB segar (banding langsung sesudah reset): 340/340, sisa 0, exit 0 | 340/340, 7/7, sisa 0, exit 0 |
+| `uji/banding.mjs --varian ubah` | 344/344, lampiran 6/6 ok, sisa 0, exit 0; DB dipulihkan ke awal (impor kode 0, selisih 0) | 344/344, 6/6, sisa 0, exit 0 | 344/344, 6/6, sisa 0, exit 0 |
+| Playwright `uji/web` (tambahan, sebelum poles web) | — | 48 lulus, 0 gagal (1,3 menit) | — |
+
+Catatan putaran ini:
+- Banding putaran 1 pertama kali menemukan 12 entri beda di 2 perintah (`task 86b2a0009`, `tasks 901822000101 --closed --full`): kunci bernilai null di item checklist (`assignee`, `group_assignee`, `parent`) hilang karena `norm_impor_tugas` memakai `jsonb_strip_nulls`. Diperbaiki (simpan verbatim) + tes `16_poles.sql`; sesudahnya sisa beda 0.
+- Bantuan psql di `uji/banding.mjs` (insert `space_anggota` untuk pemilik token tiruan) **dihapus**: importer kini mengirim anggota space privat (P2), dan banding lulus tanpa itu.
+- Fixture importer bertambah 1 lampiran CSV dari Windows (`application/vnd.ms-excel`) dan anggota list di space privat (asumsi `/list/{id}/member`); varian `ubah` mencabut 1 anggota list privat.
+
+## Hasil tes sebelumnya (29 Sep pagi, sebelum poles)
+DB 942 cek (15 berkas), kontrak 450, importer 102, banding 340/340 dan 344/344 dengan sisa beda PR-1 saja, Playwright 48. Saat itu `uji/banding.mjs` memberi pemilik token ClickUp tiruan keanggotaan space privat lewat psql karena importer belum mengirim anggota space; bantuan itu sudah dihapus (lihat di atas).
+
+**Pemindaian secret** (137 berkas yang akan di-commit sebelum STATUS.md ditambahkan, `git ls-files -co --exclude-standard`): pola JWT, `sb_secret_`/`sb_publishable_`, `sbp_`, `pk_<angka>_`, `rtk_`, `ghp_`/`github_pat_`, `sk-ant-`, token Telegram, `AGE-SECRET-KEY`, kunci privat PEM, `AKIA`, serta nilai kunci lokal dari `supabase status` (service role, secret, JWT secret, S3). Hasil: tidak ada secret. Temuan yang aman: anon key DEMO bawaan Supabase CLI di `web/config.js` (blok LOKAL, `iss: supabase-demo`, kunci publik), token palsu `rtk_salah…`/`rtk_tiruan`/`pk_salah` di tes. Email asli hanya ada di `docs/riset/*` dan `docs/RENCANA-FASE1.md` (sudah ter-commit sebelumnya; repo private). Folder yang di-ignore: `uji/web/hasil/`, `impor/laporan/`, `uji/banding/hasil/`, `node_modules/`. Putaran poles (29 Sep sore): 20 berkas yang berubah/baru dipindai ulang dengan pola yang sama + 6 nilai kunci lokal `supabase status`: tidak ada secret (yang cocok hanya nama pola di dokumen ini). Data uji baru sintetis (`@contoh.test`, ID 882…/9018…, token palsu `rtk_p1`).
+Verifikasi akhir (29 Sep, sesudah poles DB + web): **141 berkas** `git ls-files -co --exclude-standard` (termasuk 3 berkas baru: `uji/db/16_poles.sql`, `uji/web/13-poles.spec.mjs`, `impor/uji/fixture/berkas/ekspor-windows.csv`) dipindai dengan pola yang sama + 7 nilai kunci/secret lokal dari `supabase status -o env`. Hasil: **tidak ada secret**. Yang cocok pola hanya: anon key DEMO di `web/config.js` (satu-satunya nilai `supabase status` yang muncul; publik, `iss: supabase-demo`), token palsu tes (`rtk_rahasia_uji_*`, `rtk_rahasia_baca/cabut` di `uji/db`, `rtk_salah…` di kontrak) dan `pk_88200001_TIRUANB2UJI` di mock ClickUp. Email asli juga ada di dokumen ini (langkah 3 dan tabel langkah 6), sudah ter-commit sejak `b0e207f`; berkas yang diubah putaran poles tidak menambah email asli.
 
 ## Deviasi dari ARSITEKTUR (sadar, tercatat)
-Daftar lengkap 15 butir di `docs/KONTRAK-DB.md` §8 dan tabel review R1–R5 §9. Yang paling berdampak:
+Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, dan perbaikan poles P1–P6 §10. Yang paling berdampak:
 - **Privasi space (R2)** menggantikan §4 "member lihat semua": space privat hanya untuk `space_anggota` + owner/bot + assignee per kartu. Setelan `app_settings.privasi_space` = `tegakkan` (default) / `abaikan`.
 - **Komentar menaikkan `updated_at` (R4)**, kebalikan catatan "sementara" §3, supaya `agenda --hours` menangkap kartu yang hanya dapat komentar.
 - **Impor tidak pernah membuat owner (R1)**: anggota impor selalu `member`; baris owner/bot dilindungi dari impor.
@@ -68,15 +102,20 @@ Daftar lengkap 15 butir di `docs/KONTRAK-DB.md` §8 dan tabel review R1–R5 §9
 - Burst limit per isolate Edge (40 kapasitas, 20/detik), bukan global.
 
 ## Masalah terbuka
-1. **PR-1**: `tags` dan `checklists` kartu impor selalu `[]` di API app, padahal isinya tersimpan di `tasks.extra`. Terlihat di `task <id>` dan `tasks --full`. Perlu keputusan: isi dari `extra` (perubahan `j_task`) atau terima sebagai beda. Belum dicek apakah routine rhj-brain membaca tags/checklists.
-2. **Space privat ClickUp**: importer belum mengirim `members` space, jadi space privat asli hanya terlihat owner/bot + assignee kartunya. Riset K8 menyebut Online Sales kemungkinan privat, artinya Riksa/Michael bisa kehilangan tampilan list itu. Tindakan setelah impor: cek `spaces.private`, lalu isi anggota lewat Admin → Struktur, atau set `privasi_space` = `abaikan`, atau tambahkan pengiriman `members` di importer bila probe menunjukkan ClickUp menyediakannya.
-3. **Asumsi yang belum diprobe ke ClickUp asli** (mock mengikuti asumsi; `uji/banding/README.md`): urutan default `GET /list/{id}/task`, `include_closed=false` ikut membuang `done`, urutan balasan, lampiran komentar ikut di `task.attachments`, urutan assignees, `text_content` kosong = `""`, `reply_count` string, `date` lampiran string, `date_updated` naik saat komentar (R4), paginasi komentar 25, lampiran bisa diunduh tanpa login, email anggota tersedia.
+1. ~~PR-1~~ **selesai (P1)**: `tags`/`checklists` (dan `custom_fields` bila tersimpan) kartu impor kini tampil persis bentuk ClickUp di `task`/`tasks --full`; kartu app tetap `[]`. `clickup.mjs` rhj-brain hanya membaca `custom_fields` (perintah `fields` memakai `/list/{id}/field`), tidak membaca tags/checklists.
+2. **Space privat ClickUp (P2): kode selesai, tinggal probe data asli.** Dulu importer tidak mengirim anggota space privat (banding memakai bantuan psql); sekarang importer mengirim jenis `space_anggota` = gabungan `GET /list/{id}/member` semua list di space itu + owner/admin workspace (role 1/2 dari `/team`), jawaban mentah di `sync_raw` entity `list_member`. Bila satu list gagal dibaca atau struktur tidak tersapu lengkap, anggota space itu tidak disentuh dan run keluar kode 2; baris anggota sumber `app` tidak pernah dihapus impor. Sisa masalahnya hanya asumsi: ClickUp v2 tidak punya endpoint anggota space, jadi wajib dicek di data asli (langkah 4 dan `impor/README.md` "Asumsi yang WAJIB diprobe"). Riset K8: Online Sales kemungkinan privat (Riksa/Michael). Bila hasil probe meleset: tambahkan anggota lewat Admin → Struktur (sumber `app`, tidak dihapus impor) atau set `privasi_space` = `abaikan`.
+3. **Asumsi yang belum diprobe ke ClickUp asli** (mock mengikuti asumsi; `uji/banding/README.md`, `impor/README.md`): `/list/{id}/member` di space privat (P2), pola URL tampilan `/v/l/6-<list>-1` / `/v/b/6-<list>-2` (P6), MIME CSV Windows = `application/vnd.ms-excel` (P3), urutan default `GET /list/{id}/task`, `include_closed=false` ikut membuang `done`, urutan balasan, lampiran komentar ikut di `task.attachments`, urutan assignees, `text_content` kosong = `""`, `reply_count` string, `date` lampiran string, `date_updated` naik saat komentar (R4), paginasi komentar 25, lampiran bisa diunduh tanpa login, email anggota tersedia.
 4. **Rengga** (ClickUp 246027506) belum menerima undangan per 28/9. Kalau tidak ada di `/team`, impor hanya membuatnya anggota nonaktif (bila muncul sebagai assignee/penulis) atau tidak sama sekali.
 5. **Bootstrap owner & bot belum ada skripnya**: migrasi tidak membuat anggota. Langkah SQL manual ada di bawah; sudah diuji lokal dengan identitas sintetis dalam transaksi yang di-rollback: bot mendapat ID ≥ 900000000000, 3 token `rtk_…` terbentuk, `impor_batch members` berikutnya melaporkan owner `dilindungi` dan tidak mengubah role/username.
 6. `app_settings.tenggat_folder_ids` default `["1100340000026652"]` (folder RHJ Eksekusi menurut riset). Cocokkan dengan ID folder hasil impor.
 7. Banding harian `clickup.mjs` ↔ `tugas.mjs` di data asli selama paralel (RENCANA §5.5) belum punya workflow; baru ada banding fixture.
 8. Pemakaian Edge per bulan (batas Free 500 ribu) dan kuota subdomain Hostinger: belum dihitung/dicek.
 9. `web/config.js` blok PRODUKSI dan `web/.htaccess` (CSP) masih berisi `GANTI_REF` / `GANTI_DENGAN_PUBLISHABLE_KEY`.
+10. ~~Cari belum memakai `web_cari.rujukan`~~ **selesai (poles web W8)**: tautan `/l/<id>` atau URL tampilan ClickUp `/v/l/6-<list>-1` di Cari langsung membuka list itu; URL folder/space menampilkan info + tautan ke Jelajah. Diuji `13-poles.spec.mjs` tes 8.
+11. **Keyboard virtual di HP asli belum dicek.** Dialog "Tugas baru" (tombol aksi tetap terlihat saat keyboard terbuka, lewat `visualViewport`) baru diuji dengan emulasi di Chromium headless (visualViewport palsu 480px dan viewport 420px). Cek manual di iPhone Safari dan Chrome Android: buka dialog, ketik di Nama lalu Due, tombol "Buat tugas" harus tetap di atas keyboard.
+12. **Istilah yang sengaja dipertahankan** (keputusan Hannes bila ingin diganti): Due, Assignee, Filter, Space/Folder/List, owner, password/login, Token API, routine/agent, nama status (data ClickUp), padanan ClickUp dalam kurung ("Papan (Board)", "Awal (open)"). Ganti ke "Tenggat"/"Penanggung jawab" menyentuh banyak label dan tes web.
+13. Font input 16px berlaku di semua ukuran layar (bukan hanya layar sentuh), supaya iPad ikut aman; kontrol di desktop sedikit lebih besar dari sebelumnya.
+14. **Git**: commit `c8b3d6b` "WIP: putaran perbaikan (sedang berjalan)" (09:28 UTC, patch migrasi setengah jadi dari run yang terputus, sesi yang sama) sudah ada di branch `claude/rhj-task-management-app-cc50bk` dan origin. Semua hasil putaran poles DB + web + dokumen ini belum di-commit (33 berkas diubah + 3 baru). Commit/push menunggu keputusan Hannes; commit berikutnya di atas `c8b3d6b` sudah memuat versi final migrasi, jadi WIP itu tidak perlu di-revert.
 
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)
 Prasyarat dari Hannes: project Supabase baru `rhj-tugas` (akun/org baru, Singapore, Free); env cloud `SUPABASE_ACCESS_TOKEN` (PAT akun baru) + `SUPABASE_PROJECT_REF`; `CLICKUP_API_TOKEN` (sudah ada); sesi baru supaya env terbaca. Semua langkah ke ClickUp **GET saja**. Tidak memakai MCP Supabase (itu ERP).
@@ -115,7 +154,8 @@ curl -X PATCH "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/config
   -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H "content-type: application/json" \
   -d '{"disable_signup":true,"external_email_enabled":true,"site_url":"https://tugas.palletmeshindonesia.com","uri_allow_list":"https://tugas.palletmeshindonesia.com/**","password_min_length":8}'
 ```
-Lalu GET endpoint yang sama dan pastikan `disable_signup=true`. Uji: `POST /auth/v1/signup` dengan publishable key harus ditolak.
+Lalu GET endpoint yang sama dan pastikan `disable_signup=true` dan `password_min_length=8`. Uji: `POST /auth/v1/signup` dengan publishable key harus ditolak.
+- **Password (catatan 29 Sep):** `password_min_length` = **8** (sama dengan batas web `ganti-password.js` dan Edge `password_sementara` ≥ 8; `supabase/config.toml` lokal masih 6, hanya dev). Spesifikasi Management API (`api.supabase.com/api/v1-json`, dicek 29 Sep) punya field `security_update_password_require_reauthentication` (padanan `secure_password_change` di config.toml) dan `security_update_password_require_current_password`. Keduanya **biarkan `false`** untuk sekarang dan pastikan lewat GET: layar ganti password web hanya mengirim password baru (`updateUser({password})`, tanpa nonce/password lama), dan reauth mengirim kode OTP lewat email yang butuh SMTP sendiri (email bawaan Supabase dibatasi). Dengan reauth aktif, ganti password dari sesi berumur > 24 jam akan ditolak. Menyalakannya = pekerjaan web (field password lama / alur nonce) + SMTP, di luar Fase 1.
 
 Periksa bucket (dibuat migrasi `…100400_storage_lampiran.sql`), lewat `POST /v1/projects/$REF/database/query` (PAT):
 `select id, public, file_size_limit, allowed_mime_types from storage.buckets;` → `lampiran`, `false`, `26214400`, allowlist tanpa SVG/HTML.
@@ -149,7 +189,7 @@ commit;
 Alternatif: Hannes membuatnya sendiri di Admin → Token API setelah login.
 
 ### 4. Probe + impor asli
-1. Probe GET ClickUp untuk asumsi di Masalah terbuka #3 (pakai `rhj-brain/tools/clickup.mjs` baca-saja atau `curl` GET). Termasuk: apakah `GET /team/{id}/space` memberi `members` untuk space privat.
+1. Probe GET ClickUp untuk asumsi di Masalah terbuka #3 (pakai `rhj-brain/tools/clickup.mjs` baca-saja atau `curl` GET). Termasuk: apakah `GET /team/{id}/space` memberi `members` untuk space privat, dan apakah `GET /list/{id}/member` tiap list di space privat cocok dengan orang yang punya akses (tabel di `impor/README.md`). Salin 2–3 URL list/board/folder dari address bar ClickUp lalu `node cli/tugas.mjs resolve "<url>"` (setelah impor).
 2. `node impor/sinkron.mjs --mode penuh --dry-run` dengan `CLICKUP_API_TOKEN`, `TUGAS_API_URL=https://$REF.supabase.co/functions/v1/api/v2`, `TUGAS_IMPORT_TOKEN` → hanya baca.
 3. `node impor/sinkron.mjs --mode penuh` → wajib exit 0, `sensus.selisih = 0`. Laporan di `impor/laporan/` (gitignored, JANGAN commit).
 4. Jalankan ulang `--mode penuh` → idempoten (`inserted 0`, `updated 0`).
@@ -158,7 +198,8 @@ Alternatif: Hannes membuatnya sendiri di Admin → Token API setelah login.
 - `GET /x/sensus?sumber=clickup` (token bot) vs sensus crawler: per list `tasks_total, open, closed, archived, subtasks, comments_top, replies, attachments_*, assignee_links, sha_ids_*` selisih 0. Serahkan tabel angka per list ke Hannes (tanpa nama kartu). Pembanding lama (23/9): 3 space, 11 list, 198 tugas (146 open, 52 closed), 65 lampiran 16,1 MB; angka sekarang belum dihitung.
 - Lampiran: hitung `status_salin` ok/gagal/tautan_saja.
 - Cek `spaces.private` (Masalah #2) dan `tenggat_folder_ids` (Masalah #6).
-- Banding manual data asli: `node rhj-brain/tools/clickup.mjs agenda` vs `node cli/tugas.mjs agenda` (dan `task`/`comments --replies` beberapa kartu) → beda hanya N1–N11 + PR-1.
+- Banding manual data asli: `node rhj-brain/tools/clickup.mjs agenda` vs `node cli/tugas.mjs agenda` (dan `task`/`comments --replies` beberapa kartu) → beda hanya N1–N11.
+- Space privat: laporan run menulis "Space privat: <id> <n> anggota dari <m> list"; cocokkan dengan Hannes. Lampiran `tautan_saja` beserta alasannya ada di catatan laporan (`lampiran tautan_saja …`).
 
 ### 6. Akun 9 anggota
 Setelah impor, anggota sudah ada dengan ID ClickUp. Hannes (owner) → Admin → Anggota → **Aktifkan login** (Edge `/x/admin/akun`, password sementara tampil sekali, wajib ganti saat login pertama).
@@ -179,7 +220,7 @@ Sumber: `docs/riset/baca-pagar.md` §2. Email Michael & Rengga = asumsi yang bis
 1. Isi `web/config.js` blok PRODUKSI (`SUPABASE_URL=https://<ref>.supabase.co`, publishable/anon key) dan ganti `GANTI_REF` di `web/.htaccess` (CSP img-src, connect-src https + wss). Bila domain bukan `tugas.palletmeshindonesia.com`, ubah juga `app_settings.app_base_url` (dipakai CORS Edge & URL kartu).
 2. Commit, lalu `git subtree split --prefix=web -b web` → `git push origin web` (akar branch `web` = isi `web/`). Pengulangan: split ulang ke branch yang sama.
 3. hPanel: subdomain `tugas.palletmeshindonesia.com` + SSL; Git → repo rhj-tugas branch `web` ke folder subdomain; deploy key Hostinger dipasang read-only di GitHub; webhook auto-deploy.
-4. Uji: `/masuk` tampil tanpa galat CSP, login Hannes → wajib ganti password, `/t/<id ClickUp>` langsung membuka kartu, header `X-Robots-Tag: noindex`.
+4. Uji: `/masuk` tampil tanpa galat CSP, login Hannes → wajib ganti password, `/t/<id ClickUp>` langsung membuka kartu, header `X-Robots-Tag: noindex`. Di iPhone Safari dan Chrome Android: dialog "Tugas baru" dengan keyboard terbuka, tombol "Buat tugas" tetap terlihat (Masalah terbuka #11).
 
 ### 8. GitHub Actions
 - Secrets: `CLICKUP_API_TOKEN`, `TUGAS_API_URL`, `TUGAS_IMPORT_TOKEN`, `TUGAS_EXPORT_TOKEN`, `BACKUP_AGE_PUBKEY` (Hannes buat `age-keygen` di perangkatnya; kunci privat TIDAK ke GitHub).
@@ -187,4 +228,4 @@ Sumber: `docs/riset/baca-pagar.md` §2. Email Michael & Rengga = asumsi yang bis
 - Uji `workflow_dispatch`: sinkron `dry_run` dulu, lalu penuh; backup + uji buka dengan kunci privat (uji restore).
 
 ### 9. Tutup sesi
-Laporan ke Hannes: angka sensus per list, status lampiran, jawaban probe, keputusan PR-1 dan privasi space. Mode tetap `cermin`; routine tetap memakai ClickUp sampai cutover (F7).
+Laporan ke Hannes: angka sensus per list, status lampiran, jawaban probe (termasuk anggota space privat hasil `/list/{id}/member`), keputusan privasi space. Mode tetap `cermin`; routine tetap memakai ClickUp sampai cutover (F7).

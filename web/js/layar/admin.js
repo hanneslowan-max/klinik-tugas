@@ -2,7 +2,7 @@
 // mode cermin/utama, laporan sinkron. Semua tulis lewat web_admin_* (cek owner di DB) atau Edge /x/admin/*.
 import { rpc, pilih, pesanGalat, edgeAdmin } from '../api.js';
 import { sesi, anggota, struktur, semuaList, muatProfil, muatLibur, lupakanCache } from '../sesi.js';
-import { h, kosongkan, toast, lembar, konfirmasi, salinTeks, avatar, fmtWaktu, fmtTanggal, NAMA_HARI, hariDalamMinggu } from '../util.js';
+import { h, kosongkan, toast, lembar, konfirmasi, salinTeks, avatar, fmtWaktu, fmtTanggalPanjang, labelPeran } from '../util.js';
 
 const TAB = [
   ['anggota', 'Anggota'], ['status', 'Status list'], ['struktur', 'Struktur'], ['libur', 'Hari libur'],
@@ -65,7 +65,7 @@ async function tabAnggota(el) {
       avatar(m, true),
       h('div', { class: 'info' }, h('strong', { text: m.username }), m.nama && m.nama !== m.username ? h('span', { class: 'redup kecil', text: ` · ${m.nama}` }) : null,
         h('div', { class: 'sub' },
-          h('span', { class: 'chip', text: m.role }),
+          h('span', { class: 'chip', text: labelPeran(m.role) }),
           !m.aktif ? h('span', { class: 'chip telat', text: 'nonaktif' }) : null,
           m.role !== 'bot' ? h('span', { class: `chip ${m.punya_akun ? 'selesai' : 'garis'}`, text: m.punya_akun ? 'bisa login' : 'belum ada login' }) : null,
           m.harus_ganti_password ? h('span', { class: 'chip hari-ini', text: 'wajib ganti password' }) : null,
@@ -83,7 +83,8 @@ async function formAnggota(m, el) {
     clickup_email: h('input', { type: 'email', value: m ? m.clickup_email || '' : '', name: 'clickup_email' }),
     initials: h('input', { type: 'text', value: m ? m.initials || '' : '', maxlength: 3, name: 'initials' }),
     color: h('input', { type: 'color', value: m && m.color ? m.color : '#7b68ee', name: 'color' }),
-    role: h('select', { name: 'role' }, ['member', 'owner', 'bot'].map((r) => h('option', { value: r, selected: (m ? m.role : 'member') === r, text: r }))),
+    role: h('select', { name: 'role' }, [['member', 'anggota'], ['owner', 'owner (admin penuh)'], ['bot', 'bot (token agent)']].map(([r, label]) =>
+      h('option', { value: r, selected: (m ? m.role : 'member') === r, text: label }))),
     aktif: h('input', { type: 'checkbox', checked: m ? m.aktif : true, name: 'aktif' }),
   };
   const galat = h('div', { class: 'kotak-galat', hidden: true, role: 'alert' });
@@ -92,7 +93,7 @@ async function formAnggota(m, el) {
   if (m && m.role !== 'bot' && m.aktif) {
     aksiAkun.push(h('button', { type: 'button', class: 'tombol kecil', 'data-uji': m.punya_akun ? 'reset-password' : 'aktifkan-login',
       onclick: async () => { const ok = await formAkun(m); if (ok) await tabAnggota(el); } },
-    m.punya_akun ? 'Reset password' : 'Aktifkan login'));
+    m.punya_akun ? 'Setel ulang password' : 'Aktifkan login'));
   }
   const r = await lembar({
     judul: baru ? 'Tambah anggota' : `Ubah ${m.username}`,
@@ -102,7 +103,7 @@ async function formAnggota(m, el) {
       bidang('Email login', f.email, 'Email untuk masuk ke aplikasi.'),
       bidang('Email ClickUp', f.clickup_email),
       h('div', { class: 'filter' }, bidang('Inisial', f.initials), bidang('Warna', f.color)),
-      bidang('Peran', f.role, 'owner = admin penuh; member = anggota tim; bot = token agent (tanpa login).'),
+      bidang('Peran', f.role, 'owner = admin penuh; anggota = anggota tim; bot = pemilik token routine/agent (tanpa login).'),
       h('label', { class: 'centang' }, f.aktif, 'Aktif'),
       m && Number(m.id) === saya ? h('p', { class: 'redup kecil', text: 'Anda tidak bisa menurunkan peran atau menonaktifkan diri sendiri.' }) : null,
       aksiAkun.length ? h('div', { class: 'baris-aksi' }, aksiAkun) : null,
@@ -133,7 +134,7 @@ async function formAkun(m) {
   const sandi = h('input', { type: 'text', value: sandiSementara(), required: true, name: 'password-sementara', autocomplete: 'off', spellcheck: 'false' });
   const galat = h('div', { class: 'kotak-galat', hidden: true, role: 'alert' });
   const r = await lembar({
-    judul: reset ? `Reset password ${m.username}` : `Aktifkan login ${m.username}`,
+    judul: reset ? `Setel ulang password ${m.username}` : `Aktifkan login ${m.username}`,
     isi: h('form', { onsubmit: (e) => e.preventDefault() },
       h('p', { class: 'redup kecil', text: reset
         ? 'Password lama diganti password sementara. Anggota wajib menggantinya saat masuk berikutnya.'
@@ -143,7 +144,7 @@ async function formAkun(m) {
       galat),
     aksi: [
       { label: 'Batal', nilai: null },
-      { label: reset ? 'Reset password' : 'Aktifkan login', kelas: 'utama', klik: async () => {
+      { label: reset ? 'Setel ulang password' : 'Aktifkan login', kelas: 'utama', klik: async () => {
         galat.hidden = true;
         if (!reset && !email.value.trim()) { galat.textContent = 'Email wajib diisi.'; galat.hidden = false; return false; }
         if (sandi.value.length < 8) { galat.textContent = 'Password sementara minimal 8 karakter.'; galat.hidden = false; return false; }
@@ -173,6 +174,9 @@ async function formAkun(m) {
 }
 
 // ------------------------------------------------------------------ status per list
+// nilai = tipe status ClickUp (open/custom/done/closed); label Indonesia
+const TIPE_STATUS = [['open', 'Awal (open)'], ['custom', 'Proses (custom)'], ['done', 'Selesai (done)'], ['closed', 'Ditutup (closed)']];
+
 async function tabStatus(el) {
   const lists = await semuaList(true);
   const pilihL = h('select', { 'aria-label': 'Pilih list', 'data-uji': 'status-pilih-list' }, h('option', { value: '', text: '— pilih list —' }),
@@ -192,7 +196,7 @@ async function tabStatus(el) {
       kosongkan(wadah, rows.map((s, i) => {
         const nama = h('input', { type: 'text', value: s.status, 'aria-label': 'Nama status', disabled: kunci });
         nama.addEventListener('input', () => { s.status = nama.value; });
-        const tipe = h('select', { 'aria-label': 'Tipe status', disabled: kunci }, ['open', 'custom', 'done', 'closed'].map((t) => h('option', { value: t, selected: s.type === t, text: t })));
+        const tipe = h('select', { 'aria-label': 'Tipe status', disabled: kunci }, TIPE_STATUS.map(([t, label]) => h('option', { value: t, selected: s.type === t, text: label })));
         tipe.addEventListener('change', () => { s.type = tipe.value; });
         const warna = h('input', { type: 'color', value: s.color || '#d3d3d3', 'aria-label': 'Warna', disabled: kunci });
         warna.addEventListener('input', () => { s.color = warna.value; });
@@ -206,7 +210,7 @@ async function tabStatus(el) {
     gambarBaris();
     kosongkan(editor,
       kunci ? h('div', { class: 'kotak-cermin', text: 'List ClickUp: status hanya-baca selama mode cermin (ikut sinkron).' }) : null,
-      h('p', { class: 'redup kecil', text: 'Wajib ≥1 status open dan ≥1 closed. Status yang masih dipakai tugas tidak bisa dibuang (pindahkan tugasnya dulu). Ganti nama = tugas ikut.' }),
+      h('p', { class: 'redup kecil', text: 'Wajib ≥1 status bertipe Awal dan ≥1 bertipe Ditutup. Status yang masih dipakai tugas tidak bisa dibuang (pindahkan tugasnya dulu). Ganti nama = tugas ikut; nama disimpan huruf kecil.' }),
       wadah, galat,
       kunci ? null : h('div', { class: 'baris-aksi' },
         h('button', { type: 'button', class: 'tombol kecil', onclick: () => { rows.push({ status: 'status baru', type: 'custom', color: '#a0a0a0', nama_lama: null }); gambarBaris(); } }, 'Tambah status'),
@@ -319,9 +323,9 @@ async function tabLibur(el) {
     } }, h('div', { class: 'filter' }, bidang('Tanggal', tgl), bidang('Nama', nama)), galat,
     h('button', { type: 'submit', class: 'tombol utama kecil' }, 'Tambah hari libur')),
     rows.length ? h('ul', { class: 'daftar-tugas' }, rows.map((r) => h('li', { class: 'item-admin' },
-      h('div', { class: 'info' }, h('strong', { text: r.nama }), h('div', { class: 'sub', text: `${NAMA_HARI[hariDalamMinggu(r.tanggal)]}, ${fmtTanggal(r.tanggal)}` })),
+      h('div', { class: 'info' }, h('strong', { text: r.nama }), h('div', { class: 'sub', text: fmtTanggalPanjang(r.tanggal) })),
       h('button', { type: 'button', class: 'tombol kecil bahaya', onclick: async () => {
-        if (!await konfirmasi(`Hapus hari libur ${r.nama} (${r.tanggal})?`, { ya: 'Hapus', bahaya: true })) return;
+        if (!await konfirmasi(`Hapus hari libur ${r.nama} (${fmtTanggalPanjang(r.tanggal)})?`, { ya: 'Hapus', bahaya: true })) return;
         if (await panggil('web_admin_libur_simpan', { p: { tanggal: r.tanggal, hapus: true } }, 'Dihapus')) { await muatLibur(); await tabLibur(el); }
       } }, 'Hapus'))))
       : h('p', { class: 'kosong', text: 'Belum ada hari libur.' }));
@@ -331,10 +335,10 @@ async function tabLibur(el) {
 async function tabToken(el) {
   const [tokens, daftar] = await Promise.all([rpc('web_admin_tokens'), anggota(true)]);
   const aktif = daftar.filter((m) => m.aktif);
-  const member = h('select', { name: 'token-anggota' }, aktif.map((m) => h('option', { value: String(m.id), selected: m.role === 'bot', text: `${m.username} (${m.role})` })));
+  const member = h('select', { name: 'token-anggota' }, aktif.map((m) => h('option', { value: String(m.id), selected: m.role === 'bot', text: `${m.username} (${labelPeran(m.role)})` })));
   const nama = h('input', { type: 'text', placeholder: 'mis. routine digest pagi', name: 'token-nama' });
   const scope = h('select', { name: 'token-scope' },
-    h('option', { value: 'baca', text: 'baca (GET saja)' }), h('option', { value: 'tulis', text: 'tulis (baca + buat/ubah)' }), h('option', { value: 'impor', text: 'impor (khusus importer)' }));
+    h('option', { value: 'baca', text: 'baca (hanya membaca)' }), h('option', { value: 'tulis', text: 'tulis (baca + buat/ubah)' }), h('option', { value: 'impor', text: 'impor (khusus sinkron ClickUp)' }));
   const galat = h('div', { class: 'kotak-galat', hidden: true, role: 'alert' });
   kosongkan(el,
     h('form', { class: 'kartu', onsubmit: async (e) => {
@@ -348,13 +352,13 @@ async function tabToken(el) {
           isi: h('div', { 'data-uji': 'token-baru' },
             h('p', { class: 'kotak-peringatan kecil', text: 'Salin sekarang. Token ini hanya tampil SEKALI dan tidak bisa dilihat lagi.' }),
             h('div', { class: 'token-tampil', 'data-uji': 'token-mentah' }, r.token),
-            h('p', { class: 'redup kecil', text: `${r.nama} · scope ${r.scope} · awalan ${r.prefix}` })),
+            h('p', { class: 'redup kecil', text: `${r.nama} · hak ${r.scope} · awalan ${r.prefix}` })),
           aksi: [{ label: 'Salin', klik: async () => { await salinTeks(r.token); return false; } }, { label: 'Sudah disalin', kelas: 'utama' }],
         });
         await tabToken(el);
       } catch (err) { galat.textContent = pesanGalat(err); galat.hidden = false; }
     } },
-    h('h3', { text: 'Buat token' }), bidang('Anggota', member), bidang('Nama', nama), bidang('Scope', scope, 'Routine: baca. Sesi interaktif agent: tulis (tanpa hapus). Hapus hanya token owner.'), galat,
+    h('h3', { text: 'Buat token' }), bidang('Anggota', member), bidang('Nama', nama), bidang('Hak akses', scope, 'Routine: baca. Sesi interaktif agent: tulis (tanpa hapus). Hapus hanya token owner.'), galat,
     h('button', { type: 'submit', class: 'tombol utama kecil', 'data-uji': 'buat-token' }, 'Buat token')),
     tokens.length ? h('ul', { class: 'daftar-tugas', 'data-uji': 'daftar-token' }, tokens.map((k) => h('li', { class: 'item-admin', 'data-token': k.prefix },
       h('div', { class: 'info' }, h('strong', { text: k.nama }),
@@ -389,25 +393,178 @@ async function tabMode(el) {
 }
 
 // ------------------------------------------------------------------ sinkron
+// counts dari impor/sinkron.mjs (runSelesai): jumlah (tugas/komentar/anggota/list), tulis {entitas: {inserted, updated,
+// unchanged, gagal, …}}, lampiran {ok, gagal, …}, hilang {entitas: {ditandai, ids}} | teks, clickup {permintaan, r429, …},
+// space_privat [..], muat, only, durasi_detik. Semua ditampilkan sebagai tabel berbahasa Indonesia; kunci yang belum
+// dikenal tetap tampil dengan label yang dirapikan (tidak pernah "[object Object]").
+const NAMA_ENTITAS = {
+  tasks: 'Tugas', lists: 'List', spaces: 'Space', folders: 'Folder', members: 'Anggota', comments: 'Komentar',
+  attachments: 'Lampiran', list_statuses: 'Status list', space_anggota: 'Anggota space privat', workspace: 'Ruang kerja',
+  sync_raw: 'Arsip data mentah', tags: 'Label', checklists: 'Checklist',
+};
+const NAMA_KOLOM = {
+  inserted: 'Baru', updated: 'Diubah', unchanged: 'Tetap', ditambah: 'Ditambah', dibuang: 'Dibuang', dihapus: 'Dihapus',
+  gagal: 'Gagal', ditandai: 'Ditandai hilang', ok: 'Tersalin', sudah_ada: 'Sudah ada', tautan_saja: 'Hanya tautan',
+  dilewati: 'Dilewati',
+};
+// kolom utama tabel entitas; kunci angka lain (ditambah/dibuang/dihapus …) digabung ke kolom "Lainnya"
+const KOLOM_UTAMA = ['inserted', 'updated', 'unchanged', 'ditandai', 'gagal'];
+const URUT_LAIN = ['ditambah', 'dibuang', 'dihapus'];
+const urutLain = (a, b) => ((URUT_LAIN.indexOf(a) + 1 || 99) - (URUT_LAIN.indexOf(b) + 1 || 99)) || a.localeCompare(b);
+// ukuran sensus (KUNCI_SENSUS impor/sinkron.mjs) & fase galat importer
+const NAMA_SENSUS = {
+  '(list)': 'List', tasks_total: 'Jumlah tugas', open: 'Tugas terbuka', closed: 'Tugas selesai', archived: 'Tugas diarsip',
+  subtasks: 'Sub-tugas', comments_top: 'Komentar', replies: 'Balasan', reply_count_sum: 'Jumlah balasan (hitungan ClickUp)',
+  attachments_task: 'Lampiran tugas', attachments_comment: 'Lampiran komentar', assignee_links: 'Penugasan',
+  sha_ids_tasks: 'Sidik ID tugas', sha_ids_comments: 'Sidik ID komentar',
+};
+const NAMA_FASE = {
+  fatal: 'fatal', email_anggota: 'email anggota', space_anggota: 'anggota space', anggota_list: 'anggota list',
+  time_in_status: 'riwayat status', tugas_detail: 'detail tugas', lampiran: 'lampiran',
+};
+const NAMA_UKURAN = {
+  muat: 'Jenis muat', only: 'Cakupan', list: 'List', tugas: 'Tugas', komentar: 'Komentar', anggota: 'Anggota',
+  anggota_nonaktif: 'Anggota nonaktif', durasi_detik: 'Durasi', lampiran: 'Lampiran',
+  permintaan: 'Permintaan ke ClickUp', r429: 'Kena batas (HTTP 429)', ulang: 'Permintaan diulang', unduh: 'Berkas diunduh',
+  tunggu_ms: 'Waktu tunggu batas', rpm: 'Batas per menit',
+};
+const NILAI_MUAT = { sinkron: 'sinkron (perbarui data)', impor: 'impor awal' };
+const rapikan = (k) => { const t = String(k).replace(/_/g, ' '); return t.charAt(0).toUpperCase() + t.slice(1); };
+const labelDari = (peta, k) => peta[k] || rapikan(k);
+const angka = (v) => (typeof v === 'number' ? v.toLocaleString('id-ID') : v);
+
+/** Nilai apa pun → teks pendek berbahasa Indonesia (objek → "Label n · Label n", array → jumlah butir). */
+function teksNilai(v) {
+  if (v === null || v === undefined || v === '') return '—';
+  if (typeof v === 'boolean') return v ? 'ya' : 'tidak';
+  if (typeof v === 'number') return angka(v);
+  if (Array.isArray(v)) return `${angka(v.length)} butir`;
+  if (typeof v === 'object') {
+    return Object.entries(v).map(([k, x]) => `${labelDari({ ...NAMA_KOLOM, ...NAMA_UKURAN, ...NAMA_ENTITAS }, k)} ${teksNilai(x)}`).join(' · ') || '—';
+  }
+  return String(v);
+}
+
+/**
+ * Tabel: kolom pertama = label baris (th); kolom angka rata kanan (kolomAngka = true/false atau array per kolom sesudah
+ * kolom pertama); sel {buruk, n} = angka bermasalah (merah).
+ */
+function tabelAngka(kepala, baris, uji, { kolomAngka = true } = {}) {
+  const angkaKah = (i) => (Array.isArray(kolomAngka) ? !!kolomAngka[i] : kolomAngka);
+  return h('div', { class: 'tabel-gulir' }, h('table', { class: 'tabel-angka', 'data-uji': uji },
+    h('thead', {}, h('tr', {}, kepala.map((k, i) => h('th', { scope: 'col', class: i && angkaKah(i - 1) ? 'angka' : null, text: k })))),
+    h('tbody', {}, baris.map((b) => h('tr', {}, h('th', { scope: 'row', text: b[0] }), b.slice(1).map((sel, i) => {
+      const buruk = !!(sel && typeof sel === 'object' && sel.buruk);
+      const n = buruk ? sel.n : sel;
+      const kelas = [typeof n === 'number' && angkaKah(i) ? 'angka' : null, n === 0 ? 'nol' : null, buruk ? 'buruk' : null].filter(Boolean).join(' ');
+      return h('td', { class: kelas || null, text: teksNilai(n) });
+    }))))));
+}
+
+/** {entitas: {kolom: n}} → tabel Entitas × kolom utama (Baru/Diubah/Tetap/Ditandai/Gagal) + "Lainnya" (teks). */
+function tabelEntitas(obj, uji, judulKolom = 'Data') {
+  const rows = Object.entries(obj || {}).filter(([, v]) => v && typeof v === 'object' && !Array.isArray(v));
+  if (!rows.length) return null;
+  const angkaDari = (v) => Object.keys(v).filter((k) => k !== 'ids' && (typeof v[k] === 'number' || v[k] === null));
+  const semua = new Set(rows.flatMap(([, v]) => angkaDari(v)));
+  const utama = KOLOM_UTAMA.filter((k) => semua.has(k));
+  const adaLain = [...semua].some((k) => !utama.includes(k));
+  return tabelAngka([judulKolom, ...utama.map((k) => labelDari(NAMA_KOLOM, k)), ...(adaLain ? ['Lainnya'] : [])],
+    rows.map(([e, v]) => {
+      const lain = angkaDari(v).filter((k) => !utama.includes(k) && v[k]).sort(urutLain).map((k) => `${labelDari(NAMA_KOLOM, k)} ${angka(v[k])}`);
+      return [labelDari(NAMA_ENTITAS, e), ...utama.map((k) => {
+        const n = v[k] ?? 0;
+        return (k === 'gagal' || k === 'ditandai') && n > 0 ? { buruk: true, n } : n;
+      }), ...(adaLain ? [lain.join(' · ') || '—'] : [])];
+    }), uji, { kolomAngka: [...utama.map(() => true), false] });
+}
+
+const objekAngka = (v) => !!v && typeof v === 'object' && !Array.isArray(v) && Object.values(v).length > 0
+  && Object.values(v).every((n) => typeof n === 'number' || n === null);
+
+function ringkasanRun(c) {
+  const baris = [];
+  const dipakai = new Set(['tulis', 'lampiran', 'hilang', 'clickup', 'space_privat']);
+  const tambah = (k, nilai) => { if (k in c) { baris.push([labelDari(NAMA_UKURAN, k), nilai]); dipakai.add(k); } };
+  tambah('muat', NILAI_MUAT[c.muat] || c.muat || '—');
+  tambah('only', Array.isArray(c.only) && c.only.length ? `${angka(c.only.length)} list terpilih (${c.only.join(', ')})` : 'semua list');
+  for (const k of ['list', 'tugas', 'komentar', 'anggota', 'anggota_nonaktif']) tambah(k, c[k]);
+  if (typeof c.lampiran === 'number') { baris.push(['Lampiran', c.lampiran]); }
+  tambah('durasi_detik', typeof c.durasi_detik === 'number' ? `${angka(c.durasi_detik)} detik` : c.durasi_detik);
+  // kunci lain yang belum dikenal: tetap ditampilkan (teks), tanpa [object Object]; objek angka ditabelkan di bawah
+  for (const [k, v] of Object.entries(c)) {
+    if (dipakai.has(k) || objekAngka(v)) continue;
+    baris.push([labelDari({ ...NAMA_UKURAN, ...NAMA_ENTITAS }, k), v]);
+  }
+  return baris;
+}
+
+function nodeRun(x, terbuka) {
+  const c = x.counts && typeof x.counts === 'object' ? x.counts : {};
+  const galat = Array.isArray(x.errors) ? x.errors : [];
+  const selisih = Array.isArray(x.diffs) ? x.diffs : (x.diffs && Array.isArray(x.diffs.selisih) ? x.diffs.selisih : []);
+  const bagian = [];
+  const ringkas = ringkasanRun(c);
+  if (ringkas.length) bagian.push(h('h4', { text: 'Ringkasan' }), tabelAngka(['Ukuran', 'Nilai'], ringkas, 'sinkron-ringkasan', { kolomAngka: false }));
+  // entitas di level atas (bentuk lama/seed: {"tasks": {"inserted": …}})
+  const entitasAtas = Object.fromEntries(Object.entries(c).filter(([k, v]) => !['tulis', 'hilang', 'lampiran', 'clickup'].includes(k) && objekAngka(v)));
+  const tulis = { ...entitasAtas, ...(c.tulis && typeof c.tulis === 'object' ? c.tulis : {}) };
+  const tTulis = tabelEntitas(tulis, 'sinkron-tulis');
+  if (tTulis) bagian.push(h('h4', { text: 'Data ditulis ke aplikasi' }), tTulis);
+  if (c.lampiran && typeof c.lampiran === 'object') {
+    bagian.push(h('h4', { text: 'Salin lampiran' }), tabelAngka(['Hasil', 'Jumlah'], Object.entries(c.lampiran).map(([k, v]) =>
+      [labelDari(NAMA_KOLOM, k), k === 'gagal' && v > 0 ? { buruk: true, n: v } : v]), 'sinkron-lampiran'));
+  }
+  if (typeof c.hilang === 'string') bagian.push(h('h4', { text: 'Ditandai hilang di ClickUp' }), h('p', { class: 'kecil', text: c.hilang }));
+  else if (c.hilang && typeof c.hilang === 'object') {
+    const t = tabelEntitas(c.hilang, 'sinkron-hilang');
+    if (t) bagian.push(h('h4', { text: 'Ditandai hilang di ClickUp' }), t);
+  }
+  if (Array.isArray(c.space_privat) && c.space_privat.length) {
+    bagian.push(h('h4', { text: 'Anggota space privat' }), tabelAngka(['Space', 'List dibaca', 'Anggota', 'Hasil'],
+      c.space_privat.map((sp) => [String(sp.space_id ?? '—'), sp.list ?? 0, sp.anggota ?? 0, sp.ok === false ? 'tidak lengkap (tidak dikirim)' : 'ok']),
+      'sinkron-space', { kolomAngka: [true, true, false] }));
+  }
+  if (c.clickup && typeof c.clickup === 'object' && Object.keys(c.clickup).length) {
+    bagian.push(h('h4', { text: 'Pemakaian API ClickUp' }), tabelAngka(['Ukuran', 'Nilai'], Object.entries(c.clickup).map(([k, v]) =>
+      [labelDari(NAMA_UKURAN, k), k === 'tunggu_ms' && typeof v === 'number' ? `${(v / 1000).toLocaleString('id-ID', { maximumFractionDigits: 1 })} detik`
+        : k === 'r429' && v > 0 ? { buruk: true, n: v } : v]), 'sinkron-clickup', { kolomAngka: false }));
+  }
+  if (galat.length) {
+    // pesan galat = log teknis importer apa adanya (bisa berisi path API ClickUp); konteksnya diberi label Indonesia
+    bagian.push(h('h4', { text: `Galat (${galat.length})` }), h('ul', { class: 'kecil', 'data-uji': 'sinkron-galat' }, galat.slice(0, 20).map((g) => {
+      if (!g || typeof g !== 'object') return h('li', { class: 'teks-log', text: String(g) });
+      const konteks = [g.task_id ? `tugas ${g.task_id}` : null, g.fase ? `tahap ${labelDari(NAMA_FASE, g.fase).toLowerCase()}` : null,
+        g.status ? `HTTP ${g.status}` : null].filter(Boolean).join(' · ');
+      return h('li', {}, konteks ? `${konteks}: ` : null, h('span', { class: 'teks-log', text: g.err || g.message || 'tanpa pesan' }));
+    })), galat.length > 20 ? h('p', { class: 'redup kecil', text: `… ${galat.length - 20} galat lain ada di rincian teknis.` }) : null);
+  }
+  if (selisih.length) {
+    const baris = selisih.slice(0, 50).map((d) => (d && typeof d === 'object'
+      ? [String(d.list_id ?? '—'), labelDari(NAMA_SENSUS, d.kunci ?? '—'), d.clickup ?? '—', d.db ?? '—']
+      : [String(d), '—', '—', '—']));
+    bagian.push(h('h4', { text: `Selisih sensus (${selisih.length})` }),
+      tabelAngka(['List', 'Ukuran', 'ClickUp', 'Aplikasi'], baris.map((b) => [b[0], b[1], typeof b[2] === 'string' && b[2].length > 16 ? `${b[2].slice(0, 12)}…` : b[2],
+        typeof b[3] === 'string' && b[3].length > 16 ? `${b[3].slice(0, 12)}…` : b[3]]), 'sinkron-selisih', { kolomAngka: false }),
+      selisih.length > 50 ? h('p', { class: 'redup kecil', text: `… ${selisih.length - 50} selisih lain ada di rincian teknis.` }) : null);
+  }
+  if (!bagian.length) bagian.push(h('p', { class: 'redup kecil', text: 'Run ini tidak mencatat hitungan.' }));
+  return h('li', { class: 'kartu', 'data-run': x.id },
+    h('details', { class: 'run-sinkron', open: terbuka },
+      h('summary', {},
+        h('strong', { text: `#${x.id} · ${x.mode === 'uji' ? 'uji (tanpa tandai hilang)' : x.mode}` }),
+        galat.length ? h('span', { class: 'chip telat', text: `${galat.length} galat` }) : h('span', { class: 'chip selesai', text: '0 galat' }),
+        h('span', { class: `chip ${selisih.length ? 'hari-ini' : 'selesai'}`, text: `${selisih.length} selisih` }),
+        h('span', { class: 'waktu-run', text: `Mulai ${fmtWaktu(x.started_at)} · ${x.finished_at ? `selesai ${fmtWaktu(x.finished_at)}` : 'belum selesai'}` })),
+      bagian,
+      h('details', { class: 'lipat-sentuh' }, h('summary', { text: 'Rincian teknis (JSON)' }),
+        h('pre', { class: 'json', text: JSON.stringify({ counts: x.counts, census: x.census, diffs: x.diffs, errors: x.errors }, null, 2) }))));
+}
+
 async function tabSinkron(el) {
   const r = await rpc('web_admin_sinkron');
-  const ringkas = (obj) => {
-    if (!obj || typeof obj !== 'object') return '';
-    return Object.entries(obj).map(([k, v]) => (v && typeof v === 'object' && !Array.isArray(v)
-      ? `${k}: ${Object.entries(v).map(([a, b]) => `${a} ${b}`).join(', ')}` : `${k}: ${Array.isArray(v) ? v.length : v}`)).join(' · ');
-  };
   kosongkan(el,
-    h('p', { class: 'redup kecil', text: `Mode: ${r.mode}. Sinkron otomatis dijalankan GitHub Actions (05:45 WIB); pemicu manual ada di Actions.` }),
-    r.runs.length ? h('ul', { class: 'daftar-tugas', 'data-uji': 'daftar-sinkron' }, r.runs.map((x) => {
-      const galat = Array.isArray(x.errors) ? x.errors.length : 0;
-      const selisih = Array.isArray(x.diffs) ? x.diffs.length : 0;
-      return h('li', { class: 'kartu' },
-        h('div', { class: 'baris-aksi' }, h('strong', { class: 'spasi', text: `#${x.id} · ${x.mode}` }),
-          galat ? h('span', { class: 'chip telat', text: `${galat} galat` }) : h('span', { class: 'chip selesai', text: '0 galat' }),
-          h('span', { class: `chip ${selisih ? 'hari-ini' : 'selesai'}`, text: `${selisih} selisih` })),
-        h('div', { class: 'redup kecil', text: `Mulai ${fmtWaktu(x.started_at)} · ${x.finished_at ? `selesai ${fmtWaktu(x.finished_at)}` : 'belum selesai'}` }),
-        x.counts ? h('div', { class: 'kecil', text: ringkas(x.counts) }) : null,
-        h('details', {}, h('summary', { class: 'kecil', text: 'Rincian (JSON)' }),
-          h('pre', { class: 'json', text: JSON.stringify({ counts: x.counts, census: x.census, diffs: x.diffs, errors: x.errors }, null, 2) })));
-    })) : h('p', { class: 'kosong', text: 'Belum ada run sinkron.' }));
+    h('p', { class: 'redup kecil', text: `Mode: ${r.mode}. Sinkron otomatis dijalankan GitHub Actions (05:45 WIB); pemicu manual ada di Actions. Run terbaru terbuka; ketuk run lain untuk melihat hitungannya.` }),
+    r.runs.length ? h('ul', { class: 'daftar-tugas', 'data-uji': 'daftar-sinkron' }, r.runs.map((x, i) => nodeRun(x, i === 0)))
+      : h('p', { class: 'kosong', text: 'Belum ada run sinkron.' }));
 }

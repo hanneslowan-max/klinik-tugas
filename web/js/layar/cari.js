@@ -1,4 +1,6 @@
 // Cari: nama, kode (Y7, FX-PM-…), isi, ID lama, atau tempel URL app.clickup.com/t/… (web_cari).
+// URL list ClickUp (/v/l/…, /v/li/…, /v/b/…) atau tautan list aplikasi (/l/<id>) → web_cari.rujukan {type:'list'} →
+// langsung membuka list itu; URL folder/space → kartu di wadah itu + tautan ke Jelajah (perbaikan P6).
 import { rpc, pesanGalat } from '../api.js';
 import { struktur } from '../sesi.js';
 import { h, kosongkan } from '../util.js';
@@ -42,7 +44,16 @@ export async function tampil(ctx) {
         ctx.navigasi(`/t/${encodeURIComponent(persis.id)}`);
         return;
       }
+      const ruj = r.rujukan;
+      if (ruj && ruj.type === 'list' && ruj.id) {
+        ctx.navigasi(`/l/${encodeURIComponent(ruj.id)}`);
+        return;
+      }
+      const NAMA_WADAH = { folder: 'folder', space: 'space' };
       kosongkan(hasil,
+        ruj && NAMA_WADAH[ruj.type] ? h('div', { class: 'kotak-info', 'data-uji': 'rujukan-wadah' },
+          `Tautan ${NAMA_WADAH[ruj.type]} ClickUp: kartu di ${NAMA_WADAH[ruj.type]} itu ada di bawah. `,
+          h('a', { href: '/jelajah', class: 'tautan-sentuh' }, 'Buka Jelajah')) : null,
         h('p', { class: 'redup kecil', text: `${r.hasil.length} hasil${r.hasil.length >= 50 ? ' (maks. 50, persempit kata kunci)' : ''}` }),
         daftarTugas(r.hasil, { tampilList: true, kosong: idRujukan ? `Tugas ${idRujukan} tidak ditemukan.` : 'Tidak ada yang cocok.' }));
     } catch (e) {

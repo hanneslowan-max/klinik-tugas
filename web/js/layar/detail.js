@@ -5,7 +5,7 @@ import { sesi } from '../sesi.js';
 import { renderMarkdown } from '../md.js';
 import {
   h, kosongkan, ikon, avatar, toast, lembar, konfirmasi, salinTeks, statusPil, fmtTanggal, fmtWaktu, fmtRelatif,
-  fmtJamWib, ukuranBerkas, urlAman, teksBertautan, PRIORITAS, NAMA_HARI, hariDalamMinggu, chipDue,
+  fmtJamWib, fmtWaktuPanjang, ukuranBerkas, urlAman, teksBertautan, PRIORITAS, NAMA_HARI, hariDalamMinggu, chipDue,
 } from '../util.js';
 import {
   daftarTugas, pilihAnggota, pilihList, dialogBuatTugas, peringatanTanggal, selisihAssignee, hapusPermanen,
@@ -147,11 +147,13 @@ export async function tampil(ctx) {
         kotakPeringatan(t),
         h('section', { class: 'kartu kolom-field', 'aria-label': 'Field tugas' },
           fieldStatus(t), fieldAssignee(), fieldDue(t, hi), fieldMulai(t, hi), fieldPrioritas(t),
-          d.parent ? baris('Induk', h('a', { href: `/t/${encodeURIComponent(d.parent.id)}` }, d.parent.name, d.parent.deleted ? ' (di Sampah)' : '')) : null,
+          d.parent ? baris('Induk', h('a', { class: 'tautan-sentuh', href: `/t/${encodeURIComponent(d.parent.id)}` }, d.parent.name, d.parent.deleted ? ' (di Sampah)' : '')) : null,
+          fieldTag(t),
           baris('Dibuat', h('span', { class: 'kecil' }, `${fmtWaktu(t.created_at)}${t.creator ? ` · ${t.creator.username}` : ''}`)),
           baris('Diubah', h('span', { class: 'kecil', text: fmtWaktu(t.updated_at) })),
           t.closed_at ? baris('Ditutup', h('span', { class: 'kecil', text: `${fmtWaktu(t.closed_at)}${t.reopen_count ? ` · dibuka ulang ${t.reopen_count}×` : ''}` })) : null),
         bagianDeskripsi(t),
+        bagianChecklist(t),
         bagianSubtugas(t),
         bagianLampiran(),
         bagianTab());
@@ -283,6 +285,46 @@ export async function tampil(ctx) {
     return baris('Prioritas', [sel, tanda]);
   }
 
+  // ------------------------------------------------------------------ tag & checklist (kartu ClickUp, hanya-baca)
+  // Diimpor verbatim ke tasks.extra (perbaikan P1/PR-1: bentuk ClickUp). Aplikasi belum bisa mengubahnya → chip saja.
+  const warnaAman = (w) => (typeof w === 'string' && /^#[0-9a-f]{3,8}$/i.test(w) ? w : null);
+  const daftarExtra = (t, k) => (t.extra && Array.isArray(t.extra[k]) ? t.extra[k] : []);
+
+  function fieldTag(t) {
+    const tags = daftarExtra(t, 'tags').filter((x) => x && x.name);
+    if (!tags.length) return null;
+    return baris('Label', h('span', { class: 'nilai-tag', 'data-uji': 'tag-tugas' }, tags.map((x) => h('span', {
+      class: 'chip tag', vars: { '--warna': warnaAman(x.tag_bg) }, title: 'Label dari ClickUp (hanya-baca)' }, x.name))));
+  }
+
+  function butirChecklist(items) {
+    const urut = [...items].filter(Boolean).sort((a, b) => (Number(a.orderindex) || 0) - (Number(b.orderindex) || 0));
+    return h('ul', { class: 'checklist-butir' }, urut.map((it) => h('li', {},
+      h('span', { class: `chip butir${it.resolved ? ' beres' : ''}`, 'data-beres': it.resolved ? '1' : '0' },
+        h('span', { class: 'sr', text: it.resolved ? 'Selesai: ' : 'Belum: ' }),
+        it.resolved ? ikon('centang') : h('span', { 'aria-hidden': 'true', text: '○' }),
+        h('span', { class: 'teks-butir', text: it.name || '(tanpa nama)' })),
+      Array.isArray(it.children) && it.children.length ? butirChecklist(it.children) : null)));
+  }
+
+  function bagianChecklist(t) {
+    const cls = daftarExtra(t, 'checklists').filter((c) => c && Array.isArray(c.items));
+    if (!cls.length) return null;
+    const hitung = (items) => items.reduce((n, it) => {
+      const anak = Array.isArray(it.children) ? hitung(it.children) : [0, 0];
+      return [n[0] + (it.resolved ? 1 : 0) + anak[0], n[1] + 1 + anak[1]];
+    }, [0, 0]);
+    return h('section', { 'aria-label': 'Checklist', 'data-uji': 'checklist' },
+      h('h3', { text: 'Checklist' }),
+      h('p', { class: 'redup kecil', text: 'Dari ClickUp, hanya-baca. Centang di ClickUp; perubahan masuk lewat sinkron.' }),
+      cls.map((c) => {
+        const [beres, total] = hitung(c.items);
+        return h('div', { class: 'checklist' },
+          h('div', { class: 'checklist-kepala' }, h('span', { text: c.name || 'Checklist' }), h('span', { class: 'chip garis', text: `${beres}/${total}` })),
+          c.items.length ? butirChecklist(c.items) : h('p', { class: 'redup kecil', text: 'Belum ada butir.' }));
+      }));
+  }
+
   // ------------------------------------------------------------------ deskripsi
   function bagianDeskripsi(t) {
     const isiMd = t.markdown || '';
@@ -290,7 +332,7 @@ export async function tampil(ctx) {
     const badan = h('div');
     if (bolehUbah()) {
       const seg = h('div', { class: 'segmen', role: 'tablist', 'aria-label': 'Mode deskripsi' });
-      for (const [k, label] of [['lihat', 'Lihat'], ['edit', 'Edit'], ['pratinjau', 'Pratinjau']]) {
+      for (const [k, label] of [['lihat', 'Lihat'], ['edit', 'Ubah'], ['pratinjau', 'Pratinjau']]) {
         seg.append(h('button', { type: 'button', role: 'tab', 'aria-selected': modeDesk === k ? 'true' : 'false', 'data-uji': `desk-${k}`, 'data-fokus': `desk-${k}`,
           onclick: () => {
             if (k !== 'lihat' && drafDesk === null) drafDesk = t.desc_unreadable ? (t.description_plain || isiMd) : isiMd;
@@ -444,7 +486,7 @@ export async function tampil(ctx) {
     const aksiKomentar = [];
     if (!c.dihapus && bolehKomentar()) {
       if (!balasan) aksiKomentar.push(h('button', { type: 'button', class: 'tombol polos', 'data-uji': 'balas', onclick: () => { balasKe = c.id; editKomentar = null; gambar(); fokusPenyusun(`balas-${c.id}`); } }, 'Balas'));
-      if (penulis) aksiKomentar.push(h('button', { type: 'button', class: 'tombol polos', onclick: () => { editKomentar = c.id; balasKe = null; gambar(); fokusPenyusun(`edit-${c.id}`); } }, 'Edit'));
+      if (penulis) aksiKomentar.push(h('button', { type: 'button', class: 'tombol polos', onclick: () => { editKomentar = c.id; balasKe = null; gambar(); fokusPenyusun(`edit-${c.id}`); } }, 'Ubah'));
       if (penulis || sesi.owner) {
         aksiKomentar.push(h('button', { type: 'button', class: 'tombol polos', onclick: async () => {
           if (!await konfirmasi('Hapus komentar ini?', { ya: 'Hapus', bahaya: true })) return;
@@ -453,7 +495,7 @@ export async function tampil(ctx) {
       }
     }
     const teks = c.dihapus ? h('div', { class: 'komentar-teks dihapus', text: 'Komentar dihapus.' })
-      : editKomentar === c.id ? penyusun({ teksAwal: c.text, labelKirim: 'Simpan', placeholder: 'Edit komentar', batal: () => { editKomentar = null; gambar(); },
+      : editKomentar === c.id ? penyusun({ teksAwal: c.text, labelKirim: 'Simpan', placeholder: 'Ubah komentar', batal: () => { editKomentar = null; gambar(); },
         kirim: async (teksBaru) => {
           const r = await aksi('web_komentar_edit', { p_comment: c.id, p_teks: teksBaru }, 'Komentar disimpan');
           if (!r) return false;
@@ -468,8 +510,8 @@ export async function tampil(ctx) {
       h('div', { class: 'komentar-badan' },
         h('div', { class: 'komentar-kepala' },
           h('strong', { text: c.author ? c.author.username : 'tidak dikenal' }),
-          h('span', { class: 'redup', title: fmtWaktu(c.created_at), text: fmtRelatif(c.created_at, sesi.hariIni) }),
-          c.edited_at && !c.dihapus ? h('span', { class: 'redup', text: '(diedit)' }) : null,
+          h('span', { class: 'redup', title: fmtWaktuPanjang(c.created_at), text: fmtRelatif(c.created_at, sesi.hariIni) }),
+          c.edited_at && !c.dihapus ? h('span', { class: 'redup', title: `Diubah ${fmtWaktuPanjang(c.edited_at)}`, text: '(diubah)' }) : null,
           c.sumber === 'clickup' ? h('span', { class: 'chip garis', text: 'ClickUp' }) : null),
         teks,
         c.lampiran && c.lampiran.length ? h('ul', { class: 'lampiran-daftar' }, c.lampiran.map(nodeLampiran)) : null,
@@ -543,7 +585,7 @@ export async function tampil(ctx) {
       case 'hapus': return a.catatan === 'purge permanen' ? 'menghapus permanen' : 'memindah tugas ke Sampah';
       case 'pulih': return 'memulihkan tugas dari Sampah';
       case 'komentar': return ke && ke.parent_id ? 'membalas komentar' : 'berkomentar';
-      case 'komentar_edit': return 'mengedit komentar';
+      case 'komentar_edit': return 'mengubah komentar';
       case 'komentar_hapus': return 'menghapus komentar';
       case 'lampiran_tambah': return `menambah lampiran "${ke ? ke.title : ''}"`;
       case 'lampiran_hapus': return `menghapus lampiran "${dr ? dr.title : ''}"`;
@@ -584,7 +626,7 @@ export async function tampil(ctx) {
           beda ? h('div', { class: 'beda', text: beda }) : null,
           nodeSnapshot(a.snapshot),
           h('div', { class: 'waktu' },
-            h('span', { title: a.at, text: fmtWaktu(a.at) }),
+            h('span', { title: fmtWaktuPanjang(a.at), text: fmtWaktu(a.at) }),
             h('span', { class: 'chip garis', text: NAMA_SUMBER[a.sumber] || a.sumber }),
             a.at_awal ? h('span', { text: `berubah antara ${fmtWaktu(a.at_awal)} dan ${fmtWaktu(a.at)}` }) : null,
             a.lengkap === false ? h('span', { class: 'chip', title: 'Waktu/aktor tidak lengkap (data impor/sinkron)', text: 'tidak lengkap' }) : null,

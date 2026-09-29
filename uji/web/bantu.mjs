@@ -122,6 +122,11 @@ export function sqlLokal(sql) {
   const db = process.env.DB_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
   return execFileSync('psql', [db, '-X', '-At', '-v', 'ON_ERROR_STOP=1', '-c', sql], { encoding: 'utf8' }).trim();
 }
+/** SQL UBAH ke DB lokal (khusus tes: menyiapkan keadaan yang tidak bisa dibuat lewat web, mis. tasks.extra hasil impor,
+ *  atau memulihkan read_at notifikasi seed). Hanya data sintetis/uji; jangan dipakai untuk memeriksa hasil. */
+export function sqlUbahLokal(sql) {
+  return sqlLokal(`begin; select set_config('app.sumber', 'sistem', true); ${sql}; commit;`);
+}
 /** Nama objek Storage bucket lampiran di bawah t/<task>/ (termasuk yang yatim). */
 export function objekLampiran(taskId) {
   if (!/^[A-Za-z0-9_-]+$/.test(taskId)) throw new Error(`id tugas tidak wajar: ${taskId}`);

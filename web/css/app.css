@@ -164,9 +164,10 @@ h3 { font-size: 16px; margin: 16px 0 8px; }
 .bidang { display: block; margin: 0 0 12px; }
 .bidang > span:first-child { display: block; font-size: 13px; font-weight: 600; color: var(--teks-2); margin-bottom: 4px; }
 input[type="text"], input[type="email"], input[type="password"], input[type="search"], input[type="date"],
-input[type="number"], input[type="datetime-local"], select, textarea {
+input[type="number"], input[type="datetime-local"], input[type="time"], input[type="tel"], input[type="url"],
+input:not([type]), select, textarea {
   width: 100%; min-height: var(--tinggi-sentuh); padding: 8px 12px; border-radius: 10px; border: 1px solid var(--garis);
-  background: var(--permukaan); color: var(--teks); font-size: 16px; /* 16px: iOS tidak zoom */
+  background: var(--permukaan); color: var(--teks); font-size: 16px; /* 16px: iOS tidak zoom (lihat aturan penutup) */
 }
 textarea { min-height: 96px; resize: vertical; line-height: 1.45; }
 input[type="color"] { width: 48px; height: var(--tinggi-sentuh); padding: 2px; border: 1px solid var(--garis); border-radius: 10px; background: var(--permukaan); }
@@ -246,7 +247,8 @@ input:disabled, select:disabled, textarea:disabled { background: var(--permukaan
 .filter {
   display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 10px;
 }
-.filter select { font-size: 14px; min-height: var(--tinggi-sentuh); }
+.filter select { min-height: var(--tinggi-sentuh); }
+.lembar .filter { grid-template-columns: 1fr 1fr; }       /* di dialog selalu 2 kolom (bukan 4 kolom layar lebar) */
 .chip-baris { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 8px; margin: 0 0 6px; scrollbar-width: none; }
 .chip-baris::-webkit-scrollbar { display: none; }
 .chip-pilih {
@@ -262,8 +264,10 @@ input:disabled, select:disabled, textarea:disabled { background: var(--permukaan
 .segmen [aria-selected="true"], .segmen [aria-current="page"] { background: var(--permukaan); color: var(--teks); box-shadow: var(--bayang); }
 
 /* ------------------------------------------------------------------ jelajah */
-.remah { font-size: 13px; color: var(--teks-2); margin: 0 0 4px; display: flex; flex-wrap: wrap; gap: 4px; }
-.remah a { color: var(--teks-2); }
+.remah { font-size: 13px; color: var(--teks-2); margin: -6px 0 2px; display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; min-height: var(--tinggi-sentuh); }
+/* tautan remah = target sentuh penuh 44px (bukan tautan di tengah kalimat) */
+.remah a { color: var(--teks-2); display: inline-flex; align-items: center; min-height: var(--tinggi-sentuh); min-width: var(--tinggi-sentuh); padding: 0 2px; }
+.tautan-sentuh { display: inline-flex; align-items: center; min-height: var(--tinggi-sentuh); }
 .pohon-space { margin-bottom: 12px; }
 .pohon-space > h3 { margin: 4px 0 8px; display: flex; align-items: center; gap: 8px; }
 .pohon-folder { margin: 0 0 8px; }
@@ -315,6 +319,14 @@ input:disabled, select:disabled, textarea:disabled { background: var(--permukaan
 .kartu-papan.sortable-ghost { opacity: .35; }
 .sortable-fallback { opacity: .95 !important; transform: rotate(2deg); }
 .pegangan { display: none; }
+/* Board di layar lebar (≥900px): layar list melebar penuh (.isi.lebar, list.js) dan kolom membagi lebar layar
+   (min 260px, maks 480px) sehingga tidak ada kolom terpotong; kolom yang tak muat tetap bisa digeser. Tanpa snap.
+   HP & tablet sempit tetap: kolom 84vw, geser horizontal + snap, auto-scroll saat menyeret. */
+@media (min-width: 900px) {
+  .mode-board .papan { scroll-snap-type: none; margin: 0 -20px; padding-left: 20px; }
+  .mode-board .kolom { flex: 1 1 0; min-width: 260px; max-width: 480px; }
+  .mode-board .kolom:last-child { margin-right: 20px; }
+}
 
 /* ------------------------------------------------------------------ detail */
 .detail-kepala { margin: 0 0 12px; }
@@ -331,7 +343,7 @@ input:disabled, select:disabled, textarea:disabled { background: var(--permukaan
 .field:last-child { border-bottom: 0; }
 .field > .label { font-size: 13px; font-weight: 600; color: var(--teks-2); }
 .field > .nilai { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.field select, .field input { min-height: var(--tinggi-sentuh); font-size: 15px; }
+.field select, .field input { min-height: var(--tinggi-sentuh); }
 .field .nilai > select, .field .nilai > input { flex: 1 1 140px; width: auto; min-width: 0; }
 .field .nilai > .tombol.polos { min-width: var(--tinggi-sentuh); padding: 0 8px; }
 .baris-input { display: flex; align-items: center; gap: 4px; flex: 1 1 180px; min-width: 0; }
@@ -344,6 +356,19 @@ input:disabled, select:disabled, textarea:disabled { background: var(--permukaan
   font-size: 13px; font-weight: 600;
 }
 .assignee-chip.lebih { background: var(--peringatan-lembut); color: var(--peringatan); }
+/* tag & checklist kartu ClickUp (tasks.extra, hanya-baca) */
+.nilai-tag { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip.tag {
+  background: color-mix(in srgb, var(--warna, #8e8c99) 20%, var(--permukaan)); color: var(--teks);
+  border: 1px solid color-mix(in srgb, var(--warna, #8e8c99) 55%, transparent);
+}
+.checklist { margin: 0 0 10px; }
+.checklist-kepala { display: flex; align-items: center; gap: 8px; font-weight: 650; margin: 0 0 4px; }
+.checklist-butir { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.checklist-butir .checklist-butir { flex-basis: 100%; padding-left: 18px; }
+.chip.butir { height: auto; min-height: 28px; padding: 3px 10px; white-space: normal; background: var(--permukaan-2); color: var(--teks); }
+.chip.butir.beres { background: var(--sukses-lembut); color: var(--sukses); }
+.chip.butir.beres .teks-butir { text-decoration: line-through; }
 .tab-baris { display: flex; gap: 4px; border-bottom: 1px solid var(--garis); margin: 16px 0 12px; overflow-x: auto; }
 .tab-baris button {
   min-height: var(--tinggi-sentuh); padding: 0 14px; border: 0; background: none; font-weight: 650; color: var(--teks-2);
@@ -361,7 +386,7 @@ input:disabled, select:disabled, textarea:disabled { background: var(--permukaan
 .md blockquote { margin: 8px 0; padding-left: 12px; border-left: 3px solid var(--garis); color: var(--teks-2); }
 .md img { max-width: 100%; height: auto; }
 .md-kosong { color: var(--teks-3); font-style: italic; }
-.editor-md textarea { min-height: 200px; font-family: var(--mono); font-size: 14px; }
+.editor-md textarea { min-height: 200px; font-family: var(--mono); }
 
 .komentar { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--garis); scroll-margin-top: 80px; }
 .komentar:last-child { border-bottom: 0; }
@@ -408,16 +433,25 @@ input:disabled, select:disabled, textarea:disabled { background: var(--permukaan
 .riwayat .beda { font-size: 13px; color: var(--teks-2); margin-top: 4px; white-space: pre-wrap; word-break: break-word; }
 
 /* ------------------------------------------------------------------ dialog (lembar bawah di HP) */
+/* Kepala & kaki menempel, hanya isi yang bergulir: tombol aksi (Buat tugas / Simpan) selalu terlihat walau isinya
+   panjang. Keyboard virtual: util.pantauViewport() mengisi --vv-tinggi (tinggi viewport visual) dan --vv-bawah
+   (bagian layar yang tertutup keyboard, iOS Safari / Chrome Android "resizes-visual") → lembar naik di atas keyboard. */
 dialog.lembar {
-  width: 100%; max-width: 560px; max-height: 88dvh; margin: auto auto 0; padding: 0; border: 0;
+  width: 100%; max-width: 560px; max-height: min(88dvh, calc(var(--vv-tinggi, 100dvh) - 12px));
+  margin: auto auto var(--vv-bawah, 0px); padding: 0; border: 0; overflow: hidden;
   border-radius: 16px 16px 0 0; background: var(--permukaan); color: var(--teks); box-shadow: var(--bayang-besar);
 }
+dialog.lembar[open] { display: flex; flex-direction: column; }
 dialog.lembar::backdrop { background: rgba(0, 0, 0, .45); }
-@media (min-width: 600px) { dialog.lembar { margin: auto; border-radius: 16px; } }
-.lembar-kepala { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 16px; border-bottom: 1px solid var(--garis); position: sticky; top: 0; background: var(--permukaan); z-index: 1; }
-.lembar-kepala h2 { flex: 1; margin: 0; font-size: 17px; }
-.lembar-isi { padding: 14px 16px; overflow-y: auto; }
-.lembar-kaki { display: flex; gap: 8px; justify-content: flex-end; padding: 10px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--garis); flex-wrap: wrap; }
+@media (min-width: 600px) { html:not(.papan-ketik) dialog.lembar { margin: auto; border-radius: 16px; } }
+.lembar-kepala { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 16px; border-bottom: 1px solid var(--garis); background: var(--permukaan); }
+.lembar-kepala h2 { flex: 1; min-width: 0; margin: 0; font-size: 17px; }
+.lembar-isi { flex: 1 1 auto; min-height: 0; padding: 14px 16px; overflow-y: auto; overscroll-behavior: contain; }
+.lembar-kaki {
+  flex: none; display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; background: var(--permukaan);
+  padding: 10px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--garis);
+}
+html.papan-ketik .lembar-kaki { padding-bottom: 10px; }   /* keyboard terbuka: area aman bawah tertutup keyboard */
 .pilihan-anggota { list-style: none; margin: 0; padding: 0; }
 .pilihan-anggota label { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 4px; border-bottom: 1px solid var(--garis); cursor: pointer; }
 .pilihan-anggota input { flex: none; width: 22px; height: 22px; accent-color: var(--aksen); }
@@ -449,6 +483,8 @@ dialog.lembar::backdrop { background: rgba(0, 0, 0, .45); }
   font-weight: 700; box-shadow: var(--bayang-besar); display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
 }
 .fab svg { width: 20px; height: 20px; }
+/* ada FAB: ruang ekstra di bawah supaya baris/kartu terakhir tidak tertutup tombol */
+body.ada-fab .isi { padding-bottom: calc(var(--tinggi-bawah) + 92px + env(safe-area-inset-bottom)); }
 .layar-masuk { max-width: 400px; margin: 8vh auto 0; }
 .layar-masuk .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
 .layar-masuk .logo img { width: 44px; height: 44px; }
@@ -467,6 +503,26 @@ dialog.lembar::backdrop { background: rgba(0, 0, 0, .45); }
 .status-edit .tombol { min-width: var(--tinggi-sentuh); }
 .status-edit .tombol-baris { grid-column: 1 / -1; display: flex; gap: 4px; justify-content: flex-end; }
 pre.json { background: var(--permukaan-2); padding: 8px; border-radius: 8px; overflow-x: auto; font-size: 12px; max-height: 280px; }
+/* Admin › Sinkron: ringkasan hitungan per run */
+.run-sinkron > summary {
+  list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-height: var(--tinggi-sentuh);
+  cursor: pointer; padding: 4px 0;
+}
+.run-sinkron > summary::-webkit-details-marker { display: none; }
+.run-sinkron > summary::before { content: "▸"; color: var(--teks-3); transition: transform .15s; width: 12px; }
+.run-sinkron[open] > summary::before { transform: rotate(90deg); }
+.run-sinkron > summary strong { margin-right: auto; }
+.run-sinkron .waktu-run { flex-basis: 100%; padding-left: 20px; font-size: 13px; color: var(--teks-2); }
+.run-sinkron h4 { font-size: 14px; margin: 14px 0 6px; }
+.tabel-gulir { overflow-x: auto; margin: 0 0 4px; }
+.tabel-angka { border-collapse: collapse; font-size: 14px; width: 100%; max-width: 760px; }
+.tabel-angka th, .tabel-angka td { padding: 6px; border-bottom: 1px solid var(--garis); text-align: left; vertical-align: top; }
+.tabel-angka thead th { font-size: 12px; font-weight: 650; color: var(--teks-2); white-space: nowrap; }
+.tabel-angka tbody th { font-weight: 600; min-width: 7em; }
+.tabel-angka td.angka, .tabel-angka th.angka { text-align: right; font-variant-numeric: tabular-nums; }
+.tabel-angka td.nol { color: var(--teks-3); }
+.tabel-angka td.buruk { color: var(--bahaya); font-weight: 700; }
+.lipat-sentuh > summary { display: flex; align-items: center; min-height: var(--tinggi-sentuh); cursor: pointer; font-size: 13px; color: var(--teks-2); }
 
 @media (min-width: 720px) {
   .isi { padding-left: 20px; padding-right: 20px; }
@@ -474,3 +530,8 @@ pre.json { background: var(--permukaan-2); padding: 8px; border-radius: 8px; ove
   .field { grid-template-columns: 140px 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* PENUTUP (sengaja paling akhir & lebih spesifik): iOS Safari memperbesar layar bila kontrol teks yang difokus
+   bertulisan < 16px. Semua input/select/textarea minimal 16px di mana pun (kelas .kecil, .filter, .field, editor). */
+html :is(input:not([type="checkbox"], [type="radio"], [type="file"], [type="color"], [type="range"], [type="button"],
+  [type="submit"], [type="reset"], [type="image"], [type="hidden"]), select, textarea) { font-size: 16px; }

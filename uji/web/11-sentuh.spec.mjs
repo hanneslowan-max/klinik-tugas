@@ -1,5 +1,5 @@
-// Target sentuh ≥ 44×44 px di layar utama (390px). Pengecualian: tautan di dalam teks (remah, komentar, markdown)
-// dan input checkbox/berkas yang dibungkus label ≥ 44px.
+// Target sentuh ≥ 44×44 px di layar utama (390px). Pengecualian: tautan di tengah kalimat (komentar, markdown) dan
+// input checkbox/berkas yang dibungkus label ≥ 44px. Tautan remah (list induk) TIDAK dikecualikan lagi (poles #6).
 import { test, expect, masuk, AKUN, siapkanPapan, buatTugas, bersihkanTugas, tanggalWib } from './bantu.mjs';
 
 test.afterAll(async () => { await bersihkanTugas(); });
@@ -9,7 +9,7 @@ async function kecil(page) {
     const hasil = [];
     const sel = 'button, a[href], select, input, textarea, summary, [role=tab]';
     for (const el of document.querySelectorAll(sel)) {
-      if (el.closest('.remah, .komentar-teks, .md, .sr, .lompat, dialog:not([open])')) continue;
+      if (el.closest('.komentar-teks, .md, .sr, .lompat, dialog:not([open])')) continue;
       if (el.matches('input[type=checkbox], input[type=file], input[type=radio]')) {
         const lab = el.closest('label');
         if (lab && lab.getBoundingClientRect().height >= 44) continue;

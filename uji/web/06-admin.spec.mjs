@@ -151,9 +151,9 @@ test('owner: tambah/aktifkan anggota → login pertama wajib ganti password → 
   await page.reload();
   await item.getByRole('button', { name: /Ubah/ }).click();
   await page.locator('[data-uji=reset-password]').click();
-  const dReset = page.getByRole('dialog', { name: /Reset password/ });
+  const dReset = page.getByRole('dialog', { name: /Setel ulang password/ });
   const sandiReset = await dReset.locator('input[name=password-sementara]').inputValue();
-  await dReset.getByRole('button', { name: 'Reset password' }).click();
+  await dReset.getByRole('button', { name: 'Setel ulang password' }).click();
   await expect(page.locator('[data-uji=sandi-sementara]')).toHaveText(sandiReset);
   await page.getByRole('button', { name: 'Selesai' }).click();
   await expect(item).toContainText('wajib ganti password');

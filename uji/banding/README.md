@@ -27,11 +27,15 @@
 
 ## Beda yang TIDAK dinormalisasi (temuan)
 
-| ID | Temuan |
-|---|---|
-| PR-1 | `tags` dan `checklists` kartu impor selalu `[]` di API app (`j_task` memakai konstanta sesuai ARSITEKTUR §6), padahal isinya tersimpan di `tasks.extra`. Terlihat di `task <id>` dan `tasks --full`. Permintaan perubahan ke A2/kontrak |
+Tidak ada (daftar `DIKETAHUI` di `normalisasi.mjs` kosong; `--izinkan-diketahui` tidak lagi dibutuhkan).
+
+| ID | Temuan | Status |
+|---|---|---|
+| PR-1 | `tags` dan `checklists` kartu impor selalu `[]` di API app | **Selesai 29 Sep (P1)**: `j_task` mengisi dari `tasks.extra` (verbatim, termasuk kunci null di item checklist). Kartu app tetap `[]` |
+
+Space privat fixture (`Ruang Arsip B2`) terlihat oleh pemilik token tiruan karena importer kini mengirim anggota space privat (jenis `space_anggota`, P2): gabungan `/list/{id}/member` + owner/admin `/team`. Bantuan psql (insert `space_anggota`) di skrip banding sudah dihapus.
 
 ## Asumsi mock yang WAJIB dicek dengan probe ClickUp asli
 
 Mock sengaja mengikuti asumsi kontrak A2 untuk perilaku yang belum diprobe (kalau ClickUp ternyata beda, mock + app perlu disesuaikan):
-urutan default `GET /list/{id}/task` (created desc, id); `include_closed=false` ikut membuang status bertipe `done`; urutan balasan (terlama dulu); lampiran komentar ikut muncul di `task.attachments`; urutan `assignees` (fixture memakai urut id / urut penugasan); `text_content`/`description` = `""` saat kosong; `reply_count` berupa string; `date` lampiran berupa string ms.
+urutan default `GET /list/{id}/task` (created desc, id); `GET /list/{id}/member` space privat = orang yang punya akses ke list itu (owner/admin tidak otomatis tercantum; impor/README.md); `include_closed=false` ikut membuang status bertipe `done`; urutan balasan (terlama dulu); lampiran komentar ikut muncul di `task.attachments`; urutan `assignees` (fixture memakai urut id / urut penugasan); `text_content`/`description` = `""` saat kosong; `reply_count` berupa string; `date` lampiran berupa string ms.

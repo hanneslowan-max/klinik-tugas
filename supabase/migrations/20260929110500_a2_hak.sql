@@ -22,7 +22,8 @@ declare
     'norm_impor_komentar', 'sha256_hex', 'muat_members', 'muat_struktur', 'muat_list_statuses', 'muat_tasks',
     'muat_task_assignees', 'set_mentions_impor', 'muat_comment_mentions', 'muat_comments', 'muat_attachments',
     'muat_sync_raw', 'muat_workspace', 'j_lampiran_web', 'j_komentar_web', 'body_web', 'mulai_web',
-    'struktur_penjaga', 'anggota_impor_wajib', 'set_space_anggota_impor'];     -- 2 terakhir: review R1/R2
+    'struktur_penjaga', 'anggota_impor_wajib', 'set_space_anggota_impor',      -- 2 terakhir: review R1/R2
+    'rujukan_urai', 'rujukan_wadah', 'muat_space_anggota', 'list_diarsip'];    -- perbaikan P2/P5/P6
 begin
   for f in
     select p.oid::regprocedure as sig, p.proname

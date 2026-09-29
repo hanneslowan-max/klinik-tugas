@@ -68,8 +68,10 @@ Tambahan, khusus mode tugas:
 
 ```
 node cli/tugas.mjs activity <task_id>                      riwayat kartu (x_activity)
-node cli/tugas.mjs resolve <id|url>                        ID/URL app atau app.clickup.com/t/… → {type,id,url}
-node cli/tugas.mjs search "<q>" [--space id] [--closed]    nama/kode/isi/ID/URL, maks 50
+node cli/tugas.mjs resolve <id|url>                        ID/URL app, app.clickup.com/t/…, atau URL list/board/folder/space
+                                                           ClickUp (/v/li/<id>, /v/l/6-<list>-1, /v/b/6-<list>-2, /v/f/<id>,
+                                                           /v/s/<id>) → {type,id,url}
+node cli/tugas.mjs search "<q>" [--space id] [--closed]    nama/kode/isi/ID/URL, maks 50; URL list/folder/space → kartu di dalamnya
 node cli/tugas.mjs verify [--list id] [--folder id] [--space id] [--sumber clickup|app]   hitungan sensus
 node cli/tugas.mjs tenggat [--tanggal YYYY-MM-DD] [--folder id]   B10/B5
 node cli/tugas.mjs comment <task_id> --reply-to <comment_id> --text "..." [--dry-run]   balasan thread

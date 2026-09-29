@@ -40,7 +40,10 @@ const PRIORITAS = {
   4: { id: "4", priority: "low", color: "#d8d8d8", orderindex: "4" },
 };
 
-const MIME_EKST = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", pdf: "application/pdf", csv: "text/csv", svg: "image/svg+xml", txt: "text/plain" };
+const MIME_EKST = {
+  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", pdf: "application/pdf", csv: "text/csv", svg: "image/svg+xml", txt: "text/plain",
+  xls: "application/vnd.ms-excel", tsv: "text/tab-separated-values", heic: "image/heic", zip: "application/zip",
+};
 
 // ---------------------------------------------------------------- model
 export function muatModel({ varian = "awal", run = "0000", dir = FIXTURE_DIR } = {}) {
@@ -100,6 +103,7 @@ export function muatModel({ varian = "awal", run = "0000", dir = FIXTURE_DIR } =
   for (const f of fx.folders) wajib(m.spaces.has(f.space), `folder ${f.id}: space ${f.space} tak ada`);
   for (const l of fx.lists) {
     wajib(m.spaces.has(l.space), `list ${l.id}: space tak ada`);
+    for (const u of l.anggota || []) wajib(m.users.has(u), `list ${l.id}: anggota ${u} tak ada`);
     wajib(l.folder === null || m.folders.has(l.folder), `list ${l.id}: folder tak ada`);
     wajib(l.folder !== null || l.folder_hidden_id, `list ${l.id}: list tanpa folder wajib folder_hidden_id`);
   }
@@ -344,7 +348,7 @@ export async function mulaiMock(opsi = {}) {
   } = opsi;
   let m = muatModel({ varian, run, dir });
   const stat = { total: 0, perJalur: {}, nonGet: [], r429: 0, unduh: 0, tanpaAuth: 0, komentarLanjut: 0 };
-  const hidup = { tis, tolak429Setiap }; // bisa diubah saat jalan lewat setel()
+  const hidup = { tis, tolak429Setiap, tolakJalur: null }; // bisa diubah saat jalan lewat setel(); tolakJalur: RegExp → 403
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, "http://x");
@@ -378,6 +382,7 @@ export async function mulaiMock(opsi = {}) {
       });
     }
     const jalur = p.slice("/api/v2".length);
+    if (hidup.tolakJalur && hidup.tolakJalur.test(jalur)) return kirim(res, 403, { err: "Akses ditolak (tiruan)", ECODE: "ACCESS_TIRUAN" });
     const kunci = jalur.replace(/\/(?=[0-9a-z]*\d)[0-9a-z]{6,}(?=\/|$)/gi, "/:id");
     if (q.get("start_id")) stat.komentarLanjut++;
     stat.perJalur[kunci] = (stat.perJalur[kunci] || 0) + 1;
@@ -447,8 +452,14 @@ function rute(m, jalur, q, { tis }) {
     return l ? jList(m, l, { statuses: true }) : new Galat(404, { err: "List not found", ECODE: "SUBCAT_016" });
   }
   if ((g = jalur.match(/^\/list\/([^/]+)\/member$/))) {
-    if (!m.lists.has(g[1])) return new Galat(404, { err: "List not found", ECODE: "SUBCAT_016" });
-    return { members: [...m.users.values()].filter((u) => u.tim).map((u) => ({ ...jUserMember(u), profileInfo: {} })) };
+    const l = m.lists.get(g[1]);
+    if (!l) return new Galat(404, { err: "List not found", ECODE: "SUBCAT_016" });
+    // ASUMSI (probe, perbaikan P2): list di space PRIVAT → hanya orang yang diberi akses (fixture `anggota` list, atau
+    // `anggota` space); owner/admin workspace TIDAK otomatis tercantum. List di space publik → semua anggota tim.
+    const sp = m.spaces.get(l.space);
+    const ids = l.anggota ?? sp?.anggota ?? (sp?.private ? [] : null);
+    const users = ids ? ids.map((id) => m.users.get(id)) : [...m.users.values()].filter((u) => u.tim);
+    return { members: users.map((u) => ({ ...jUserMember(u), profileInfo: {} })) };
   }
   if ((g = jalur.match(/^\/list\/([^/]+)\/field$/))) {
     return m.lists.has(g[1]) ? { fields: [] } : new Galat(404, { err: "List not found", ECODE: "SUBCAT_016" });

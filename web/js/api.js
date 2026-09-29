@@ -94,12 +94,18 @@ export async function edgeAdmin(jalur, body) {
 
 // ------------------------------------------------------------------ Storage lampiran
 export const BUCKET = 'lampiran';
+// SAMA dengan allowlist bucket 'lampiran' (migrasi 20260929100400, perbaikan P3) dan impor/sinkron.mjs MIME_IZIN.
+// CSV dari Excel Windows sering bertipe application/vnd.ms-excel → diterima apa adanya (bucket mengizinkan).
 export const MIME_IZIN = {
   'image/png': ['png'], 'image/jpeg': ['jpg', 'jpeg'], 'image/webp': ['webp'], 'image/gif': ['gif'],
+  'image/heic': ['heic'], 'image/heif': ['heif'],
   'application/pdf': ['pdf'],
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['docx'],
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['xlsx'],
-  'text/csv': ['csv'], 'text/plain': ['txt'],
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['pptx'],
+  'application/msword': ['doc'],
+  'application/vnd.ms-excel': ['xls'],
+  'text/csv': ['csv'], 'text/plain': ['txt'], 'text/tab-separated-values': ['tsv'],
 };
 export const BATAS_BERKAS = 25 * 1024 * 1024;
 export const ACCEPT = Object.values(MIME_IZIN).flat().map((e) => `.${e}`).join(',');
@@ -119,7 +125,7 @@ function namaAman(nama) {
 /** Unggah ke t/<task>/<uuid>-<nama> lalu catat lewat web_lampiran_catat. */
 export async function unggahLampiran(taskId, file, commentId = null) {
   const mime = mimeBerkas(file);
-  if (!mime) throw new GalatApi({ message: `Tipe berkas tidak diizinkan: ${file.name}. Boleh: gambar, PDF, DOCX, XLSX, CSV, TXT.` });
+  if (!mime) throw new GalatApi({ message: `Tipe berkas tidak diizinkan: ${file.name}. Boleh: gambar (termasuk HEIC), PDF, DOC/DOCX, XLS/XLSX, PPTX, CSV, TSV, TXT.` });
   if (file.size > BATAS_BERKAS) throw new GalatApi({ message: `Berkas ${file.name} melebihi 25 MB.` });
   const path = `t/${taskId}/${crypto.randomUUID()}-${namaAman(file.name)}`;
   const { error } = await klien.storage.from(BUCKET).upload(path, file, { contentType: mime, upsert: false, cacheControl: '3600' });

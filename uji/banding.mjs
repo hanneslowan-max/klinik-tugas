@@ -113,8 +113,8 @@ try {
     if (r.code !== 0 || r.json?.sensus?.selisih !== 0) throw new Error(`impor fixture gagal/selisih: kode ${r.code} ${r.stderr.slice(-400)}`);
   }
   const model = mock.model;
-  // (R2) importer belum mengirim `members` space; ClickUp menyajikan space privat ke pemilik token → beri keanggotaan (sumber app)
-  for (const s of model.spaces.values()) if (s.private) psql(`insert into public.space_anggota (space_id, member_id) values ('${s.id}', ${model.pemilik}) on conflict do nothing`);
+  // (P2) importer mengirim anggota space privat (jenis space_anggota: /list/{id}/member + owner/admin /team), jadi
+  // pemilik token ClickUp tiruan (owner ClickUp, anggota biasa di app) melihat space privat tanpa bantuan tes.
   const tBaca = await tok.buat(model.pemilik, "baca", "pembaca");
   const asli = siapkanClickupAsli(mock.base);
   console.log(`clickup.mjs asli: ${asli.asli} (sha ${asli.sha.slice(0, 12)}) → ${asli.f} (2 baris diganti: BASE, URL v3)`);

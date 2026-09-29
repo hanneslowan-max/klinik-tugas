@@ -317,14 +317,16 @@ begin
   if r ? 'extra' and jsonb_typeof(r -> 'extra') = 'object' then
     v_extra := r -> 'extra';
   else
-    v_extra := jsonb_strip_nulls(jsonb_build_object(
-      'tags', case when jsonb_typeof(r -> 'tags') = 'array' and jsonb_array_length(r -> 'tags') > 0 then r -> 'tags' end,
-      'checklists', case when jsonb_typeof(r -> 'checklists') = 'array' and jsonb_array_length(r -> 'checklists') > 0
-                         then r -> 'checklists' end,
-      'custom_fields', case when jsonb_typeof(r -> 'custom_fields') = 'array'
-                              and exists (select 1 from jsonb_array_elements(r -> 'custom_fields') f
-                                           where f.value ? 'value' and f.value -> 'value' not in ('null'::jsonb, '""'::jsonb))
-                            then r -> 'custom_fields' end));
+    -- (perbaikan P1) isi VERBATIM: kunci bernilai null di dalam checklist/tag/custom field (assignee, parent, …)
+    -- dipertahankan supaya task json app sama persis dengan ClickUp (dulu jsonb_strip_nulls membuangnya).
+    v_extra := case when jsonb_typeof(r -> 'tags') = 'array' and jsonb_array_length(r -> 'tags') > 0
+                    then jsonb_build_object('tags', r -> 'tags') else '{}'::jsonb end
+            || case when jsonb_typeof(r -> 'checklists') = 'array' and jsonb_array_length(r -> 'checklists') > 0
+                    then jsonb_build_object('checklists', r -> 'checklists') else '{}'::jsonb end
+            || case when jsonb_typeof(r -> 'custom_fields') = 'array'
+                          and exists (select 1 from jsonb_array_elements(r -> 'custom_fields') f
+                                       where f.value ? 'value' and f.value -> 'value' not in ('null'::jsonb, '""'::jsonb))
+                    then jsonb_build_object('custom_fields', r -> 'custom_fields') else '{}'::jsonb end;
   end if;
   return jsonb_build_object(
     'id', r ->> 'id',

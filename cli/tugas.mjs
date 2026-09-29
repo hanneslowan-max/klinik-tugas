@@ -8,8 +8,10 @@
 //   dengan clickup.mjs; di mode tugas prefix pesan "clickup:" menjadi "tugas:".
 //   Tambahan KHUSUS mode tugas:
 //   node tools/tugas.mjs activity <task_id>                           riwayat kartu (siapa ubah apa, kapan)
-//   node tools/tugas.mjs resolve <id|url>                             ID/URL (termasuk app.clickup.com/t/…) → {type,id,url}
-//   node tools/tugas.mjs search "<q>" [--space id] [--closed]         cari nama/kode/isi/ID/URL (cek duplikat M6)
+//   node tools/tugas.mjs resolve <id|url>                             ID/URL (app.clickup.com/t/…, URL list/board/folder/space
+//                                                                     ClickUp mis. /v/l/6-<list>-1, /v/b/6-<list>-2) → {type,id,url}
+//   node tools/tugas.mjs search "<q>" [--space id] [--closed]         cari nama/kode/isi/ID/URL (cek duplikat M6); URL list/
+//                                                                     folder/space → kartu di dalamnya
 //   node tools/tugas.mjs verify [--list id] [--folder id] [--space id] [--sumber clickup|app]   hitungan sensus
 //   node tools/tugas.mjs tenggat [--tanggal YYYY-MM-DD] [--folder id]    angka B10/B5 (telat, hari ini, ≤3 HK, H-1, beban)
 //   node tools/tugas.mjs comment <task_id> --reply-to <comment_id> --text "..." | --file <path> [--dry-run]   balasan thread

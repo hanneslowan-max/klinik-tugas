@@ -1,7 +1,7 @@
 // Kerangka aplikasi: router path (history API), penjaga sesi, header, navigasi bawah, lonceng (polling 60 dtk).
 import { klien, pesanGalat, GalatApi, KONFIG_OK } from './api.js';
 import { sesi, muatProfil, muatLibur, keluar, dengarSesi } from './sesi.js';
-import { h, kosongkan, lembar, toast, lanjutAman } from './util.js';
+import { h, kosongkan, lembar, toast, lanjutAman, labelPeran, pantauViewport } from './util.js';
 
 import * as layarMasuk from './layar/masuk.js';
 import * as layarGanti from './layar/ganti-password.js';
@@ -158,6 +158,8 @@ async function jalankan(rute, url, nomor, gulir = 0) {
     judul: setJudul,
     navigasi,
     aktif: () => nomor === nomorRender,
+    /** layar memakai lebar penuh (mis. Board di desktop); diatur ulang tiap pindah layar */
+    lebar: (v = true) => { if (nomor === nomorRender) el.isi.classList.toggle('lebar', !!v); },
     /** ganti query tanpa menambah riwayat & tanpa render ulang */
     setQuery(obj) {
       const u = new URL(location.href);
@@ -239,7 +241,7 @@ el.menu.addEventListener('click', () => {
         h('div', { class: 'item-admin' },
           h('span', { class: 'avatar besar', vars: { '--warna': p.member.color } }, p.member.initials || '?'),
           h('div', { class: 'info' }, h('strong', { text: p.member.nama || p.member.username }),
-            h('div', { class: 'sub' }, h('span', { text: p.member.email || '' }), h('span', { class: 'chip', text: p.member.role })))),
+            h('div', { class: 'sub' }, h('span', { text: p.member.email || '' }), h('span', { class: 'chip', text: labelPeran(p.member.role) })))),
         h('ul', { class: 'menu-daftar' },
           h('li', {}, h('a', { href: '/notif', onclick: ke('/notif') }, 'Notifikasi')),
           p.owner ? h('li', {}, h('a', { href: '/admin', onclick: ke('/admin'), 'data-uji': 'menu-admin' }, 'Admin')) : null,
@@ -281,6 +283,7 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
   window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => {}); });
 }
 
+pantauViewport();
 document.getElementById('muat-awal')?.remove();
 history.replaceState({ dalam: 0 }, '', location.pathname + location.search + location.hash);
 if (KONFIG_OK) render();

@@ -4,7 +4,8 @@
     "ID team = 1100340000004525 (workspace tunggal kontrak ARSITEKTUR §1) dan nama sama dengan data_awal, supaya impor tidak mengganti nama workspace di DB bersama.",
     "ID lain sengaja berawalan unik: user 882000xx, space/folder/list 9018220000xx, task 86b2xxxxx, komentar 901822000xxxxx, lampiran b2xxxxxx-….",
     "Tanggal: 'YYYY-MM-DD' = due tanpa jam (disajikan sebagai ms 12:00 WIB, due_date_time=false); ISO dengan jam = due berjam (due_date_time=true).",
-    "Waktu beku uji banding = 'sekarang' (Selasa 29 Sep 2026 09:00 WIB)."
+    "Waktu beku uji banding = 'sekarang' (Selasa 29 Sep 2026 09:00 WIB).",
+    "Space privat: `anggota` di list = jawaban GET /list/{id}/member tiruan (asumsi P2, wajib diprobe). Lampiran b2a00304 = CSV dari Windows (mime application/vnd.ms-excel, P3)."
   ],
   "sekarang": "2026-09-29T02:00:00.000Z",
   "team": { "id": "1100340000004525", "name": "Roda Hammerindo Workspace", "color": "#7b68ee" },
@@ -52,7 +53,8 @@
     { "id": "901822000106", "space": "901822000001", "folder": null, "folder_hidden_id": "901822000019", "name": "Uji Coba Fiktif", "orderindex": 0, "statuses": "standar" },
     { "id": "901822000107", "space": "901822000001", "folder": null, "folder_hidden_id": "901822000019", "name": "Coretan Lama", "orderindex": 1, "statuses": "standar", "archived": true },
     { "id": "901822000108", "space": "901822000001", "folder": "901822000014", "name": "Gudang Ide", "orderindex": 0, "statuses": "standar" },
-    { "id": "901822000201", "space": "901822000002", "folder": "901822000021", "name": "List Ruang Arsip", "orderindex": 0, "statuses": "standar" }
+    { "id": "901822000201", "space": "901822000002", "folder": "901822000021", "name": "List Ruang Arsip", "orderindex": 0, "statuses": "standar",
+      "anggota": [88200002, 88200003] }
   ],
   "tasks": [
     { "id": "86b2a0001", "list": "901822000101", "name": "A1 · Susun rencana konten mingguan", "status": "in progress",
@@ -70,7 +72,8 @@
       "md": "Rekap angka iklan minggu 39 (fiktif).", "teks": "Rekap angka iklan minggu 39 (fiktif).",
       "attachments": [
         { "id": "b2a00301-0000-4000-8000-000000000001.png", "title": "grafik-rekap.png", "berkas": "grafik.png", "mimetype": "image/png", "user": 88200004, "date": "2026-09-28T09:50:00Z" },
-        { "id": "b2a00302-0000-4000-8000-000000000002.csv", "title": "rekap-uji.csv", "berkas": "rekap.csv", "mimetype": "text/csv", "user": 88200004, "date": "2026-09-28T09:51:00Z" }
+        { "id": "b2a00302-0000-4000-8000-000000000002.csv", "title": "rekap-uji.csv", "berkas": "rekap.csv", "mimetype": "text/csv", "user": 88200004, "date": "2026-09-28T09:51:00Z" },
+        { "id": "b2a00304-0000-4000-8000-000000000007.csv", "title": "ekspor-windows.csv", "berkas": "ekspor-windows.csv", "mimetype": "application/vnd.ms-excel", "user": 88200004, "date": "2026-09-28T09:52:00Z" }
       ] },
     { "id": "86b2a0004", "list": "901822000101", "name": "[Claude] A4 · Draf balasan pelanggan fiktif", "status": "review",
       "creator": 88200001, "assignees": [], "priority": 4, "due": "2026-10-01T15:30:00+07:00", "start": "2026-09-28T09:00:00+07:00",

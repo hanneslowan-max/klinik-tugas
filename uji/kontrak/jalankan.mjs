@@ -557,6 +557,22 @@ async function ujiTambahan() {
   sama("resolve list", [r.json?.type, r.json?.id], ["list", st.L.A]);
   r = await tugas(cfg, st.tok.baca, ["resolve", "uji-b1-tidak-ada"]);
   cek("resolve tak dikenal → 404", r.code === 1 && r.stderr.includes("HTTP 404"), r.stderr);
+  // (P6) URL tampilan ClickUp list/board/folder/space
+  const CU = `https://app.clickup.com/${WS}`;
+  for (const [ref, harap, label] of [
+    [`${CU}/v/l/6-${st.L.A}-1?pr=${st.S}`, ["list", st.L.A], "tampilan List /v/l/6-<list>-1"],
+    [`${CU}/v/b/6-${st.L.A}-2`, ["list", st.L.A], "tampilan Board /v/b/6-<list>-2"],
+    [`${CU}/v/li/${st.L.A}`, ["list", st.L.A], "/v/li/<list>"],
+    [`${CU}/v/f/${st.F}`, ["folder", st.F], "/v/f/<folder>"],
+    [`${CU}/v/s/${st.S}`, ["space", st.S], "/v/s/<space>"],
+  ]) {
+    r = await tugas(cfg, st.tok.baca, ["resolve", ref]);
+    sama(`P6 resolve URL ClickUp ${label}`, [r.json?.type, r.json?.id], harap);
+  }
+  r = await tugas(cfg, st.tok.baca, ["resolve", `${CU}/v/l/6-${st.L.A}-1`]);
+  cek("P6 resolve tampilan list: url /l/<list>", String(r.json?.url).endsWith(`/l/${st.L.A}`), r.json);
+  r = await tugas(cfg, st.tok.baca, ["resolve", `${CU}/v/l/6-99999999999-1`]);
+  cek("P6 resolve tampilan list ID tak ada → 404", r.code === 1 && r.stderr.includes("HTTP 404"), r.stderr);
 
   r = await tugas(cfg, st.tok.baca, ["search", `revisi ${RUN}`]);
   sama("search nama → T1", (r.json || []).map((x) => x.id), [T1]);
@@ -567,6 +583,9 @@ async function ujiTambahan() {
   sama("search --closed → T3", (r.json || []).map((x) => x.id), [T3]);
   r = await tugas(cfg, st.tok.baca, ["search", `https://app.clickup.com/t/${T1}`]);
   sama("search URL → T1", (r.json || []).map((x) => x.id), [T1]);
+  r = await tugas(cfg, st.tok.baca, ["search", `https://app.clickup.com/${WS}/v/l/6-${st.L.A}-1`]);
+  cek("P6 search URL tampilan list → kartu list itu saja", (r.json || []).length >= 1 && r.json.every((x) => x.list?.id === st.L.A),
+    (r.json || []).map((x) => [x.id, x.list?.id]));
   r = await tugas(cfg, st.tok.baca, ["search", RUN, "--space", st.S]);
   cek("search --space: hanya space uji", (r.json || []).length >= 4 && r.json.every((x) => x.space_id === st.S), r.json);
   r = await tugas(cfg, st.tok.baca, ["search", RUN, "--space", "1100340000900001"]);
@@ -689,6 +708,26 @@ async function ujiImporLampiran() {
   const dl2 = f.headers.get("location") ? await http("GET", f.headers.get("location")) : { status: 0, buf: Buffer.alloc(0) };
   cek("/x/file: berkas identik", dl2.status === 200 && dl2.buf.equals(PNG));
 
+  // (P3) allowlist bucket: CSV dari Windows (application/vnd.ms-excel), tsv, doc, pptx, heic, heif diterima; zip ditolak.
+  const CSV_WIN = Buffer.from("tanggal;klik\r\n2026-09-21;12\r\n");
+  const pCsv = `t/${T1}/uji-b1-win-${RUN}.csv`;
+  st.storage.add(pCsv);
+  const upCsv = await unggahSesi(st.jwt.budi, pCsv, CSV_WIN, "application/vnd.ms-excel");
+  cek("P3 unggah CSV Windows (application/vnd.ms-excel) lewat Storage → 200", upCsv.status === 200, upCsv.text);
+  const lpCsv = await rpcWeb(cfg, st.jwt.budi, "web_lampiran_catat", { p_task: T1, p_comment: null, p_path: pCsv, p_title: "ekspor.csv", p_mime: null, p_size: null });
+  sama("P3 web_lampiran_catat CSV Windows: mimetype dari Storage", [lpCsv?.mimetype, lpCsv?.extension, lpCsv?.status_salin], ["application/vnd.ms-excel", "csv", "ok"]);
+  for (const [ext, mime] of [["tsv", "text/tab-separated-values"], ["doc", "application/msword"], ["heic", "image/heic"], ["heif", "image/heif"],
+    ["pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"]]) {
+    const pX = `t/${T1}/uji-b1-${RUN}.${ext}`;
+    st.storage.add(pX);
+    const up = await unggahSesi(st.jwt.budi, pX, Buffer.from(`uji-b1 ${ext}`), mime);
+    cek(`P3 unggah ${ext} (${mime}) → 200`, up.status === 200, up.text);
+  }
+  const pZip = `t/${T1}/uji-b1-${RUN}.zip`;
+  st.storage.add(pZip);
+  const upZip = await unggahSesi(st.jwt.budi, pZip, Buffer.from("PK uji"), "application/zip");
+  cek("P3 zip tetap ditolak bucket", upZip.status >= 400, upZip.status);
+
   // Review: token impor sempat bisa menimpa berkas kartu app lewat upload-url + upsert:true (tanpa activity).
   x = await imp("POST", "/x/impor/upload-url", { body: { task_id: T1, nama: `uji-b1-baru-${RUN}.png` } });
   sama("upload-url ke kartu app → 403 ACCESS_001", [x.status, x.json?.ECODE], [403, "ACCESS_001"]);
@@ -746,9 +785,11 @@ async function ujiLampiranClickup(imp) {
     const a = (r.json?.attachments || []).find((z) => z.id === attId);
     const dl = a?.url ? await http("GET", a.url) : { status: 0, buf: Buffer.alloc(0) };
     cek("task kartu ClickUp: berkas lampiran = hasil upsert", dl.status === 200 && dl.buf.equals(PNG2), [dl.status, a?.url]);
-    // PR-1 (bukan area Edge/CLI): j_task masih mengisi tags/checklists/custom_fields dengan [] untuk kartu impor.
-    const pr1 = JSON.stringify(r.json?.tags) === JSON.stringify(tags) && r.json?.checklists?.length === 1;
-    console.log(`  catatan PR-1 (j_task tags/checklists dari tasks.extra): ${pr1 ? "sudah diperbaiki" : `masih TERBUKA (tags=${JSON.stringify(r.json?.tags)}, checklists=${JSON.stringify(r.json?.checklists)})`}`);
+    // PR-1 (perbaikan P1): tags/checklists kartu impor = isi payload ClickUp (tasks.extra), bentuk sama.
+    sama("P1 task kartu impor: tags verbatim dari payload ClickUp", r.json?.tags, tags);
+    sama("P1 task kartu impor: checklists verbatim", [r.json?.checklists?.length, r.json?.checklists?.[0]?.items?.[0]?.name], [1, "satu"]);
+    const rl = await tugas(cfg, st.tok.baca, ["tasks", LIST_CU, "--full"]);
+    sama("P1 tasks --full: tags kartu impor sama", (rl.json || []).find((z) => z.id === id)?.tags, tags);
 
     // Lampiran app di kartu ClickUp (keadaan sah di mode utama; mode cermin menolaknya, jadi dibuat lewat psql).
     const pAppCu = `t/${id}/uji-b1-app-${RUN}.png`;

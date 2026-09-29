@@ -22,6 +22,13 @@ export async function muatProfil() {
   return sesi.profil;
 }
 
+/** Ubah hitungan notifikasi belum dibaca secara lokal (lonceng langsung berubah), mis. sesudah notifikasi dibuka. */
+export function setNotifBelum(n) {
+  if (!sesi.profil) return;
+  sesi.profil = { ...sesi.profil, notif_belum: Math.max(0, Number(n) || 0) };
+  kabari();
+}
+
 export async function muatLibur() {
   try {
     const rows = await pilih('hari_libur', (q) => q.select('tanggal'));

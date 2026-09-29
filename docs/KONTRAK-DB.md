@@ -3,8 +3,8 @@
 Pegangan untuk agen Edge Function (`supabase/functions/api`), web (`web/`), dan importer (`impor/`). Turunan dari `docs/ARSITEKTUR.md` §3–§7; bila ada beda, bagian **Deviasi** di bawah yang berlaku sampai ARSITEKTUR diperbarui.
 
 - Migrasi: `supabase/migrations/20260929110000_a2_*.sql` s.d. `…110500_a2_hak.sql` (setelah A1).
-- Perbaikan review (R1–R5, 29 Sep) diterapkan **di tempat** pada migrasi A1/A2 yang ada (belum ada produksi); tiap blok ditandai komentar `(review Rn)`. Ringkasan di §9.
-- Tes: `uji/db/09_api_baca.sql` … `15_ikut_induk.sql` (+ pembantu `uji/db/_bantu_a2.sql`). Jalankan `supabase db reset` lalu `bash uji/db/jalankan.sh`. Suite juga lulus di DB bersama yang sudah berisi data uji area lain (hitungan dibatasi ke ID seed).
+- Perbaikan review (R1–R5, 29 Sep) dan perbaikan poles (P1–P6, 29 Sep) diterapkan **di tempat** pada migrasi A1/A2 yang ada (belum ada produksi); tiap blok ditandai komentar `(review Rn)` / `(perbaikan Pn)`. Ringkasan di §9 dan §10.
+- Tes: `uji/db/09_api_baca.sql` … `16_poles.sql` (+ pembantu `uji/db/_bantu_a2.sql`). Jalankan `supabase db reset` lalu `bash uji/db/jalankan.sh`. Suite juga lulus di DB bersama yang sudah berisi data uji area lain (hitungan dibatasi ke ID seed).
 - Contoh JSON di dokumen ini diambil dari `supabase/seed.sql` (sintetis). Tanggal seed relatif terhadap hari reset, jadi angka ms berubah tiap reset.
 
 ## 1. Aturan umum
@@ -56,8 +56,8 @@ Pegangan untuk agen Edge Function (`supabase/functions/api`), web (`web/`), dan 
 - Mengikuti setelan privat ClickUp (riset K8). Anggota melihat **semua** bila role `owner`/`bot` aktif, atau `app_settings.privasi_space = "abaikan"` (default `"tegakkan"`).
 - Selain itu space `private=true` hanya terlihat oleh anggotanya (`space_anggota`). Kartu di space privat juga terlihat oleh **assignee** kartu itu (beserta komentar, lampiran, riwayatnya), tetapi space/list-nya tidak.
 - Berlaku di semua jalur: RLS select langsung dan Storage (anggota sesi JWT; `app.actor_id` diabaikan bila ada JWT), `web_*` (anggota sesi), `api_*`/`x_*` (per `p_aktor`). Yang tertutup diperlakukan seperti tidak ada (`PT404`); daftar/pencarian/tenggat/sensus menyaringnya.
-- `space_anggota(space_id, member_id, sumber 'clickup'|'app', added_at)`: `clickup` dikelola impor dari payload `members` space (§5), `app` diberi owner lewat `web_admin_struktur_simpan` (§6).
-- Selama importer belum mengirim `members`, space privat ClickUp hanya terlihat owner/bot (+ assignee per kartu). Bot routine tetap melihat semua.
+- `space_anggota(space_id, member_id, sumber 'clickup'|'app', added_at)`: `clickup` dikelola impor (jenis `space_anggota`, atau kunci `members` di baris `spaces`, §5), `app` diberi owner lewat `web_admin_struktur_simpan` (§6). Impor tidak pernah menghapus baris `app`.
+- (P2) Importer mengirim anggota space privat lewat jenis `space_anggota`: gabungan `GET /list/{id}/member` semua list di space itu + owner/admin workspace (role 1/2 `/team`). ClickUp v2 tidak punya endpoint anggota space; asumsi ini wajib diprobe di data asli (`impor/README.md`). Bot routine tetap melihat semua.
 
 **Activity & notifikasi**
 - Selalu dibuat trigger A1, bukan fungsi A2.
@@ -100,6 +100,7 @@ Pegangan untuk agen Edge Function (`supabase/functions/api`), web (`web/`), dan 
 Rincian nilai:
 - `text_content` dan `description` = `description_plain` (teks ClickUp) bila ada, selain itu markdown. Isinya `""` bila keduanya kosong.
 - `markdown_description` = markdown. Nilainya `""` untuk kartu `desc_unreadable`, meniru ClickUp; CLI lalu mencetak "(isi deskripsi tak terbaca)".
+- (P1, PR-1) `tags`, `checklists`, `custom_fields` kartu **impor** = isi payload ClickUp yang tersimpan di `tasks.extra`, verbatim (termasuk kunci bernilai null di item checklist). Tidak tersimpan (kosong; `custom_fields` tanpa satu pun nilai) → `[]`. Kartu **app** selalu `[]`.
 - `status.id` = `clickup_status_id`. Untuk status buatan app: `sc<list_id>_<md5(status) 8 hex>`.
 - `top_level_parent` = akar rantai induk. Bernilai `null` bila bukan sub-tugas.
 - List tanpa folder memakai `folder` dan `project` semu `{"id":"<list_id>-hidden","name":"hidden","hidden":true,"access":true}`.
@@ -204,7 +205,8 @@ List sama → no-op. List tak ada → 404.
 
 **`x_search`: pencocokan dan urutan**
 - Cocok dengan ID atau `clickup_id`, URL (`app.clickup.com/t/<id>`, `/t/<team>/<id>`, `<app>/t/<id>`), kode di awal nama (`Y7`, `FX-PM`, `[Claude]`), `name ILIKE`, markdown/teks, atau full-text.
-- Urut: ID persis → kode awal → nama → isi, lalu `updated_at desc`.
+- (P6) URL wadah (bentuk yang sama dengan `x_resolve`: list/folder/space ClickUp termasuk tampilan `/v/l/6-<list>-1`, `/v/b/6-<list>-2`, atau `<app>/l/<id>`) yang ada dan terlihat aktor → kartu di wadah itu (tidak diarsip; selesai hanya dengan `p_include_closed`) berperingkat sama dengan ID persis.
+- Urut: ID persis / isi wadah URL → kode awal → nama → isi, lalu `updated_at desc`.
 - ID/URL persis selalu tampil walau kartunya selesai. Selain itu kartu selesai hanya tampil dengan `p_include_closed`.
 - Tugas terhapus tidak tampil. Wildcard `%`/`_` di-escape. `q` kosong → 400.
 
@@ -212,6 +214,7 @@ List sama → no-op. List tak ada → 404.
 - ID tugas, list, folder, space, komentar, lampiran, atau anggota.
 - URL app `/t/<id>` dan `/l/<id>`.
 - URL ClickUp: `/t/<id>`, `/t/<team>/<id>`, `/<team>/v/li/<list>`, `/v/f/<folder>`, `/v/s/<space>`.
+- (P6) URL tampilan ClickUp: `/v/<kode>/<induk>-<id>-<n>` dengan induk `6` = list (`/v/l/6-<list>-1` List, `/v/b/6-<list>-2` Board), `5` = folder, `4` = space; `7` (workspace) → 404. Juga bentuk bersarang `/v/l/li/<list>`, `/v/o/f/<folder>`, `/v/o/s/<space>` dan `/v/l/<list>`. Query `?pr=…` dan fragmen dibuang. Tipe dari URL dihormati: `/v/f/<id list>` → 404. ID yang tidak ada / tertutup privasi → 404. Pola = asumsi dari URL umum ClickUp, dicek dengan URL asli saat probe.
 
 **`x_export`: isi dan syarat**
 - Kunci: `meta`, `workspace`, `members`, `spaces`, `space_anggota`, `folders`, `lists`, `list_statuses`, `tasks`, `task_assignees`, `comments`, `comment_mentions`, `attachments`, `activity`, `notifications`, `api_tokens`, `hari_libur`, `app_settings`, `sync_runs`, `sync_raw`.
@@ -226,7 +229,7 @@ List sama → no-op. List tak ada → 404.
 
 **Cakupan**
 - List di folder cakupan: `app_settings.tenggat_folder_ids` (default `["1100340000026652"]` = RHJ Eksekusi; `[]` berarti semua folder). `p_folder` menimpa setelan ini.
-- List tidak diarsip dan `tidak_ditagih=false`.
+- List tidak diarsip **efektif** (list, folder-nya, dan space-nya tidak diarsip; P5) dan `tidak_ditagih=false`.
 - Tugas belum selesai, tidak diarsip, tidak dihapus, dan punya due.
 
 **Kategori** (`p_tanggal` default hari ini WIB)
@@ -275,7 +278,7 @@ Definisi kolom:
 ## 5. Fungsi impor (service_role, scope `impor`)
 
 **`impor_batch(p_aktor bigint, p_jenis text, p_rows jsonb, p_mode text default 'impor', p_at_awal timestamptz default null)`**
-- Hasil: `{"jenis","mode","inserted","updated","unchanged","gagal":[{"id","err"}]}`. `tasks`/`comments` menambah `tertunda:[{"id","parent_id"}]`. `list_statuses` menambah `dihapus` dan `dipertahankan`. `task_assignees` menambah `dihapus`.
+- Hasil: `{"jenis","mode","inserted","updated","unchanged","gagal":[{"id","err"}]}`. `tasks`/`comments` menambah `tertunda:[{"id","parent_id"}]`. `list_statuses` menambah `dihapus` dan `dipertahankan`. `task_assignees` menambah `dihapus`. `space_anggota` menambah `ditambah`, `dibuang`, `dilewati`.
 - `p_mode`:
   - `impor` = muat awal. Assignee bukan kejadian, jadi tidak dicatat.
   - `sinkron` = sinkron berikutnya. Perubahan dicatat per field dengan `sumber='sinkron'`, `lengkap=false`, aktor null.
@@ -290,7 +293,7 @@ Definisi kolom:
   - INSERT tugas → `dibuat` (aktor = creator, `at` = date_created, `lengkap=false`).
   - INSERT tugas yang sudah selesai → tambah `ditutup_impor` (aktor null, `at` = date_closed).
   - Tidak ada transisi karangan: parent yang tertunda tidak menghasilkan activity `induk`.
-- Urutan jenis: `workspace → members → spaces → folders → lists → list_statuses → tasks → task_assignees → comments → comment_mentions → attachments → sync_raw`.
+- Urutan jenis: `workspace → members → spaces → folders → lists → space_anggota → list_statuses → tasks → task_assignees → comments → comment_mentions → attachments → sync_raw`.
 
 Format baris per `p_jenis`. Kolom tabel atau payload ClickUp mentah sama-sama diterima.
 
@@ -299,6 +302,7 @@ Format baris per `p_jenis`. Kolom tabel atau payload ClickUp mentah sama-sama di
 | `workspace` | `{id, name}` |
 | `members` | Objek member ClickUp `{"user":{id, username, email, color, initials}}` atau `{id, username, email, …}`. Rincian di bawah tabel. |
 | `spaces` | `{id, name, private, archived, orderindex, color}` |
+| `space_anggota` | (P2) `{space_id \| space:{id}, member_ids:[…]}` atau `members:[{user:{id}} \| {id} \| id]`. Himpunan penuh sumber `clickup` per space. Rincian di bawah tabel. |
 | `folders` | `{id, space_id \| space:{id}, name, hidden, archived, orderindex}` |
 | `lists` | `{id, space_id \| space:{id}, folder_id (null = tanpa folder) \| folder:{id}, name, content, archived, orderindex}`. Rincian di bawah tabel. |
 | `list_statuses` | `{list_id, status, type, orderindex, color, clickup_status_id \| id}` atau `{list_id, statuses:[…]}`. Rincian di bawah tabel. |
@@ -322,6 +326,13 @@ Format baris per `p_jenis`. Kolom tabel atau payload ClickUp mentah sama-sama di
 - Kunci opsional `members` (payload ClickUp `[{user:{id}}]`, atau `[{id}]`/`[id]`) → `space_anggota` sumber `clickup`, himpunan penuh per space. ID yang belum diimpor dilewati. Baris sumber `app` (dari owner) tidak disentuh. Tanpa kunci `members` = anggota tidak disentuh.
 - Perubahan anggota saja dihitung `updated`.
 
+**`space_anggota`** (perbaikan P2)
+- Baris = himpunan penuh anggota **sumber `clickup`** satu space. Anggota `clickup` yang tidak dikirim dihapus; baris sumber `app` (ditambah owner di Admin) **tidak pernah** dihapus atau diubah. `member_ids: []` = kosongkan anggota `clickup`.
+- Space wajib sudah diimpor dan bersumber `clickup` (space belum ada → `gagal` 404; space app → `gagal` PT409). `member_ids`/`members` bukan array → `gagal` PT400.
+- ID yang belum diimpor sebagai anggota, atau di rentang app (≥ 900000000000), dilewati dan dilaporkan di `dilewati:[{space_id, ids:[…]}]`.
+- Hasil per space: `inserted` (space belum punya anggota `clickup` lalu mendapat ≥1), `updated` (himpunan berubah), `unchanged` (sama; idempoten). Tambahan kunci hasil: `ditambah`, `dibuang` (jumlah baris), `dilewati`.
+- Importer menurunkan himpunan untuk space `private=true` saja: gabungan `GET /list/{id}/member` semua list (aktif + arsip) di space itu + anggota `/team` ber-role 1/2 (owner/admin ClickUp; di app mereka `member`, R1). Satu list gagal dibaca → space itu tidak dikirim (anggota lama tidak disentuh) + galat baca.
+
 **`folders` / `lists`**
 - Space (dan folder untuk list) wajib sudah diimpor dan bersumber `clickup` (R1).
 - `tidak_ditagih` tidak disentuh, kecuali dikirim eksplisit.
@@ -335,7 +346,7 @@ Format baris per `p_jenis`. Kolom tabel atau payload ClickUp mentah sama-sama di
 **`tasks`**
 - Payload dianggap LENGKAP: kunci yang tidak ada dianggap null. Pengecualian: `assignees` yang tidak ada = assignee tidak disentuh, dan `status` yang tidak ada = status tetap.
 - Tanggal diterima sebagai ms, string ms, atau ISO dan disimpan verbatim.
-- `tags`/`checklists`/`custom_fields` yang berisi → `extra`.
+- `tags`/`checklists`/`custom_fields` yang berisi → `extra`, **verbatim** (kunci bernilai null di dalamnya dipertahankan, P1). `custom_fields` hanya disimpan bila ≥1 field punya nilai. Isi ini yang disajikan task json (§2).
 - `markdown_description` kosong tetapi `text_content` berisi → `desc_unreadable=true` dan markdown = teks polos.
 - Induk: induk di batch yang sama diproses lebih dulu. Induk yang belum ada di DB → baris **tertunda**. Kirim ulang setelah induk masuk. Bila induk memang hilang, kirim dengan `parent:null`.
 - Anggota (creator/assignee) atau list yang belum diimpor → `gagal`. Assignee kartu ClickUp wajib anggota impor (id < 900000000000) dan bukan bot; eks-anggota nonaktif tetap sah (R1).
@@ -354,7 +365,8 @@ Format baris per `p_jenis`. Kolom tabel atau payload ClickUp mentah sama-sama di
 
 **`attachments`**
 - Hanya di kartu/komentar ClickUp (R1); tugas belum diimpor → `gagal` 404.
-- Tanpa `storage_path` → `status_salin='tautan_saja'` (atau nilai lama).
+- Tanpa `storage_path` → `status_salin='tautan_saja'` (atau nilai lama). `url` payload → `clickup_url` (lampiran tautan_saja tetap bisa dibuka lewat URL ClickUp).
+- (P3) Importer menyalin berkas hanya bila MIME ada di allowlist bucket (`MIME_IZIN` di `impor/sinkron.mjs` = `allowed_mime_types` bucket, diuji), ≤ 25 MB, dan ada URL; selain itu `tautan_saja` dan alasannya dicatat di laporan run (`lampiran_tautan`).
 - Setelah file disalin, kirim ulang dengan `storage_path` = `t/<task_id>/<nama>` dan `status_salin:'ok'`. Unggah via signed upload URL dari Edge.
 
 **`impor_tandai_hilang(p_aktor bigint, p_jenis text, p_ids_ada text[], p_mode text default 'sinkron', p_lingkup jsonb default null)`**
@@ -387,10 +399,10 @@ Semua memanggil `mulai_web()`: wajib anggota aktif (`PT403 ACCESS_001` bila buka
 |---|---|
 | `web_saya()` | `{"member":{id,username,nama,email,initials,color,role,aktif,harus_ganti_password}\|null,"anggota_aktif","owner","mode","app_base_url","hari_ini","notif_belum"}`. Non-anggota **tidak** error (`member:null`). |
 | `web_struktur()` | `{"hari_ini","spaces":[{id,name,private,archived,sumber,orderindex,anggota:[member_id],"folders":[{id,name,hidden,archived,sumber,orderindex,"lists":[L]}],"lists":[L tanpa folder]}]}`. `L` = `{id,name,archived,tidak_ditagih,sumber,orderindex,folder_id,"statuses":[{status,type,color,orderindex}],"hitungan":{terbuka,selesai,telat,menunggu,arsip}}`. `telat` tanpa kartu menunggu keputusan dan selalu 0 untuk list tidak ditagih; `menunggu` = kartu terbuka BERSYARAT/CADANGAN/DITUNDA (R5). Termasuk yang diarsip. Hanya space yang terlihat (R2). |
-| `web_tugas_saya(p_member bigint default null)` | `{"member","tanggal","telat":[baris+lewat_hari],"hari_ini":[…],"tiga_hk":[baris+sisa_hk],"nanti":[…],"tanpa_due":[…],"menunggu_keputusan":[baris+lewat_hari],"tidak_ditagih":[baris+lewat_hari]}`. Kartu terbuka milik anggota (default diri sendiri), tidak diarsip/dihapus. Grup = `kategori_due`; di dua grup terakhir `lewat_hari` hanya diisi bila due sudah lewat (info), selain itu null (R5). Hanya kartu yang terlihat oleh **pemanggil** (R2). |
+| `web_tugas_saya(p_member bigint default null)` | `{"member","tanggal","telat":[baris+lewat_hari],"hari_ini":[…],"tiga_hk":[baris+sisa_hk],"nanti":[…],"tanpa_due":[…],"menunggu_keputusan":[baris+lewat_hari],"tidak_ditagih":[baris+lewat_hari]}`. Kartu terbuka milik anggota (default diri sendiri), tidak diarsip/dihapus, dan tidak berada di list/folder/space yang diarsip (P5; sama untuk `x_tenggat`/`web_tenggat` dan beban B5). Grup = `kategori_due`; di dua grup terakhir `lewat_hari` hanya diisi bila due sudah lewat (info), selain itu null (R5). Hanya kartu yang terlihat oleh **pemanggil** (R2). |
 | `web_daftar(p_list text, p_include_closed boolean default false)` | `{"list":{id,name,space_id,folder_id,archived,tidak_ditagih,sumber,boleh_ubah,statuses},"tasks":[baris]}`. Tanpa terhapus dan arsip. Urut status → orderindex → terbaru. |
 | `web_detail(p_task text)` | Satu panggilan untuk layar detail. Rincian di bawah tabel. |
-| `web_cari(p_q text, p_space text default null)` | `{"hasil":[baris]}`, maks 50, termasuk kartu selesai. Pencocokan sama dengan `x_search`. |
+| `web_cari(p_q text, p_space text default null)` | `{"hasil":[baris],"rujukan":{type,id,url}\|null}`, maks 50, termasuk kartu selesai. Pencocokan sama dengan `x_search`. (P6) `rujukan` terisi bila `q` = URL list/folder/space (bentuk §4 `x_resolve`) yang ada dan terlihat; `url` list = `<app>/l/<id>`, folder/space `null`. Layar Cari bisa langsung membuka wadahnya. |
 | `web_notif(p_limit integer default 50)` | `{"belum":6,"items":[{id,jenis,created_at,read_at,comment_id,"task":{id,name,deleted},"actor":{id,username,initials,color},"cuplikan":"120 huruf"}]}`, milik sendiri saja, terbaru dulu, maks 500. Kartu yang tertutup privasi: `task` = `{id,name:"(kartu di space privat)",deleted,tertutup:true}` dan `cuplikan` null (R2). |
 | `web_notif_baca(p_ids bigint[] default null)` | `{"dibaca":n}`. `null` = semua milik sendiri. |
 | `web_anggota()` | `[{id,username,nama,email,clickup_email,initials,color,role,aktif,punya_akun,harus_ganti_password,impor_clickup}]` |
@@ -435,7 +447,7 @@ Objek Storage **tidak** terhapus dari SQL karena trigger `storage.protect_object
 - Syarat:
   - Objek harus sudah ada di `storage.objects`.
   - MIME dan ukuran diambil dari metadata objek; `p_mime`/`p_size` hanya cadangan.
-  - MIME harus ada di allowlist bucket dan ukuran ≤ 25 MB.
+  - MIME harus ada di allowlist bucket dan ukuran ≤ 25 MB. Allowlist (P3): png, jpeg, webp, gif, heic, heif, pdf, docx, doc, xlsx, xls (`application/vnd.ms-excel`, juga CSV dari Windows), pptx, csv, tsv, txt. SVG/HTML/zip ditolak.
   - Path harus `t/<p_task>/…`.
   - `p_comment` (boleh null) harus komentar di tugas itu.
 - Idempoten per path. Hasil = lampiran web.
@@ -465,6 +477,7 @@ Objek Storage **tidak** terhapus dari SQL karena trigger `storage.protect_object
 - `[{status, type, color, orderindex?, nama_lama?}]` menggantikan seluruh status list.
 - `nama_lama` = ganti nama; tugas ikut tanpa activity status palsu.
 - Wajib ≥1 open dan ≥1 closed. Nama tidak boleh ganda (tanpa beda huruf besar).
+- (P4) Nama status yang **dibuat** atau **diganti nama** lewat Admin dinormalkan: trim + huruf kecil (`"  Sedang Ditinjau "` → `sedang ditinjau`). Status yang sudah ada dan dikirim dengan nama persis sama (tanpa `nama_lama`, atau `nama_lama` = nama) tetap **verbatim**, jadi status impor ClickUp seperti `BACKLOG` tidak berubah walau warnanya diubah. Status impor sendiri selalu verbatim (paritas ClickUp). Status baru yang hanya beda kapital dari status lain di daftar (mis. `backlog` di samping `BACKLOG`) → PT400.
 - Membuang status yang masih dipakai tugas → `PT409 KONFLIK_001`.
 - List ClickUp saat cermin → 409.
 - Hasil `{"list_id","statuses":[…]}`.
@@ -484,7 +497,7 @@ Objek Storage **tidak** terhapus dari SQL karena trigger `storage.protect_object
 
 ## 7. Pembantu internal (tidak bisa dipanggil klien)
 
-`ms`, `ms_ke_ts`, `ts_dari`, `bool_dari`, `prioritas_dari`, `ids_dari`, `mulai_api`, `mulai_web`, `anggota_wajib`, `anggota_impor_wajib`, `set_space_anggota_impor`, `penilai`, `akses_semua`, `list_terlihat`, `tugas_terlihat`, `menunggu_keputusan`, `kategori_due`, `wajib_owner_aktor`, `idem_ambil`, `idem_simpan`, `status_cari`, `status_petakan`, `status_id`, `app_url`, `team_id`, `j_member`, `j_prioritas`, `j_folder_list`, `j_list`, `j_list_statuses`, `j_lampiran`, `j_task`, `j_comment`, `komentar_parts`, `inti_buat_tugas`, `inti_assignee`, `inti_ubah_tugas`, `inti_pindah`, `inti_hapus`, `inti_komentar`, `cari_tugas`, `riwayat_tugas`, `j_baris`, `tenggat_hitung`, `norm_impor_tugas`, `norm_impor_komentar`, `sha256_hex`, `muat_*`, `set_mentions_impor`, `j_lampiran_web`, `j_komentar_web`, `body_web`.
+`ms`, `ms_ke_ts`, `ts_dari`, `bool_dari`, `prioritas_dari`, `ids_dari`, `mulai_api`, `mulai_web`, `anggota_wajib`, `anggota_impor_wajib`, `set_space_anggota_impor`, `muat_space_anggota`, `list_diarsip`, `rujukan_urai`, `rujukan_wadah`, `penilai`, `akses_semua`, `list_terlihat`, `tugas_terlihat`, `menunggu_keputusan`, `kategori_due`, `wajib_owner_aktor`, `idem_ambil`, `idem_simpan`, `status_cari`, `status_petakan`, `status_id`, `app_url`, `team_id`, `j_member`, `j_prioritas`, `j_folder_list`, `j_list`, `j_list_statuses`, `j_lampiran`, `j_task`, `j_comment`, `komentar_parts`, `inti_buat_tugas`, `inti_assignee`, `inti_ubah_tugas`, `inti_pindah`, `inti_hapus`, `inti_komentar`, `cari_tugas`, `riwayat_tugas`, `j_baris`, `tenggat_hitung`, `norm_impor_tugas`, `norm_impor_komentar`, `sha256_hex`, `muat_*`, `set_mentions_impor`, `j_lampiran_web`, `j_komentar_web`, `body_web`.
 
 Konvensi: setiap fungsi berawalan `api_`, `x_`, `impor_`, atau `web_` adalah endpoint publik. Tes 09 memeriksa jumlahnya (29 service_role + 33 authenticated) dan haknya.
 
@@ -514,6 +527,8 @@ Pembantu privasi yang dipakai policy RLS/Storage dan bisa dipanggil `authenticat
 13. **Sub-tugas ikut induk (review R3)**: hapus lunak/pulihkan dan arsip/buka arsip menurun ke turunan (trigger `tasks_sesudah`, activity dengan `catatan` "ikut induk <id>"). Impor/sinkron hanya menurunkan ke anak buatan app. Sub-tugas tidak boleh dibuat/dipulihkan/dibuka arsip di bawah induk yang di Sampah/diarsip (`PT409`). `web_purge` menolak bila ada turunan aktif.
 14. **Komentar menaikkan `updated_at` (review R4)**: komentar/balasan baru dari ui/api/sistem menaikkan `tasks.updated_at` (`date_updated`), tanpa menaikkan `versi`. Impor/sinkron tetap verbatim. ARSITEKTUR §3 menyebut sebaliknya "(sementara)"; alasannya pagar M-CU: `agenda … --hours N` tanpa `--all-comments` kini menangkap kartu terbuka yang hanya dapat komentar baru (masuk `berubah_baru`). Perilaku ClickUp asli tetap wajib diprobe; bila ClickUp tidak menaikkan `date_updated`, app tetap menaikkan (superset, lebih aman untuk routine).
 15. **Kategori due pagar B10 di web (review R5)**: `web_tugas_saya` menambah grup `menunggu_keputusan` & `tidak_ditagih`; baris web menambah `kategori_due`; `web_struktur.hitungan` menambah `menunggu` dan `telat` tidak lagi menghitung kartu BERSYARAT/CADANGAN/DITUNDA maupun list tidak ditagih.
+16. **Isi tags/checklists/custom_fields kartu impor (perbaikan P1)**: ARSITEKTUR §6 menyebut konstanta `[]`; kini kartu impor menyajikan isi payload ClickUp dari `tasks.extra` (paritas `clickup.mjs task`/`tasks --full`). Kartu app tetap `[]`.
+17. **Jenis impor baru `space_anggota` (perbaikan P2)** dan kunci `rujukan` di `web_cari` (P6). Nama status dari Admin dinormalkan huruf kecil (P4); nama status impor tetap verbatim.
 
 ## 9. Perbaikan review 29 Sep (ringkas)
 
@@ -524,3 +539,16 @@ Pembantu privasi yang dipakai policy RLS/Storage dan bisa dipanggil `authenticat
 | R3 | Sub-tugas dari induk terhapus/diarsip tetap aktif lalu ikut di-purge | Kaskade di trigger + penjaga induk + tolak purge bila ada turunan aktif | `15_ikut_induk.sql` |
 | R4 | Komentar baru tidak menaikkan `date_updated` | `comments_sesudah` → `app.sentuh_waktu` (updated_at saja) | `03_status_activity.sql` bagian D |
 | R5 | BERSYARAT/CADANGAN & list tidak ditagih tampil sebagai telat | `kategori_due()` + grup baru `web_tugas_saya` + `hitungan` | `13_web.sql` bagian R5 |
+
+## 10. Perbaikan poles 29 Sep (P1–P6, ringkas)
+
+| # | Temuan | Perbaikan | Tes |
+|---|---|---|---|
+| P1 | PR-1: `tags`/`checklists` kartu impor selalu `[]`; `jsonb_strip_nulls` membuang kunci null di dalam checklist | `j_task` mengisi dari `tasks.extra` (kartu impor saja); `norm_impor_tugas` menyimpan verbatim | `16_poles.sql` P1, kontrak (kartu impor sementara), banding sisa beda 0 |
+| P2 | Anggota space privat tidak pernah diimpor | Jenis impor `space_anggota` (`muat_space_anggota`); importer menurunkan dari `/list/{id}/member` + owner/admin | `16_poles.sql` P2, `impor/uji` (mock per list), banding tanpa bantuan psql |
+| P3 | CSV dari Windows (`application/vnd.ms-excel`), tsv, doc, pptx, heic, heif ditolak bucket | Allowlist bucket + `MIME_IZIN` importer (sama persis, diuji); alasan `tautan_saja` dilaporkan | `16_poles.sql` P3, kontrak unggah Storage, `impor/uji` |
+| P4 | Nama status Admin tidak dinormalkan; duplikat beda kapital | `web_admin_status_simpan`: baru/ganti nama → trim + huruf kecil, status lama verbatim | `16_poles.sql` P4 |
+| P5 | Kartu di folder/space diarsip tetap di Tugas Saya/TENGGAT/beban | `list_diarsip()` dipakai `web_tugas_saya`, `tenggat_hitung`, `beban` | `16_poles.sql` P5 |
+| P6 | URL tampilan ClickUp (`/v/l/6-<list>-1`, `/v/b/…`) tidak dikenali | `rujukan_urai` (pengurai bersama) + `rujukan_wadah`; `x_resolve`, `cari_tugas`, `web_cari.rujukan` | `16_poles.sql` P6, kontrak `resolve`/`search` |
+
+Hak: `rujukan_urai`, `rujukan_wadah`, `muat_space_anggota`, `list_diarsip` internal (tanpa EXECUTE role API). Jumlah fungsi publik tetap 29 service_role + 33 authenticated.

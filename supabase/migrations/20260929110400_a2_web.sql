@@ -293,6 +293,9 @@ begin
 end;
 $$;
 
+-- (perbaikan P6) + "rujukan": {type,id,url} bila q = URL list/folder/space (ClickUp /v/li|l|b|f|s/…, app /l/<id>)
+-- yang ada & terlihat, supaya layar Cari bisa langsung membuka wadahnya; selain itu null. "hasil" tetap berisi kartu
+-- di wadah itu (cari_tugas).
 create or replace function public.web_cari(p_q text, p_space text default null)
 returns jsonb
 language plpgsql
@@ -304,7 +307,8 @@ begin
   return jsonb_build_object('hasil', (
     select coalesce(jsonb_agg(public.j_baris(c.task_id) order by c.peringkat, t.updated_at desc, t.id), '[]'::jsonb)
       from public.cari_tugas(p_q, p_space, true, 50) c
-      join public.tasks t on t.id = c.task_id));
+      join public.tasks t on t.id = c.task_id),
+    'rujukan', public.rujukan_wadah(btrim(coalesce(p_q, ''))));
 end;
 $$;
 

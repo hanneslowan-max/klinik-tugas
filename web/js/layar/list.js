@@ -1,4 +1,4 @@
-// List: daftar per status + Board kanban (SortableJS, tekan-tahan di HP). Filter di URL:
+// List: daftar per status + Papan/Board kanban (SortableJS, tekan-tahan di HP; desktop ≥900px: lebar penuh). Filter di URL:
 //   ?v=board · a=<member id>|saya|kosong · s=<status> · d=telat|hari_ini|tiga_hk|tanpa_due · selesai=1
 import { rpc, pesanGalat } from '../api.js';
 import { Sortable } from '../../vendor/muat.js';
@@ -57,7 +57,7 @@ export async function tampil(ctx) {
     return `/l/${encodeURIComponent(listId)}${s ? `?${s}` : ''}`;
   }
   const tabDaftar = h('a', { role: 'tab', 'aria-selected': mode === 'daftar' ? 'true' : 'false', 'data-uji': 'tab-daftar' }, 'Daftar');
-  const tabBoard = h('a', { role: 'tab', 'aria-selected': mode === 'board' ? 'true' : 'false', 'data-uji': 'tab-board' }, 'Board');
+  const tabBoard = h('a', { role: 'tab', 'aria-selected': mode === 'board' ? 'true' : 'false', 'data-uji': 'tab-board' }, 'Papan (Board)');
   segmen.append(tabDaftar, tabBoard);
   function perbaruiTab() {
     tabDaftar.href = urlDengan({ v: '' });
@@ -102,6 +102,7 @@ export async function tampil(ctx) {
     if (!l) return;
     kosongkan(remah, h('a', { href: '/jelajah', text: l.space.name }),
       l.folder && !l.folder.hidden ? [h('span', { text: '›' }), h('span', { text: l.folder.name })] : null);
+    ukurPapan();                        // remah terisi belakangan (bisa 2 baris) → posisi papan bergeser
   }).catch(() => {});
 
   const lolos = (t) => {
@@ -184,7 +185,9 @@ export async function tampil(ctx) {
           onEnd: (ev) => { papan.classList.remove('menyeret'); pindahKartu(ev); },
         }));
       }
-      kosongkan(isi, h('p', { class: 'redup kecil petunjuk', text: 'Tekan-tahan kartu, lalu geser ke kolom lain untuk mengubah status.' }), papan);
+      const petunjuk = window.matchMedia('(hover: hover) and (pointer: fine)').matches
+        ? 'Seret kartu ke kolom lain untuk mengubah status.' : 'Tekan-tahan kartu, lalu geser ke kolom lain untuk mengubah status.';
+      kosongkan(isi, h('p', { class: 'redup kecil petunjuk', text: petunjuk }), papan);
       if (gulirPapan) papan.scrollLeft = gulirPapan;
       ukurPapan();
     }
@@ -239,7 +242,7 @@ export async function tampil(ctx) {
       }
       toast(dari !== ke ? `Status: ${ke}` : 'Urutan disimpan', 'sukses', 1800);
     } catch (e) {
-      toast(e.konflik ? 'Kartu sudah diubah orang lain. Board dimuat ulang.' : pesanGalat(e), 'galat', 5000);
+      toast(e.konflik ? 'Kartu sudah diubah orang lain. Papan dimuat ulang.' : pesanGalat(e), 'galat', 5000);
     }
     await muat();
   }
@@ -247,6 +250,7 @@ export async function tampil(ctx) {
   const saatUkuran = () => ukurPapan();
   if (mode === 'board') {
     ctx.el.classList.add('mode-board');
+    ctx.lebar(true);                     // desktop: papan memakai lebar layar (CSS ≥900px); HP tidak berubah
     window.addEventListener('resize', saatUkuran);
     wadahFilter.addEventListener('toggle', saatUkuran);
   }
@@ -260,10 +264,11 @@ export async function tampil(ctx) {
       if (baru && baru.id) ctx.navigasi(`/t/${encodeURIComponent(baru.id)}`);
     } }, ikon('tambah'), 'Tugas');
     document.body.appendChild(fab);
+    document.body.classList.add('ada-fab');
   }
   return () => {
     for (const s of sortables) s.destroy();
     window.removeEventListener('resize', saatUkuran);
-    if (fab) fab.remove();
+    if (fab) { fab.remove(); document.body.classList.remove('ada-fab'); }
   };
 }

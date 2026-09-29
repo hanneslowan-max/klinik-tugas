@@ -72,6 +72,9 @@ const fmtTglTahun = new Intl.DateTimeFormat('id-ID', { timeZone: ZONA, weekday: 
 const fmtJam = new Intl.DateTimeFormat('id-ID', { timeZone: ZONA, hour: '2-digit', minute: '2-digit', hour12: false });
 const fmtLengkap = new Intl.DateTimeFormat('id-ID', { timeZone: ZONA, day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
 const fmtIsoWib = new Intl.DateTimeFormat('en-CA', { timeZone: ZONA, year: 'numeric', month: '2-digit', day: '2-digit' });
+// tooltip: tanggal/waktu lengkap berbahasa Indonesia (bukan ISO) — 'Selasa, 29 September 2026' / '… pukul 11.25.31 WIB'
+const fmtTglPanjang = new Intl.DateTimeFormat('id-ID', { timeZone: ZONA, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+const fmtJamDetik = new Intl.DateTimeFormat('id-ID', { timeZone: ZONA, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 
 /** 'YYYY-MM-DD' (tanggal WIB) dari Date/ISO. */
 export function tanggalWib(t) {
@@ -94,6 +97,16 @@ export function fmtWaktu(iso) {
   if (!iso) return '';
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? '' : `${fmtLengkap.format(d)} WIB`;
+}
+/** 'Selasa, 29 September 2026' dari tanggal WIB 'YYYY-MM-DD'. */
+export function fmtTanggalPanjang(s) {
+  return s ? fmtTglPanjang.format(dariTanggal(s)) : '';
+}
+/** 'Selasa, 29 September 2026 pukul 11.25.31 WIB' dari ISO (untuk tooltip). */
+export function fmtWaktuPanjang(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : `${fmtTglPanjang.format(d)} pukul ${fmtJamDetik.format(d)} WIB`;
 }
 export function fmtJamWib(iso) {
   if (!iso) return '';
@@ -156,16 +169,21 @@ export function chipDue(t, hariIni, libur) {
   if (kat === 'telat') { teks = `${teks} · telat ${selisihHari(t.due_wib, hariIni)} hr`; kelas += ' telat'; }
   else if (kat === 'hari_ini') { teks = `Hari ini${jam}`; kelas += ' hari-ini'; }
   else if (kat === 'tiga_hk') { teks = `${teks} · sisa ${hariKerja(hariIni, t.due_wib, libur)} hk`; kelas += ' dekat'; }
-  return h('span', { class: kelas, title: `Due ${t.due_wib} (WIB)` }, ikon('kalender'), teks);
+  return h('span', { class: kelas, title: `Due ${fmtTanggalPanjang(t.due_wib)}${jam} (WIB)` }, ikon('kalender'), teks);
 }
 
 // ------------------------------------------------------------------ prioritas
+// nilai 1–4 = prioritas ClickUp (urgent/high/normal/low); label tampil berbahasa Indonesia
 export const PRIORITAS = {
-  1: { nama: 'Urgent', warna: '#f50000' },
-  2: { nama: 'High', warna: '#ffcc00' },
+  1: { nama: 'Mendesak', warna: '#f50000' },
+  2: { nama: 'Tinggi', warna: '#ffcc00' },
   3: { nama: 'Normal', warna: '#6fddff' },
-  4: { nama: 'Low', warna: '#d8d8d8' },
+  4: { nama: 'Rendah', warna: '#d8d8d8' },
 };
+
+/** Label peran anggota (nilai DB tetap owner/member/bot). */
+export const PERAN = { owner: 'owner', member: 'anggota', bot: 'bot' };
+export const labelPeran = (r) => PERAN[r] || r;
 export function chipPrioritas(p) {
   const x = PRIORITAS[p];
   if (!x) return null;
@@ -282,6 +300,37 @@ export function lanjutAman(s, cadangan = '/saya', larang = []) {
   if (!s || typeof s !== 'string' || !s.startsWith('/') || s.startsWith('//') || s.includes('\\')) return cadangan;
   if (larang.some((p) => s.startsWith(p))) return cadangan;
   return s;
+}
+
+/**
+ * Keyboard virtual: iOS Safari & Chrome Android (resizes-visual) tidak mengecilkan layout viewport, jadi lembar bawah
+ * (dialog) tertutup keyboard. Isi --vv-tinggi (tinggi viewport visual) & --vv-bawah (bagian bawah layout viewport yang
+ * tertutup) di <html>; CSS memakainya untuk tinggi maks & margin bawah dialog. Kontrol yang sedang fokus di dialog
+ * digulir supaya tetap terlihat.
+ */
+export function pantauViewport() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const akar = document.documentElement;
+  let bawahLama = -1;
+  const perbarui = () => {
+    // cubit-zoom juga mengecilkan viewport visual → bukan keyboard; abaikan saat skala ≠ 1
+    const zoom = vv.scale && Math.abs(vv.scale - 1) > 0.01;
+    const tinggi = Math.round(zoom ? window.innerHeight : vv.height);
+    const bawah = zoom ? 0 : Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+    akar.style.setProperty('--vv-tinggi', `${tinggi}px`);
+    akar.style.setProperty('--vv-bawah', `${bawah}px`);
+    akar.classList.toggle('papan-ketik', bawah > 80);
+    if (bawah !== bawahLama) {
+      bawahLama = bawah;
+      const aktif = document.activeElement;
+      if (aktif && aktif.closest && aktif.closest('dialog[open]')) requestAnimationFrame(() => aktif.scrollIntoView({ block: 'nearest' }));
+    }
+  };
+  vv.addEventListener('resize', perbarui);
+  vv.addEventListener('scroll', perbarui);
+  window.addEventListener('resize', perbarui);
+  perbarui();
 }
 
 export function debounce(fn, ms) {

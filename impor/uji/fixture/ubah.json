@@ -28,6 +28,7 @@
     { "op": "tambah_task", "task": { "id": "86b2q{RUN}", "list": "901822000106", "parent": "86b2p{RUN}", "name": "Q · Anak di list lain", "status": "to do",
         "creator": 88200001, "assignees": [88200003], "created": "2026-09-29T01:47:00Z", "orderindex": "5" } },
     { "op": "ubah_list", "id": "901822000102", "set": { "name": "Fase Fiktif 2 (baru)" } },
+    { "op": "ubah_list", "id": "901822000201", "set": { "anggota": [88200002] } },
     { "op": "ganti_status", "list": "901822000102", "dari": "dikerjakan", "ke": "sedang dikerjakan" }
   ]
 }

@@ -319,12 +319,14 @@ $$;
 -- ---------------------------------------------------------------- rujukan (ID / URL)
 -- (perbaikan P6) Urai rujukan → (tipe, id). tipe null = ID polos (jenisnya dicari pemanggil).
 --   URL tugas   : …/t/<id>, …/t/<team>/<id> (ClickUp & app)                         → task
---   URL ClickUp : /<team>/v/li/<list>, /v/f/<folder>[/…], /v/s/<space>               → list / folder / space
+--   URL ClickUp : /<team>/v/li/<list>, /v/f/<folder>, /v/s/<space>, juga bersarang di bawah kode tampilan
+--                 (/v/l/li/<list>, /v/o/f/<folder>, /v/o/s/<space>)                  → list / folder / space
 --                 tampilan /v/<l|b|c|g|t|…>/<induk>-<id>-<n> (mis. /v/l/6-<list>-1 list, /v/b/6-<list>-2 board):
 --                 induk 6 = list, 5 = folder, 4 = space, 7 = workspace (tipe 'workspace', tidak dirujuk)
 --                 /v/l/<list> (tanpa pola induk-id-n) → list
 --   URL app     : /l/<list>                                                          → list
--- Query string & fragmen (?pr=…, #…) dan garis miring akhir dibuang.
+-- Query string & fragmen (?pr=…, #…) dan garis miring akhir dibuang. Pola tampilan ClickUp = asumsi dari URL
+-- yang umum dipakai; dicek ulang dengan URL asli saat probe (impor/README.md).
 create or replace function public.rujukan_urai(p_ref text, out tipe text, out id text)
 language plpgsql
 immutable
@@ -341,15 +343,18 @@ begin
   elsif m is not null then
     tipe := case m[1] when '6' then 'list' when '5' then 'folder' when '4' then 'space' else 'workspace' end;
     id := m[2];
-  elsif v ~ '/v/(li|l)/' then
+  elsif v ~ '/v/(?:[A-Za-z]+/)*li/[0-9A-Za-z_-]' then
     tipe := 'list';
-    id := substring(v from '/v/(?:li|l)/([0-9A-Za-z_-]+)');
-  elsif v ~ '/v/f/' then
+    id := substring(v from '/v/(?:[A-Za-z]+/)*li/([0-9A-Za-z_-]+)');
+  elsif v ~ '/v/(?:[A-Za-z]+/)*f/[0-9A-Za-z_-]' then
     tipe := 'folder';
-    id := substring(v from '/v/f/([0-9A-Za-z_-]+)');
-  elsif v ~ '/v/s/' then
+    id := substring(v from '/v/(?:[A-Za-z]+/)*f/([0-9A-Za-z_-]+)');
+  elsif v ~ '/v/(?:[A-Za-z]+/)*s/[0-9A-Za-z_-]' then
     tipe := 'space';
-    id := substring(v from '/v/s/([0-9A-Za-z_-]+)');
+    id := substring(v from '/v/(?:[A-Za-z]+/)*s/([0-9A-Za-z_-]+)');
+  elsif v ~ '/v/l/[0-9A-Za-z_-]' then
+    tipe := 'list';
+    id := substring(v from '/v/l/([0-9A-Za-z_-]+)');
   elsif v ~ '/l/' then
     tipe := 'list';
     id := substring(v from '/l/([0-9A-Za-z_-]+)$');
@@ -357,6 +362,38 @@ begin
     tipe := null;
     id := nullif(v, '');
   end if;
+end;
+$$;
+
+-- (perbaikan P6) URL wadah (list/folder/space) yang ADA dan terlihat penilai → {"type","id","url"}; selain itu
+-- null (termasuk ID polos, URL tugas, dan wadah di space privat yang tertutup). url list = <app>/l/<id>; folder &
+-- space tidak punya halaman sendiri di app (url null). Dipakai cari_tugas (x_search/web_cari) dan web_cari.rujukan.
+create or replace function public.rujukan_wadah(p_ref text)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_tipe text;
+  v_id   text;
+begin
+  if coalesce(p_ref, '') !~ '/' then
+    return null;
+  end if;
+  select u.tipe, u.id into v_tipe, v_id from public.rujukan_urai(p_ref) u;
+  if v_id is null then
+    return null;
+  elsif v_tipe = 'list' and public.list_terlihat(v_id) then
+    return jsonb_build_object('type', 'list', 'id', v_id, 'url', public.app_url() || '/l/' || v_id);
+  elsif v_tipe = 'folder'
+        and exists (select 1 from public.folders f where f.id = v_id and public.space_terlihat(f.space_id)) then
+    return jsonb_build_object('type', 'folder', 'id', v_id, 'url', null);
+  elsif v_tipe = 'space' and exists (select 1 from public.spaces s where s.id = v_id) and public.space_terlihat(v_id) then
+    return jsonb_build_object('type', 'space', 'id', v_id, 'url', null);
+  end if;
+  return null;
 end;
 $$;
 
@@ -376,26 +413,14 @@ declare
   v_like  text;
   v_kode  text;
   v_tutup text[] := public.tugas_tertutup();            -- (review R2) privasi space
-  v_r     record;
-  v_wtipe text;                                          -- (P6) wadah dari URL: list | folder | space
-  v_wid   text;
+  v_w     jsonb := public.rujukan_wadah(v_q);             -- (P6) wadah dari URL (terlihat aktor) atau null
+  v_wtipe text := v_w ->> 'type';                        --      list | folder | space
+  v_wid   text := v_w ->> 'id';
 begin
   if v_q = '' then
     perform public.lempar('PT400', 'Kata kunci pencarian kosong', 'INPUT_001');
   end if;
   v_id := coalesce(substring(v_q from '/t/(?:[0-9]+/)?([0-9A-Za-z_-]+)'), v_q);
-  if v_q ~ '/' then
-    select * into v_r from public.rujukan_urai(v_q);
-    if v_r.tipe in ('list', 'folder', 'space') and v_r.id is not null
-       and ((v_r.tipe = 'list' and public.list_terlihat(v_r.id))
-            or (v_r.tipe = 'folder' and exists (select 1 from public.folders f
-                                                  where f.id = v_r.id and public.space_terlihat(f.space_id)))
-            or (v_r.tipe = 'space' and exists (select 1 from public.spaces sp where sp.id = v_r.id)
-                and public.space_terlihat(v_r.id))) then
-      v_wtipe := v_r.tipe;
-      v_wid := v_r.id;
-    end if;
-  end if;
   v_like := '%' || replace(replace(replace(v_q, '\', '\\'), '%', '\%'), '_', '\_') || '%';
   v_kode := '^' || regexp_replace(v_q, '([.^$*+?(){}|\[\]\\-])', '\\\1', 'g') || '([^[:alnum:]]|$)';
   return query
