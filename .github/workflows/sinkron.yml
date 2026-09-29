@@ -1,0 +1,90 @@
+# Sinkron ClickUp → aplikasi Tugas RHJ (impor/sinkron.mjs, ARSITEKTUR §10).
+# Jadwal: 05:45 WIB (22:45 UTC) di luar jendela routine 07:00–09:15 WIB, plus pemicu manual.
+# HANYA jalan bila Variables repo SINKRON_AKTIF == '1' (Settings → Secrets and variables → Actions → Variables).
+# Secrets wajib: CLICKUP_API_TOKEN (dipakai baca saja: importer menolak method selain GET),
+#                TUGAS_API_URL (…/functions/v1/api/v2), TUGAS_IMPORT_TOKEN (token app scope 'impor').
+# Log Actions hanya berisi angka (tanpa nama kartu). Laporan angka per list disimpan sebagai artifact 30 hari.
+name: Sinkron ClickUp
+
+on:
+  schedule:
+    - cron: "45 22 * * *" # 05:45 WIB
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Mode run (penuh | akhir | uji)"
+        type: choice
+        options: [penuh, akhir, uji]
+        default: penuh
+      only:
+        description: "Batasi list, format list=<id>[,<id>] (kosong = semua)"
+        type: string
+        default: ""
+      dry_run:
+        description: "Hanya baca ClickUp + bandingkan sensus, tanpa menulis"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sinkron-clickup
+  cancel-in-progress: false
+
+jobs:
+  sinkron:
+    if: ${{ vars.SINKRON_AKTIF == '1' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CLICKUP_API_TOKEN: ${{ secrets.CLICKUP_API_TOKEN }}
+      TUGAS_API_URL: ${{ secrets.TUGAS_API_URL }}
+      TUGAS_IMPORT_TOKEN: ${{ secrets.TUGAS_IMPORT_TOKEN }}
+      SINKRON_RPM: "60"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Cek secrets
+        run: |
+          set -euo pipefail
+          kurang=0
+          for v in CLICKUP_API_TOKEN TUGAS_API_URL TUGAS_IMPORT_TOKEN; do
+            if [ -z "${!v:-}" ]; then echo "::error::secret $v kosong"; kurang=1; fi
+          done
+          exit "$kurang"
+
+      - name: Sinkron
+        env:
+          MODE: ${{ inputs.mode || 'penuh' }}
+          ONLY: ${{ inputs.only || '' }}
+          DRY: ${{ inputs.dry_run && '1' || '' }}
+        run: |
+          set -uo pipefail
+          args=(--mode "$MODE")
+          if [ -n "$ONLY" ]; then args+=(--only "$ONLY"); fi
+          if [ -n "$DRY" ]; then args+=(--dry-run); fi
+          node impor/sinkron.mjs "${args[@]}" > ringkasan.json
+          kode=$?
+          cat ringkasan.json
+          case "$kode" in
+            0) echo "Sinkron sukses, sensus selisih 0." ;;
+            2) echo "::error::Sinkron selesai dengan selisih sensus / baris gagal / tertunda (lihat artifact laporan)." ;;
+            *) echo "::error::Sinkron gagal (kode $kode)." ;;
+          esac
+          exit "$kode"
+
+      - name: Simpan laporan (angka per list)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: laporan-sinkron-${{ github.run_id }}
+          path: |
+            impor/laporan/
+            ringkasan.json
+          retention-days: 30
+          if-no-files-found: ignore

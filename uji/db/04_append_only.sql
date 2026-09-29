@@ -1,6 +1,8 @@
 -- 04 · activity append-only: tidak bisa UPDATE/DELETE/TRUNCATE oleh siapa pun (postgres, authenticated, service_role).
 begin;
 \ir _bantu.sql
+-- DB bisa berisi data uji area lain (mis. space privat fixture B2); privasi space diuji di 14, di sini dimatikan.
+update public.app_settings set value = '"abaikan"' where key = 'privasi_space';
 
 create temp table awal as
   select count(*) as n, max(id) as maks, (select jenis from public.activity order by id limit 1) as jenis_pertama

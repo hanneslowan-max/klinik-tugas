@@ -41,7 +41,6 @@ declare
   abjad constant text := '0123456789abcdefghijklmnopqrstuvwxyz';
   hasil text := '';
   acak bytea;
-  i integer;
   v integer;
 begin
   if len is null or len < 1 or len > 64 then

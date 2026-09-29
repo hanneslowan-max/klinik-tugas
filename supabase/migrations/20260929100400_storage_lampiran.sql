@@ -28,7 +28,8 @@ as $$
   end
 $$;
 
--- Boleh unggah: member aktif, tugas ada & tidak dihapus, dan bukan kartu ClickUp saat mode cermin.
+-- Boleh unggah: member aktif, tugas ada & tidak dihapus, terlihat aktor (privasi space, review R2),
+-- dan bukan kartu ClickUp saat mode cermin.
 create or replace function public.boleh_unggah_lampiran(p_name text)
 returns boolean
 language sql
@@ -41,15 +42,18 @@ as $$
        select 1 from public.tasks t
         where t.id = public.lampiran_task_dari_path(p_name)
           and t.deleted_at is null
-          and (t.sumber = 'app' or public.mode_app() <> 'cermin'))
+          and (t.sumber = 'app' or public.mode_app() <> 'cermin')
+          and public.tugas_terlihat(t.id))
 $$;
 
+-- Baca: member aktif, path t/<task_id>/…, dan tugasnya tidak tertutup privasi space (review R2).
 create policy "lampiran: member baca" on storage.objects
   for select to authenticated
   using (
     bucket_id = 'lampiran'
     and public.lampiran_task_dari_path(name) is not null
     and (select public.is_member())
+    and not coalesce(public.lampiran_task_dari_path(name) = any ((select public.tugas_tertutup())::text[]), false)
   );
 
 create policy "lampiran: member unggah" on storage.objects

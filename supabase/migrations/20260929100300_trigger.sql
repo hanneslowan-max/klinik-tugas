@@ -1,4 +1,4 @@
--- A1 · Fondasi 4/7: trigger — turunan (due_wib, status_type, tanggal tutup), updated_at/versi, pencarian,
+-- A1 · Fondasi 4/7 (+ perbaikan review R3/R4): trigger — turunan (due_wib, status_type, tanggal tutup), updated_at/versi, pencarian,
 -- penghitung komentar, activity per field + snapshot, notifikasi, append-only, penjaga mode cermin,
 -- status default list baru. Kontrak ARSITEKTUR.md §0, §2, §3.
 --
@@ -122,6 +122,24 @@ begin
 end;
 $$;
 
+-- ---------------------------------------------------------------- izin hapus (kontrak §3)
+-- Hapus/pulihkan/purge tugas hanya owner aktif (bot tidak pernah). Berlaku untuk sumber ui/api;
+-- impor/sinkron (hilang di ClickUp) dan sistem tidak dibatasi.
+create or replace function public.wajib_owner_hapus()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if public.sumber_aktif() in ('ui', 'api')
+     and not exists (select 1 from public.members m
+                      where m.id = public.aktor() and m.role = 'owner' and m.aktif) then
+    perform public.lempar('PT403', 'Hanya owner yang boleh menghapus atau memulihkan tugas', 'HAPUS_OWNER');
+  end if;
+end;
+$$;
+
 -- ---------------------------------------------------------------- tasks
 create or replace function public.tasks_sebelum()
 returns trigger
@@ -138,12 +156,14 @@ declare
   v_tutup_baru boolean;
   v_berubah    boolean;
   v_abaikan    constant text[] := array['comment_count', 'last_comment_at', 'cari'];
+  v_induk      record;
 begin
   -- purge
   if tg_op = 'DELETE' then
     if old.sumber = 'clickup' and not public.boleh_ubah_clickup() then
       perform public.tolak_cermin();
     end if;
+    perform public.wajib_owner_hapus();
     return old;
   end if;
 
@@ -206,6 +226,22 @@ begin
 
   v_tutup_baru := new.status_type in ('closed', 'done');
 
+  -- (review R3) sub-tugas tidak boleh aktif di bawah induk yang di Sampah / diarsip (ui/api/sistem).
+  -- Berlaku saat dibuat, ganti induk, dipulihkan, atau dibuka arsipnya. Impor/sinkron = data ClickUp verbatim.
+  if not v_impor and new.parent_id is not null
+     and (tg_op = 'INSERT' or new.parent_id is distinct from old.parent_id
+          or (old.deleted_at is not null and new.deleted_at is null)
+          or (old.archived and not new.archived)) then
+    select p.deleted_at is not null as dihapus, p.archived as diarsip into v_induk
+      from public.tasks p where p.id = new.parent_id;
+    if v_induk.dihapus and (tg_op = 'INSERT' or new.deleted_at is null) then
+      perform public.lempar('PT409', 'Induk tugas ini ada di Sampah; pulihkan induknya dulu', 'KONFLIK_001');
+    end if;
+    if v_induk.diarsip and not new.archived then
+      perform public.lempar('PT409', 'Induk tugas ini diarsip; buka arsip induknya dulu', 'KONFLIK_001');
+    end if;
+  end if;
+
   if tg_op = 'INSERT' then
     if v_impor then
       new.created_at := coalesce(new.created_at, now());
@@ -243,6 +279,12 @@ begin
     new.created_at := old.created_at;
     new.creator_id := old.creator_id;
   end if;
+  -- penghitung komentar hanya boleh diubah trigger comments_sesudah (app.hitung_komentar = id tugas);
+  -- melindungi dari upsert "set ... = excluded.*" yang membawa nilai 0 dari BEFORE INSERT.
+  if coalesce(current_setting('app.hitung_komentar', true), '') is distinct from new.id then
+    new.comment_count := old.comment_count;
+    new.last_comment_at := old.last_comment_at;
+  end if;
 
   if v_tutup_baru and not v_tutup_lama then                 -- ditutup
     if not v_impor then
@@ -277,7 +319,10 @@ begin
     new.archived_at := old.archived_at;
   end if;
 
-  -- hapus lunak
+  -- hapus lunak / pulihkan: hanya owner (ui/api)
+  if (new.deleted_at is null) <> (old.deleted_at is null) then
+    perform public.wajib_owner_hapus();
+  end if;
   if new.deleted_at is null then
     new.deleted_by := null;
   elsif not v_impor then
@@ -290,8 +335,9 @@ begin
     end if;
   end if;
 
-  -- versi & updated_at. Komentar/penghitung TIDAK menaikkan keduanya.
-  -- app.sentuh_tugas = id tugas → dianggap berubah (dipakai trigger assignee).
+  -- versi & updated_at. Penghitung komentar TIDAK menaikkan versi.
+  -- app.sentuh_tugas = id tugas → dianggap berubah (versi + updated_at; dipakai trigger assignee).
+  -- app.sentuh_waktu = id tugas → updated_at saja (komentar/balasan baru ui/api, review R4; versi tetap).
   v_berubah :=
        (new.list_id, new.parent_id, new.name, new.markdown, new.description_plain, new.desc_unreadable,
         new.status, new.priority, new.due_at, new.due_has_time, new.start_at, new.start_has_time,
@@ -307,7 +353,10 @@ begin
     if not v_impor then new.updated_at := now(); end if;
   else
     new.versi := old.versi;
-    if not v_impor then new.updated_at := old.updated_at; end if;
+    if not v_impor then
+      new.updated_at := case when coalesce(current_setting('app.sentuh_waktu', true), '') = new.id
+                             then now() else old.updated_at end;
+    end if;
   end if;
   if v_impor then
     new.updated_at := coalesce(new.updated_at, old.updated_at);   -- date_updated ClickUp verbatim
@@ -329,6 +378,8 @@ declare
   v_tutup_lama boolean;
   v_tutup_baru boolean;
   v_rename     boolean;
+  v_ikut       text := nullif(current_setting('app.ikut_induk', true), '');   -- baris ini diubah karena induknya
+  v_catatan    text;
 begin
   if tg_op = 'INSERT' then
     if v_impor then
@@ -354,6 +405,7 @@ begin
 
   -- UPDATE: satu baris activity per field yang berubah
   v_at_awal := case when v_impor then old.synced_at end;
+  v_catatan := case when v_ikut is not null then format('ikut induk %s', v_ikut) end;
   v_tutup_lama := old.status_type in ('closed', 'done');
   v_tutup_baru := new.status_type in ('closed', 'done');
 
@@ -421,17 +473,43 @@ begin
 
   if new.archived is distinct from old.archived then
     perform public.catat_activity(new.id, case when new.archived then 'arsip' else 'pulih_arsip' end,
-      to_jsonb(old.archived), to_jsonb(new.archived), p_at_awal => v_at_awal);
+      to_jsonb(old.archived), to_jsonb(new.archived), p_at_awal => v_at_awal, p_catatan => v_catatan);
   end if;
 
   if new.deleted_at is not null and old.deleted_at is null then
-    perform public.catat_activity(new.id, case when v_impor then 'hilang_di_clickup' else 'hapus' end,
+    perform public.catat_activity(new.id,
+      case when v_impor and v_ikut is null then 'hilang_di_clickup' else 'hapus' end,
       null, jsonb_build_object('deleted_at', public.iso_utc(new.deleted_at), 'deleted_by', new.deleted_by),
-      p_at_awal => v_at_awal);
+      p_at_awal => v_at_awal, p_catatan => v_catatan);
   elsif new.deleted_at is null and old.deleted_at is not null then
     perform public.catat_activity(new.id, 'pulih',
       jsonb_build_object('deleted_at', public.iso_utc(old.deleted_at), 'deleted_by', old.deleted_by), null,
-      p_at_awal => v_at_awal);
+      p_at_awal => v_at_awal, p_catatan => v_catatan);
+  end if;
+
+  -- (review R3) sub-tugas ikut induk: hapus lunak / pulihkan, arsip / buka arsip (rekursif lewat trigger ini).
+  -- ui/api/sistem → semua anak. impor/sinkron → hanya anak buatan app (anak ClickUp mengikuti data ClickUp).
+  -- Pulihkan/buka arsip hanya anak yang ikut terhapus/terarsip BERSAMA induk (deleted_at/archived_at sama persis,
+  -- satu transaksi); anak yang dihapus sendiri sebelumnya tetap di Sampah.
+  if (new.deleted_at is null) <> (old.deleted_at is null) or new.archived <> old.archived then
+    perform set_config('app.ikut_induk', new.id, true);
+    if new.deleted_at is not null and old.deleted_at is null then
+      update public.tasks c set deleted_at = new.deleted_at, deleted_by = new.deleted_by
+       where c.parent_id = new.id and c.deleted_at is null and (not v_impor or c.sumber = 'app');
+    elsif new.deleted_at is null and old.deleted_at is not null then
+      update public.tasks c set deleted_at = null
+       where c.parent_id = new.id and c.deleted_at = old.deleted_at
+         and c.deleted_by is not distinct from old.deleted_by and (not v_impor or c.sumber = 'app');
+    end if;
+    if new.archived and not old.archived then
+      update public.tasks c set archived = true
+       where c.parent_id = new.id and not c.archived and c.deleted_at is null and (not v_impor or c.sumber = 'app');
+    elsif old.archived and not new.archived then
+      update public.tasks c set archived = false
+       where c.parent_id = new.id and c.archived and c.archived_at is not distinct from old.archived_at
+         and (not v_impor or c.sumber = 'app');
+    end if;
+    perform set_config('app.ikut_induk', coalesce(v_ikut, ''), true);
   end if;
 
   return null;
@@ -575,6 +653,18 @@ begin
          or new.sumber is distinct from old.sumber or new.clickup_id is distinct from old.clickup_id then
         perform public.lempar('PT400', 'Induk/penulis/sumber komentar tidak bisa diubah', 'INPUT_001');
       end if;
+      if public.sumber_aktif() in ('ui', 'api') then
+        if (new.text is distinct from old.text or new.body_json is distinct from old.body_json)
+           and public.aktor() is distinct from old.author_id then
+          perform public.lempar('PT403', 'Hanya penulis yang boleh mengedit komentar', 'ACCESS_001');
+        end if;
+        if (new.deleted_at is null) <> (old.deleted_at is null)
+           and public.aktor() is distinct from old.author_id
+           and not exists (select 1 from public.members m
+                            where m.id = public.aktor() and m.role = 'owner' and m.aktif) then
+          perform public.lempar('PT403', 'Hanya penulis atau owner yang boleh menghapus komentar', 'ACCESS_001');
+        end if;
+      end if;
       new.created_at := old.created_at;
       if new.text is distinct from old.text or new.body_json is distinct from old.body_json then
         new.edited_at := now();
@@ -623,7 +713,14 @@ declare
   v_task   text := case when tg_op = 'DELETE' then old.task_id else new.task_id end;
   v_actor  bigint;
 begin
-  -- penghitung di tasks: semua komentar + balasan yang tidak dihapus (tidak menaikkan updated_at/versi)
+  -- penghitung di tasks: semua komentar + balasan yang tidak dihapus (tidak menaikkan versi).
+  -- (review R4) komentar/balasan BARU dari ui/api/sistem menaikkan updated_at (date_updated) supaya sapuan
+  -- `agenda` (berubah_baru) menangkap kartu terbuka yang hanya dapat komentar baru (pagar M-CU).
+  -- Impor/sinkron tidak menyentuh updated_at (date_updated ClickUp verbatim).
+  perform set_config('app.hitung_komentar', v_task, true);
+  if tg_op = 'INSERT' and v_sumber in ('ui', 'api', 'sistem') and new.deleted_at is null then
+    perform set_config('app.sentuh_waktu', v_task, true);
+  end if;
   update public.tasks t
      set comment_count = x.n,
          last_comment_at = x.terakhir
@@ -631,7 +728,10 @@ begin
             from public.comments c
            where c.task_id = v_task and c.deleted_at is null) x
    where t.id = v_task
-     and (t.comment_count, t.last_comment_at) is distinct from (x.n, x.terakhir);
+     and ((t.comment_count, t.last_comment_at) is distinct from (x.n, x.terakhir)
+          or coalesce(current_setting('app.sentuh_waktu', true), '') = v_task);
+  perform set_config('app.hitung_komentar', '', true);
+  perform set_config('app.sentuh_waktu', '', true);
 
   if tg_op = 'INSERT' then
     -- komentar impor/sinkron sudah tercatat sebagai baris komentar sendiri (waktu & penulis asli)

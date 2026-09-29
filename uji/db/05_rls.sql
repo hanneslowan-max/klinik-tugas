@@ -1,6 +1,9 @@
 -- 05 · RLS & hak baca: anon, authenticated non-member, member, owner, anggota nonaktif, bot; Storage lampiran.
 begin;
 \ir _bantu.sql
+-- RLS dasar ("member melihat semua"). Privasi space (review R2) diuji di 14; di sini dimatikan supaya tes tetap
+-- sah bila DB bersama berisi space privat dari fixture area lain.
+update public.app_settings set value = '"abaikan"' where key = 'privasi_space';
 
 create function uji.hitung(tabel text) returns int language plpgsql as $$
 declare n int;

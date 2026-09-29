@@ -158,3 +158,199 @@ as $$
   select exists (select 1 from public.list_statuses s where s.list_id = p_list and s.type = 'open')
      and exists (select 1 from public.list_statuses s where s.list_id = p_list and s.type = 'closed')
 $$;
+
+-- ================================================================ (review R2) privasi space
+-- Aturan (riset K8 "ikuti setelan privat ClickUp"): anggota melihat SEMUA bila owner/bot aktif, atau setelan
+-- app_settings.privasi_space = "abaikan". Selain itu space privat hanya terlihat oleh anggotanya (space_anggota),
+-- dan kartu di space privat juga terlihat oleh assignee kartu itu.
+-- Yang dinilai = penilai(): anggota sesi JWT bila ada (RLS, Storage, web_*), selain itu aktor() (api_*/x_* lewat
+-- service role: app.actor_id = p_aktor). Tanpa parameter anggota supaya klien tidak bisa menanyakan hak orang lain.
+create or replace function public.penilai()
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when (select auth.uid()) is not null then public.member_saya() else public.aktor() end
+$$;
+
+-- Internal (tanpa EXECUTE untuk klien): p_m melihat semua? owner/bot aktif, atau privasi_space "abaikan".
+create or replace function public.akses_semua(p_m bigint)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select s.value #>> '{}' from public.app_settings s where s.key = 'privasi_space'), 'tegakkan') = 'abaikan'
+      or exists (select 1 from public.members m where m.id = p_m and m.aktif and m.role in ('owner', 'bot'))
+$$;
+
+create or replace function public.lihat_semua()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.akses_semua(public.penilai())
+$$;
+
+-- Jalur cepat dulu (space tidak privat), baru hak penilai.
+create or replace function public.space_terlihat(p_space text)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_m bigint;
+begin
+  if exists (select 1 from public.spaces s where s.id = p_space and not s.private) then
+    return true;
+  end if;
+  v_m := public.penilai();
+  return public.akses_semua(v_m)
+      or exists (select 1 from public.space_anggota sa where sa.space_id = p_space and sa.member_id = v_m);
+end;
+$$;
+
+-- List ada DAN space-nya terlihat.
+create or replace function public.list_terlihat(p_list text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (select 1 from public.lists l where l.id = p_list and public.space_terlihat(l.space_id))
+$$;
+
+-- List yang TIDAK terlihat (di space privat tanpa keanggotaan). Kosong bila tidak ada space privat / lihat semua.
+create or replace function public.list_tertutup()
+returns text[]
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_m bigint;
+begin
+  if not exists (select 1 from public.spaces s where s.private) then
+    return '{}'::text[];
+  end if;
+  v_m := public.penilai();
+  if public.akses_semua(v_m) then
+    return '{}'::text[];
+  end if;
+  return coalesce((
+    select array_agg(l.id order by l.id)
+      from public.lists l
+      join public.spaces s on s.id = l.space_id
+     where s.private
+       and not exists (select 1 from public.space_anggota sa where sa.space_id = s.id and sa.member_id = v_m)), '{}'::text[]);
+end;
+$$;
+
+-- Tugas yang TIDAK terlihat: di list tertutup dan bukan assignee-nya. Dipakai RLS & filter daftar.
+create or replace function public.tugas_tertutup()
+returns text[]
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_l text[] := public.list_tertutup();
+  v_m bigint;
+begin
+  if cardinality(v_l) = 0 then
+    return '{}'::text[];
+  end if;
+  v_m := public.penilai();
+  return coalesce((
+    select array_agg(t.id order by t.id)
+      from public.tasks t
+     where t.list_id = any (v_l)
+       and not exists (select 1 from public.task_assignees ta where ta.task_id = t.id and ta.member_id = v_m)), '{}'::text[]);
+end;
+$$;
+
+-- Satu tugas terlihat? Tugas tak ada → akses_semua (pemanggil memeriksa ada/terhapus sendiri).
+create or replace function public.tugas_terlihat(p_task text)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v   record;
+  v_m bigint;
+begin
+  select s.id as space_id, s.private into v
+    from public.tasks t
+    join public.lists l on l.id = t.list_id
+    join public.spaces s on s.id = l.space_id
+   where t.id = p_task;
+  if found and not v.private then
+    return true;
+  end if;
+  v_m := public.penilai();
+  if public.akses_semua(v_m) then
+    return true;
+  end if;
+  return found
+     and (exists (select 1 from public.space_anggota sa where sa.space_id = v.space_id and sa.member_id = v_m)
+          or exists (select 1 from public.task_assignees ta where ta.task_id = p_task and ta.member_id = v_m));
+end;
+$$;
+
+-- ================================================================ (review R5) kategori due pagar B10
+-- Nama berisi BERSYARAT/CADANGAN/DITUNDA → "menunggu keputusan", bukan telat (baca-pagar.md B10).
+create or replace function public.menunggu_keputusan(p_nama text)
+returns boolean
+language sql
+immutable
+parallel safe
+set search_path = ''
+as $$
+  select coalesce(p_nama ~* '(BERSYARAT|CADANGAN|DITUNDA)', false)
+$$;
+
+-- Kategori due satu kartu (sumber tunggal untuk web_tugas_saya, baris web, hitungan web_struktur):
+--   null (selesai) · tidak_ditagih (list tidak ditagih; dikecualikan TENGGAT) · menunggu_keputusan ·
+--   tanpa_due · telat (due < hari ini) · hari_ini · tiga_hk (hari_kerja ≤ 3) · nanti.
+-- Urutan pengecualian sama dengan tenggat_hitung: list tidak ditagih dulu, lalu nama menunggu keputusan.
+create or replace function public.kategori_due(p_selesai boolean, p_due date, p_nama text, p_tidak_ditagih boolean,
+                                               p_hari date default null)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_hari date := coalesce(p_hari, public.hari_ini_wib());
+begin
+  if coalesce(p_selesai, false) then
+    return null;
+  elsif coalesce(p_tidak_ditagih, false) then
+    return 'tidak_ditagih';
+  elsif public.menunggu_keputusan(p_nama) then
+    return 'menunggu_keputusan';
+  elsif p_due is null then
+    return 'tanpa_due';
+  elsif p_due < v_hari then
+    return 'telat';
+  elsif p_due = v_hari then
+    return 'hari_ini';
+  elsif p_due - v_hari <= 40 and public.hari_kerja(v_hari, p_due) <= 3 then   -- > 40 hari pasti > 3 hari kerja
+    return 'tiga_hk';
+  end if;
+  return 'nanti';
+end;
+$$;

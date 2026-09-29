@@ -7,5 +7,7 @@ on conflict (id) do nothing;
 
 insert into public.app_settings (key, value) values
   ('mode',         '"cermin"'::jsonb),
-  ('app_base_url', '"https://tugas.palletmeshindonesia.com"'::jsonb)
+  ('app_base_url', '"https://tugas.palletmeshindonesia.com"'::jsonb),
+  -- (review R2) "tegakkan" = space privat ClickUp hanya untuk anggotanya (+ owner/bot); "abaikan" = semua lihat semua.
+  ('privasi_space', '"tegakkan"'::jsonb)
 on conflict (key) do nothing;

@@ -79,6 +79,18 @@ create table public.lists (
 create index lists_space_idx  on public.lists (space_id);
 create index lists_folder_idx on public.lists (folder_id) where folder_id is not null;
 
+-- (review R2) Anggota space privat (setelan privat ClickUp, riset K8). Space privat hanya terlihat oleh anggotanya
+-- + owner/bot; kartu di dalamnya juga terlihat oleh assignee kartu itu. sumber 'clickup' = dikelola impor
+-- (himpunan penuh per space dari payload `members`), 'app' = diberi owner lewat web_admin_struktur_simpan.
+create table public.space_anggota (
+  space_id  text not null references public.spaces (id) on delete cascade,
+  member_id bigint not null references public.members (id) on delete cascade,
+  sumber    text not null default 'app' check (sumber in ('app', 'clickup')),
+  added_at  timestamptz not null default now(),
+  primary key (space_id, member_id)
+);
+create index space_anggota_member_idx on public.space_anggota (member_id);
+
 create table public.list_statuses (
   list_id           text not null references public.lists (id) on delete cascade,
   status            text not null,
@@ -295,7 +307,9 @@ create table public.app_settings (
   key        text primary key,
   value      jsonb not null,
   updated_at timestamptz not null default now(),                     -- (teknis)
-  constraint app_settings_mode_valid check (key <> 'mode' or value in ('"cermin"'::jsonb, '"utama"'::jsonb))
+  constraint app_settings_mode_valid check (key <> 'mode' or value in ('"cermin"'::jsonb, '"utama"'::jsonb)),
+  constraint app_settings_privasi_valid check (key <> 'privasi_space'
+                                               or value in ('"tegakkan"'::jsonb, '"abaikan"'::jsonb))
 );
 
 create table public.sync_runs (
@@ -328,6 +342,7 @@ create table public.idem (
 alter table public.workspace        enable row level security;
 alter table public.members          enable row level security;
 alter table public.spaces           enable row level security;
+alter table public.space_anggota    enable row level security;
 alter table public.folders          enable row level security;
 alter table public.lists            enable row level security;
 alter table public.list_statuses    enable row level security;

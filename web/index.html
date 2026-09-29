@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#14161a" media="(prefers-color-scheme: dark)">
+  <meta name="description" content="Aplikasi tugas internal PT Roda Hammerindo Jaya">
+  <title>Tugas RHJ</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/ikon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="/css/app.css">
+  <script src="/config.js"></script>
+  <script src="/vendor/supabase-js-2.117.2.umd.js"></script>
+  <script type="module" src="/js/app.js"></script>
+</head>
+<body>
+  <a class="lompat" href="#isi">Lompat ke isi</a>
+  <header class="atas" id="atas" hidden>
+    <button class="ikon-tombol" id="tombol-kembali" type="button" aria-label="Kembali" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <h1 class="atas-judul" id="judul">Tugas RHJ</h1>
+    <button class="lencana-mode" id="lencana-mode" type="button" hidden><span>Mode cermin</span></button>
+    <a class="ikon-tombol lonceng" id="lonceng" href="/notif" aria-label="Notifikasi">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15z"/><path d="M10 21h4"/></svg>
+      <span class="lonceng-angka" id="lonceng-angka" hidden>0</span>
+    </a>
+  </header>
+  <main id="isi" class="isi" tabindex="-1">
+    <div class="muat-awal" id="muat-awal">Memuat…</div>
+    <noscript><p class="kotak-galat">Aplikasi ini butuh JavaScript.</p></noscript>
+  </main>
+  <nav class="bawah" id="nav-bawah" aria-label="Navigasi utama" hidden>
+    <a href="/saya" data-nav="saya">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l2 2 4-4"/><rect x="4" y="4" width="16" height="16" rx="3"/></svg>
+      <span>Saya</span></a>
+    <a href="/jelajah" data-nav="jelajah">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h6l2 2h8v10H4z"/></svg>
+      <span>Jelajah</span></a>
+    <a href="/cari" data-nav="cari">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>
+      <span>Cari</span></a>
+    <button type="button" id="tombol-menu" data-nav="menu">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      <span>Menu</span></button>
+  </nav>
+  <div class="toast-wadah" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

@@ -121,7 +121,20 @@ select uji.cek((select sumber = 'sinkron' and not lengkap from uji.akt('z8r3uj00
 select uji.sama((select count(*)::int from public.notifications where task_id = 'z8r3uj0004'), 0,
   'sinkron: tidak membuat notifikasi');
 
+-- pola upsert importir: insert ... on conflict do update set ... = excluded.* (termasuk kolom turunan)
 select uji.konteks('impor', 900000000002);
+insert into public.tasks (id, list_id, name, status, creator_id, created_at, updated_at, sumber, comment_count, last_comment_at, versi)
+values ('z8r3uj0001', '1100340000900101', 'Y7 · Uji ringkasan (upsert)', 'in progress', 100000001,
+        (select created_at from public.tasks where id = 'z8r3uj0001'), '2026-09-28 10:00:00+07', 'clickup', 0, null, 1)
+on conflict (id) do update
+  set name = excluded.name, updated_at = excluded.updated_at, comment_count = excluded.comment_count,
+      last_comment_at = excluded.last_comment_at, versi = excluded.versi;
+select uji.cek((select name = 'Y7 · Uji ringkasan (upsert)' and comment_count = 3 and last_comment_at is not null
+                   and versi = 2 and updated_at = '2026-09-28 10:00:00+07'
+                from public.tasks where id = 'z8r3uj0001'),
+  'upsert impor: field ClickUp masuk; comment_count/last_comment_at/versi tetap turunan');
+select uji.sama(uji.n_act('z8r3uj0001', 'dibuat'), 1, 'upsert impor ke baris yang ada: tidak membuat activity dibuat kedua');
+
 insert into public.task_assignees (task_id, member_id) values ('z8r3uj0006', 100000003);
 select uji.sama(uji.n_act('z8r3uj0006', 'assignee_tambah'), 0, 'impor awal: assignee tidak dicatat sebagai kejadian');
 
@@ -130,11 +143,21 @@ select uji.konteks('ui', 100000001);
 create temp table sebelum as select updated_at, versi, comment_count from public.tasks where id = 'rtujib0006';
 grant select on sebelum to public;
 
-insert into public.comments (id, task_id, text) values ('rcstat00003', 'rtujib0006', 'Komentar tidak menaikkan updated_at');
-select uji.cek((select t.updated_at = s.updated_at and t.versi = s.versi and t.comment_count = s.comment_count + 1
-                   and t.last_comment_at = now()
+insert into public.comments (id, task_id, text) values ('rcstat00003', 'rtujib0006', 'Komentar menaikkan updated_at');
+select uji.cek((select t.updated_at = now() and t.updated_at > s.updated_at and t.versi = s.versi
+                   and t.comment_count = s.comment_count + 1 and t.last_comment_at = now()
                 from public.tasks t, sebelum s where t.id = 'rtujib0006'),
-  'komentar baru: updated_at & versi tetap, comment_count +1, last_comment_at = waktu komentar');
+  'komentar baru (ui): updated_at = now() (review R4), versi tetap, comment_count +1, last_comment_at = waktu komentar');
+insert into public.comments (id, task_id, parent_id, text) values ('rcstat00004', 'rtujib0006', 'rcstat00003', 'Balasan');
+select uji.cek((select t.updated_at = now() and t.versi = s.versi and t.comment_count = s.comment_count + 2
+                from public.tasks t, sebelum s where t.id = 'rtujib0006'),
+  'balasan baru (ui): updated_at = now(), versi tetap');
+update public.comments set deleted_at = now() where id = 'rcstat00004';
+
+-- kembalikan updated_at lama (jalur impor mempertahankan nilai) supaya cek berikut bermakna
+select uji.konteks('impor', 900000000002);
+update public.tasks t set updated_at = s.updated_at from sebelum s where t.id = 'rtujib0006';
+select uji.konteks('ui', 100000001);
 
 update public.tasks set orderindex = 12345 where id = 'rtujib0006';
 select uji.cek((select t.updated_at = s.updated_at and t.versi = s.versi from public.tasks t, sebelum s where t.id = 'rtujib0006'),
@@ -146,14 +169,14 @@ select uji.cek((select t.updated_at = now() and t.versi = s.versi + 1 from publi
 
 update public.comments set text = 'Komentar sudah diedit' where id = 'rcstat00003';
 select uji.cek((select c.edited_at = now() from public.comments c where c.id = 'rcstat00003'), 'edit komentar: edited_at = now()');
-select uji.cek((select dari->>'teks' = 'Komentar tidak menaikkan updated_at' and ke->>'teks' = 'Komentar sudah diedit'
+select uji.cek((select dari->>'teks' = 'Komentar menaikkan updated_at' and ke->>'teks' = 'Komentar sudah diedit'
                 from uji.akt('rtujib0006', 'komentar_edit')), 'activity komentar_edit menyimpan teks lama & baru');
 
 update public.comments set deleted_at = now() where id = 'rcstat00003';
 select uji.cek((select c.deleted_by = 100000001 from public.comments c where c.id = 'rcstat00003'), 'hapus komentar: deleted_by = aktor');
 select uji.cek((select t.comment_count = s.comment_count from public.tasks t, sebelum s where t.id = 'rtujib0006'),
   'hapus komentar: comment_count kembali');
-select uji.sama(uji.n_act('rtujib0006', 'komentar_hapus'), 1, 'activity komentar_hapus');
+select uji.sama(uji.n_act('rtujib0006', 'komentar_hapus'), 2, 'activity komentar_hapus (balasan + komentar)');
 
 -- ================================================================ E. activity per field (UI)
 insert into public.lists (id, space_id, name) values ('rlstat0002', 'rsujib0001', 'List status uji 2');

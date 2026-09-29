@@ -1,0 +1,33 @@
+{
+  "_catatan": [
+    "Varian 'ubah' = keadaan ClickUp SETELAH tim bekerja (dipakai uji sinkron ulang). Diterapkan di atas awal.json.",
+    "{RUN} diganti 4 karakter kode run oleh mock (opsi run), supaya pasangan induk/anak lintas list selalu baru → jalur 'tertunda' teruji tiap run.",
+    "Semua perubahan harus terekam activity sumber='sinkron', lengkap=false, aktor null (lihat impor/uji/jalankan.mjs)."
+  ],
+  "ops": [
+    { "op": "tambah_user", "user": { "id": 88200007, "username": "Zaki Firmansyah", "email": "zaki.uji@contoh.test", "color": "#0f9d9f", "initials": "ZF", "role": 3, "tim": true } },
+    { "op": "ubah_task", "id": "86b2a0002", "set": { "status": "complete", "closed": "2026-09-29T01:30:00Z", "updated": "2026-09-29T01:30:00Z" } },
+    { "op": "ubah_task", "id": "86b2a0004", "set": { "name": "[Claude] A4 · Draf balasan pelanggan fiktif (revisi)", "updated": "2026-09-29T01:31:00Z" } },
+    { "op": "ubah_task", "id": "86b2a0007", "set": { "due": "2026-10-02", "updated": "2026-09-29T01:32:00Z" } },
+    { "op": "ubah_task", "id": "86b2b0002", "set": { "assignees": [88200004, 88200001], "updated": "2026-09-29T01:33:00Z" } },
+    { "op": "ubah_task", "id": "86b2a0001", "set": { "priority": 1, "updated": "2026-09-29T01:34:00Z" } },
+    { "op": "ubah_task", "id": "86b2a0008", "set": { "list": "901822000102", "status": "BACKLOG", "updated": "2026-09-29T01:35:00Z" } },
+    { "op": "ubah_task", "id": "86b2a0013", "set": { "archived": true, "updated": "2026-09-29T01:36:00Z" } },
+    { "op": "ubah_task", "id": "86b2a0009", "set": { "md": "Deskripsi baru A9 **setelah** sinkron.", "teks": "Deskripsi baru A9 setelah sinkron.", "updated": "2026-09-29T01:37:00Z" } },
+    { "op": "ubah_task", "id": "86b2b0005", "set": { "assignees": [88200007], "updated": "2026-09-29T01:38:00Z" } },
+    { "op": "ubah_task", "id": "86b2f0001", "set": { "list": "901822000101", "updated": "2026-09-29T01:39:00Z" } },
+    { "op": "hapus_task", "id": "86b2a0012" },
+    { "op": "ubah_komentar", "id": "90182200000104", "teks": "Deadline tetap hari ini ya (diubah)." },
+    { "op": "hapus_komentar", "id": "90182200000103" },
+    { "op": "tambah_komentar", "comment": { "id": "90182200000610", "task": "86b2b0006", "user": 88200002, "date": "2026-09-29T01:40:00Z", "teks": "Komentar baru setelah sinkron." } },
+    { "op": "hapus_lampiran", "id": "b2a00302-0000-4000-8000-000000000002.csv" },
+    { "op": "tambah_task", "task": { "id": "86b2a0016", "list": "901822000101", "name": "A16 · Kartu baru setelah sinkron", "status": "to do",
+        "creator": 88200001, "assignees": [88200007], "due": "2026-10-03", "created": "2026-09-29T01:45:00Z", "orderindex": "16" } },
+    { "op": "tambah_task", "task": { "id": "86b2p{RUN}", "list": "901822000101", "name": "P · Induk baru lintas list", "status": "to do",
+        "creator": 88200001, "assignees": [], "created": "2026-09-29T01:46:00Z", "orderindex": "17" } },
+    { "op": "tambah_task", "task": { "id": "86b2q{RUN}", "list": "901822000106", "parent": "86b2p{RUN}", "name": "Q · Anak di list lain", "status": "to do",
+        "creator": 88200001, "assignees": [88200003], "created": "2026-09-29T01:47:00Z", "orderindex": "5" } },
+    { "op": "ubah_list", "id": "901822000102", "set": { "name": "Fase Fiktif 2 (baru)" } },
+    { "op": "ganti_status", "list": "901822000102", "dari": "dikerjakan", "ke": "sedang dikerjakan" }
+  ]
+}
