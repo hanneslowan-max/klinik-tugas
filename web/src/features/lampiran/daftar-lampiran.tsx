@@ -103,9 +103,9 @@ function ItemLampiran({ a, bolehHapus, onHapus }: { a: Lampiran; bolehHapus: boo
       ) : null}
       {tautanCu ? (
         <Button asChild variant="outline" size="sm">
-          <a href={tautanCu} target="_blank" rel="noopener noreferrer" data-luar="">
+          <a href={tautanCu} target="_blank" rel="noopener noreferrer" data-luar="" title={`Buka ${judul} di ClickUp`}>
             <ExternalLink aria-hidden />
-            Tautan ClickUp
+            <span className="max-sm:sr-only">Tautan ClickUp</span>
           </a>
         </Button>
       ) : null}

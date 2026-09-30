@@ -35,11 +35,13 @@ type PropsKolom = {
   disembunyikan: number;
   /** kolom tempat kartu yang diseret sedang berada */
   sorot: boolean;
+  /** semua kartu sementara tidak bisa diseret (pindah sebelumnya sedang disimpan) */
+  kunciSemua: boolean;
   /** ruang bawah ekstra supaya kartu terakhir tidak tertutup tombol "Tugas" */
   adaFab: boolean;
 };
 
-export function KolomPapan({ status: s, ids, peta, jumlah, disembunyikan, sorot, adaFab }: PropsKolom) {
+export function KolomPapan({ status: s, ids, peta, jumlah, disembunyikan, sorot, kunciSemua, adaFab }: PropsKolom) {
   const { setNodeRef } = useDroppable({ id: idKolom(s.status) });
   return (
     <section
@@ -74,7 +76,7 @@ export function KolomPapan({ status: s, ids, peta, jumlah, disembunyikan, sorot,
         >
           {ids.map((id) => {
             const t = peta.get(id);
-            return t ? <KartuPapan key={id} tugas={t} /> : null;
+            return t ? <KartuPapan key={id} tugas={t} tahan={kunciSemua} /> : null;
           })}
         </ul>
       </SortableContext>
@@ -88,13 +90,13 @@ const kelasKartu = (kunci: boolean) =>
     kunci ? "border-l-[3px] border-l-cermin" : "cursor-grab touch-manipulation hover:border-primary/40",
   );
 
-function KartuPapan({ tugas: t }: { tugas: Tugas }) {
+function KartuPapan({ tugas: t, tahan }: { tugas: Tugas; tahan: boolean }) {
   const terkunci = useTerkunci();
   const kunci = terkunci(t);
   // kartu terkunci tidak bisa diseret, tetapi tetap menjadi posisi urut bagi kartu lain
   const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
     id: t.id,
-    disabled: { draggable: kunci, droppable: false },
+    disabled: { draggable: kunci || tahan, droppable: false },
   });
   return (
     <li
@@ -122,7 +124,7 @@ type PropsIsi = {
 };
 
 function IsiKartu({ tugas: t, tautanRef, petunjukSeret, statis }: PropsIsi) {
-  const kelasNama = "flex min-h-11 items-center rounded-sm text-sm leading-snug font-semibold break-words";
+  const kelasNama = "flex min-h-11 items-center rounded-sm text-sm leading-snug font-semibold break-words pointer-fine:min-h-7";
   return (
     <>
       {statis ? (

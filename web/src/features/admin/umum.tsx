@@ -79,9 +79,9 @@ export function TombolSalin({ teks }: { teks: string }) {
   );
 }
 
-/** Warna untuk <input type="color"> (wajib #rrggbb): #abc → #aabbcc; tidak sah → warna baku. */
+/** Warna untuk <input type="color"> (wajib #rrggbb): #abc → #aabbcc; tidak sah → cadangan. */
 export function warnaInput(w: string | null | undefined, cadangan = WARNA_ANGGOTA_BAKU): string {
-  if (w && /^#[0-9a-f]{6}$/i.test(w)) return w.toLowerCase();
+  if (w && /^#[0-9a-f]{6}$/i.test(w)) return w;
   const m = w?.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/i);
   return m ? `#${m[1]}${m[1]}${m[2]}${m[2]}${m[3]}${m[3]}`.toLowerCase() : cadangan;
 }

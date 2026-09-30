@@ -38,7 +38,7 @@ export function NavAdmin() {
                 aria-current={ini ? "page" : undefined}
                 data-tab={t.kunci}
                 className={cn(
-                  "inline-flex h-9 items-center rounded-full border px-3.5 text-sm font-medium whitespace-nowrap transition-colors pointer-coarse:h-11 pointer-coarse:px-4",
+                  "inline-flex h-9 items-center rounded-full border px-3.5 text-sm font-medium whitespace-nowrap pointer-coarse:h-11 pointer-coarse:px-4",
                   "focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
                   ini ? "border-primary bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
