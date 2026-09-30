@@ -1,0 +1,261 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (@media (prefers-color-scheme: dark));
+
+@theme inline {
+  --color-telat: var(--telat);
+  --color-telat-lembut: var(--telat-lembut);
+  --color-hari-ini: var(--hari-ini);
+  --color-hari-ini-lembut: var(--hari-ini-lembut);
+  --color-dekat: var(--dekat);
+  --color-dekat-lembut: var(--dekat-lembut);
+  --color-sukses: var(--sukses);
+  --color-sukses-lembut: var(--sukses-lembut);
+  --color-cermin: var(--cermin);
+  --color-cermin-lembut: var(--cermin-lembut);
+  --color-info: var(--info);
+  --color-info-lembut: var(--info-lembut);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Ubuntu, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* warna semantik tugas (sama maknanya dengan web lama: telat/hari ini/≤3 hk/selesai/mode cermin) */
+  --telat: #c62828;
+  --telat-lembut: #fdecec;
+  --hari-ini: #b25e00;
+  --hari-ini-lembut: #fff4e0;
+  --dekat: #8a6d00;
+  --dekat-lembut: #fff8d6;
+  --sukses: #1f7a3d;
+  --sukses-lembut: #e6f5eb;
+  --cermin: #6b4fbb;
+  --cermin-lembut: #f0ebfc;
+  --info: #4f46e5;
+  --info-lembut: #eceafd;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.511 0.262 276.966);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.585 0.233 277.117);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+@media (prefers-color-scheme: dark) {
+:root {
+  --telat: #ff7b7b;
+  --telat-lembut: #3a1f22;
+  --hari-ini: #ffb45c;
+  --hari-ini-lembut: #3a2b17;
+  --dekat: #f3d35c;
+  --dekat-lembut: #36301a;
+  --sukses: #6fd394;
+  --sukses-lembut: #1b3325;
+  --cermin: #c3b1ff;
+  --cermin-lembut: #2d2544;
+  --info: #8b85ff;
+  --info-lembut: #2a2850;
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.673 0.182 276.935);
+  --primary-foreground: oklch(0.145 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    color-scheme: light dark;
+  }
+  body {
+    min-height: 100dvh;
+  }
+  /* Layar sentuh (termasuk iPad): input ≥16px supaya iOS tidak zoom; target sentuh ≥44px (sama dengan web lama). */
+  @media (pointer: coarse) {
+    input,
+    textarea,
+    select,
+    [data-slot="select-trigger"] {
+      font-size: 16px !important;
+    }
+    [data-slot="button"],
+    [data-slot="select-trigger"],
+    [data-slot="tabs-trigger"],
+    [data-slot="toggle-group-item"],
+    [data-slot="dropdown-menu-item"],
+    [data-slot="input"] {
+      min-height: 44px;
+    }
+    [data-slot="button"][data-size^="icon"] {
+      min-width: 44px;
+    }
+  }
+}
+
+/* Isi markdown (deskripsi tugas) — gaya ringan tanpa plugin typography. */
+.md {
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.md :where(p, ul, ol, pre, blockquote, table) {
+  margin-block: 0.5rem;
+}
+.md :where(ul) {
+  list-style: disc;
+  padding-inline-start: 1.25rem;
+}
+.md :where(ol) {
+  list-style: decimal;
+  padding-inline-start: 1.25rem;
+}
+.md :where(h1, h2, h3, h4) {
+  font-weight: 600;
+  margin-block: 0.75rem 0.25rem;
+}
+.md :where(a) {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.md :where(code) {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: var(--muted);
+  border-radius: 4px;
+  padding: 0.1em 0.3em;
+}
+.md :where(pre) {
+  background: var(--muted);
+  border-radius: 8px;
+  padding: 0.75rem;
+  overflow-x: auto;
+}
+.md :where(pre code) {
+  background: transparent;
+  padding: 0;
+}
+.md :where(blockquote) {
+  border-inline-start: 3px solid var(--border);
+  padding-inline-start: 0.75rem;
+  color: var(--muted-foreground);
+}
+.md :where(img) {
+  max-width: 100%;
+  border-radius: 8px;
+}
+.md :where(table) {
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+}
+.md :where(th, td) {
+  border: 1px solid var(--border);
+  padding: 0.25rem 0.5rem;
+}

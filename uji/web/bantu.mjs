@@ -1,6 +1,6 @@
 // Pembantu tes Playwright web/. Data uji SINTETIS berawalan "uji-b3" (space/list/tugas/anggota milik tes web).
 // Kunci lokal dibaca dari `supabase status -o env` saat tes (tidak ditulis ke repo). Service role HANYA dipakai
-// oleh tes (Edge tiruan + pembersihan), tidak pernah oleh web/.
+// oleh tes (Edge tiruan + pembersihan), tidak pernah oleh web-lama/.
 import { test as dasar, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';

@@ -1,4 +1,4 @@
-// Playwright untuk web/ (ARSITEKTUR §12): chromium lokal /opt/pw-browsers, viewport 390×844, zona WIB.
+// Playwright untuk web-lama/ (ARSITEKTUR §12): chromium lokal /opt/pw-browsers, viewport 390×844, zona WIB.
 //   npx playwright test -c uji/web/playwright.config.mjs
 // Prasyarat: stack Supabase lokal jalan (supabase start) + seed. Tes TIDAK me-reset DB; data uji berawalan "uji-b3".
 import { defineConfig } from '@playwright/test';

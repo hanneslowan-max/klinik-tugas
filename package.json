@@ -2,7 +2,7 @@
   "name": "rhj-tugas",
   "private": true,
   "version": "0.1.0",
-  "description": "Aplikasi tugas internal PT RHJ (pengganti ClickUp). Web statis di web/, tes di uji/.",
+  "description": "Aplikasi tugas internal PT RHJ (pengganti ClickUp). Web Next.js di web/ (web statis lama di web-lama/ sampai web baru lulus paritas), tes di uji/.",
   "type": "module",
   "scripts": {
     "web:vendor": "node uji/web/salin-vendor.mjs",

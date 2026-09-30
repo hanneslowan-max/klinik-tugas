@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Server statis kecil untuk web/ (dev lokal & Playwright). Meniru web/.htaccess:
+// Server statis kecil untuk web-lama/ (dev lokal & Playwright). Meniru web-lama/.htaccess:
 //  - berkas yang ada dilayani langsung; /css|/js|/vendor atau path berekstensi yang tidak ada → 404
 //  - rute lain (SPA: /saya, /t/<id>, /l/<id>, …) → index.html
-//  - header keamanan sama (CSP ketat; origin Supabase diambil dari web/config.js)
+//  - header keamanan sama (CSP ketat; origin Supabase diambil dari web-lama/config.js)
 //   PORT=4173 HOST=127.0.0.1 node uji/web/server.mjs
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import { extname, join, normalize, resolve, sep, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const AKAR = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'web');
+const AKAR = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'web-lama');
 const PORT = Number(process.env.PORT || 4173);
 const HOST = process.env.HOST || '127.0.0.1';
 
@@ -98,5 +98,5 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`web/ disajikan di http://${HOST}:${PORT} (Supabase ${supa.origin})`);
+  console.log(`web-lama/ disajikan di http://${HOST}:${PORT} (Supabase ${supa.origin})`);
 });

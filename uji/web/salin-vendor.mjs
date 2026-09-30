@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Salin pustaka pihak ketiga dari node_modules ke web/vendor (tanpa CDN saat runtime, CSP script-src 'self').
-//   node uji/web/salin-vendor.mjs        → salin + tulis web/vendor/VERSI.json dan web/vendor/muat.js
-//   node uji/web/salin-vendor.mjs --cek  → hanya periksa: isi web/vendor sama dengan node_modules & index.html merujuk
+// Salin pustaka pihak ketiga dari node_modules ke web-lama/vendor (tanpa CDN saat runtime, CSP script-src 'self').
+//   node uji/web/salin-vendor.mjs        → salin + tulis web-lama/vendor/VERSI.json dan web-lama/vendor/muat.js
+//   node uji/web/salin-vendor.mjs --cek  → hanya periksa: isi web-lama/vendor sama dengan node_modules & index.html merujuk
 //                                          berkas supabase-js versi terpasang (exit 1 bila beda)
 // Nama berkas memuat versi supaya bisa di-cache "immutable" (.htaccess). Komentar sourceMappingURL dibuang
 // (berkas .map tidak ikut disalin).
@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 const AKAR = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const NM = join(AKAR, 'node_modules');
-const VENDOR = join(AKAR, 'web', 'vendor');
+const VENDOR = join(AKAR, 'web-lama', 'vendor');
 const CEK = process.argv.includes('--cek');
 
 const versi = (pkg) => JSON.parse(readFileSync(join(NM, pkg, 'package.json'), 'utf8')).version;
@@ -45,13 +45,13 @@ for (const p of PAKET) {
   const lis = readFileSync(join(NM, p.pkg, p.lisensi), 'utf8');
   const namaLis = `${p.pkg.replace(/[@/]/g, '_').replace(/^_/, '')}-LICENSE.txt`;
   if (CEK) {
-    if (!existsSync(tujuan)) { console.error(`GAGAL: ${nama} tidak ada di web/vendor`); gagal++; }
+    if (!existsSync(tujuan)) { console.error(`GAGAL: ${nama} tidak ada di web-lama/vendor`); gagal++; }
     else if (sha(readFileSync(tujuan, 'utf8')) !== sha(isi)) { console.error(`GAGAL: ${nama} beda dengan node_modules`); gagal++; }
     else console.log(`ok  ${nama}`);
   } else {
     writeFileSync(tujuan, isi);
     writeFileSync(join(VENDOR, 'lisensi', namaLis), lis);
-    console.log(`salin ${p.pkg}@${v} → web/vendor/${nama}`);
+    console.log(`salin ${p.pkg}@${v} → web-lama/vendor/${nama}`);
   }
   if (p.ekspor) muat.push(`export { default as ${p.ekspor} } from './${nama}';`);
   hasil.push({ paket: p.pkg, versi: v, berkas: nama, sha256: sha(isi), catatan: p.catatan });
@@ -63,15 +63,15 @@ const teksMuat = muat.join('\n') + '\n';
 const teksVersi = JSON.stringify({ catatan: 'Dibuat uji/web/salin-vendor.mjs', paket: hasil }, null, 2) + '\n';
 
 // index.html wajib merujuk berkas supabase-js yang sama
-const indexHtml = readFileSync(join(AKAR, 'web', 'index.html'), 'utf8');
+const indexHtml = readFileSync(join(AKAR, 'web-lama', 'index.html'), 'utf8');
 if (!indexHtml.includes(`/vendor/${supa.berkas}`)) {
-  console.error(`GAGAL: web/index.html belum merujuk /vendor/${supa.berkas} (perbarui tag <script>)`);
+  console.error(`GAGAL: web-lama/index.html belum merujuk /vendor/${supa.berkas} (perbarui tag <script>)`);
   gagal++;
 }
 
 if (CEK) {
   const lama = existsSync(join(VENDOR, 'muat.js')) ? readFileSync(join(VENDOR, 'muat.js'), 'utf8') : '';
-  if (lama !== teksMuat) { console.error('GAGAL: web/vendor/muat.js tidak sesuai versi terpasang'); gagal++; }
+  if (lama !== teksMuat) { console.error('GAGAL: web-lama/vendor/muat.js tidak sesuai versi terpasang'); gagal++; }
   const sisa = readdirSync(VENDOR).filter((f) => /\.(m?js)$/.test(f) && f !== 'muat.js'
     && !hasil.some((h) => h.berkas === f));
   if (sisa.length) { console.error(`GAGAL: berkas vendor lama tersisa: ${sisa.join(', ')}`); gagal++; }
@@ -80,7 +80,7 @@ if (CEK) {
   for (const f of readdirSync(VENDOR)) {
     if (/\.(m?js)$/.test(f) && f !== 'muat.js' && !hasil.some((h) => h.berkas === f)) {
       unlinkSync(join(VENDOR, f));
-      console.log(`hapus versi lama web/vendor/${f}`);
+      console.log(`hapus versi lama web-lama/vendor/${f}`);
     }
   }
   writeFileSync(join(VENDOR, 'muat.js'), teksMuat);
