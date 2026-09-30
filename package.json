@@ -5,6 +5,10 @@
   "description": "Aplikasi tugas internal PT RHJ (pengganti ClickUp). Web Next.js di web/ (web statis lama di web-lama/ sampai web baru lulus paritas), tes di uji/.",
   "type": "module",
   "scripts": {
+    "dev": "npm --prefix web run dev",
+    "build": "npm --prefix web run build",
+    "start": "npm --prefix web run start",
+    "cek": "npm --prefix web run cek",
     "web:vendor": "node uji/web/salin-vendor.mjs",
     "web:vendor:cek": "node uji/web/salin-vendor.mjs --cek",
     "web:serve": "node uji/web/server.mjs",
