@@ -23,9 +23,11 @@ function geserFokus(e: KeyboardEvent<HTMLDivElement>) {
   tab[(i + (e.key === "ArrowRight" ? 1 : tab.length - 1)) % tab.length]?.focus();
 }
 
-export function TabTampilan({ listId, mode, filter }: { listId: string; mode: ModeList; filter: FilterList }) {
+type Props = { listId: string; mode: ModeList; filter: FilterList; className?: string };
+
+export function TabTampilan({ listId, mode, filter, className }: Props) {
   return (
-    <div role="tablist" aria-label="Tampilan" onKeyDown={geserFokus} className="inline-flex shrink-0 rounded-lg bg-muted p-[3px]">
+    <div role="tablist" aria-label="Tampilan" onKeyDown={geserFokus} className={cn("inline-flex shrink-0 rounded-lg bg-muted p-[3px]", className)}>
       {TAB.map(({ mode: m, label, Ikon, uji }) => {
         const aktif = mode === m;
         return (
@@ -37,7 +39,7 @@ export function TabTampilan({ listId, mode, filter }: { listId: string; mode: Mo
             href={urlList(listId, m, filter)}
             data-uji={uji}
             className={cn(
-              "inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors outline-none pointer-coarse:h-11",
+              "inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors outline-none pointer-coarse:h-11",
               "focus-visible:ring-3 focus-visible:ring-ring/50",
               aktif ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
             )}

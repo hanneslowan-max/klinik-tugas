@@ -48,7 +48,7 @@ export function useAksiTugas() {
       toast.error(pesanGalat(e), { duration: 5000 });
       return false;
     }
-    segarkanTugas(qc, id);
+    void segarkanTugas(qc, id);
     void qc.invalidateQueries({ queryKey: kunci.sampah });
     await muat();
     return true;

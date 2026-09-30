@@ -87,7 +87,7 @@ function ItemLampiran({ a, bolehHapus, onHapus }: { a: Lampiran; bolehHapus: boo
         {sub ? <div className="text-xs text-muted-foreground">{sub}</div> : null}
       </div>
       {a.storage_path ? (
-        <Button asChild variant="outline" size="sm">
+        <Button asChild variant="outline" size="sm" className="pointer-coarse:min-w-11">
           <a
             href={unduh.data ?? "#"}
             target="_blank"
@@ -102,7 +102,7 @@ function ItemLampiran({ a, bolehHapus, onHapus }: { a: Lampiran; bolehHapus: boo
         </Button>
       ) : null}
       {tautanCu ? (
-        <Button asChild variant="outline" size="sm">
+        <Button asChild variant="outline" size="sm" className="pointer-coarse:min-w-11">
           <a href={tautanCu} target="_blank" rel="noopener noreferrer" data-luar="" title={`Buka ${judul} di ClickUp`}>
             <ExternalLink aria-hidden />
             <span className="max-sm:sr-only">Tautan ClickUp</span>

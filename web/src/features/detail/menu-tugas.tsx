@@ -33,7 +33,7 @@ export function MenuTugas() {
       {/* modal={false}: dialog konfirmasi / pemilih list yang dibuka dari menu tidak berebut fokus dengan menu */}
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="icon-sm" aria-label="Aksi lain" data-uji="menu-tugas">
+          <Button variant="outline" size="icon-sm" aria-label="Aksi lain" data-uji="menu-tugas" className="pointer-coarse:size-11">
             <MoreHorizontal aria-hidden />
           </Button>
         </DropdownMenuTrigger>

@@ -81,9 +81,10 @@ export function LayarList({ listId }: { listId: string }) {
   return (
     <>
       <KepalaHalaman judul={list?.name ?? lokasi?.name ?? "List"} kembali="/jelajah" />
-      <IsiHalaman lebar={board} className={cn("flex flex-col gap-2", adaFab && !board && "pb-28 lg:pb-24")}>
+      <IsiHalaman lebar={board} className={cn("flex flex-col gap-2 pt-1 md:pt-3", adaFab && !board && "pb-28 lg:pb-24")}>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+          {/* basis: di HP remah mendapat baris sendiri (tidak terpotong jadi "Ruang › Eks…"), tab di bawahnya */}
+          <div className="flex min-w-0 flex-1 basis-48 flex-wrap items-center gap-x-2 gap-y-1">
             {lokasi ? (
               <nav aria-label="Lokasi list" className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground" data-uji="remah">
                 <Link href="/jelajah" className="inline-flex min-h-11 min-w-11 items-center truncate hover:text-foreground hover:underline md:min-h-8">
@@ -100,7 +101,7 @@ export function LayarList({ listId }: { listId: string }) {
             {list?.tidak_ditagih ? <Chip nada="garis">tidak ditagih</Chip> : null}
             {list?.archived ? <Chip nada="garis">list diarsip</Chip> : null}
           </div>
-          <TabTampilan listId={listId} mode={mode} filter={filter} />
+          <TabTampilan listId={listId} mode={mode} filter={filter} className="w-full sm:ml-auto sm:w-auto" />
         </div>
 
         {list && !list.boleh_ubah ? (

@@ -89,7 +89,7 @@ export function Deskripsi() {
           <h3 id={idJudul} className="flex-1 text-sm font-semibold">
             Deskripsi
           </h3>
-          <TabsList aria-label="Mode deskripsi">
+          <TabsList aria-label="Mode deskripsi" className="group-data-horizontal/tabs:h-auto">
             <TabsTrigger value="lihat" data-uji="desk-lihat" className="px-3">
               Lihat
             </TabsTrigger>

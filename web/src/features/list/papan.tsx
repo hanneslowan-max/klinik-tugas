@@ -19,14 +19,16 @@ import {
   useSensor,
   useSensors,
   type Announcements,
+  type ClientRect,
   type CollisionDetection,
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
+  type KeyboardCoordinateGetter,
   type PointerSensorOptions,
   type UniqueIdentifier,
 } from "@dnd-kit/core";
-import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import { arrayMove } from "@dnd-kit/sortable";
 import { useCallback, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { toast } from "sonner";
 
@@ -52,6 +54,50 @@ class SensorPenunjuk extends PointerSensor {
     },
   ];
 }
+
+const PANAH = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+
+/**
+ * Panah keyboard selama kartu terangkat: kiri/kanan → kolom sebelah (dekat kartu yang setinggi, atau kolom kosong),
+ * atas/bawah → kartu sebelumnya/berikutnya di kolom yang sama. (sortableKeyboardCoordinates bawaan ikut menimbang
+ * droppable kolom sehingga panah kiri bisa berhenti di kolom sendiri.)
+ */
+const koordinatKeyboard: KeyboardCoordinateGetter = (event, { active, context: { collisionRect, droppableRects, droppableContainers } }) => {
+  if (!PANAH.includes(event.code)) return undefined;
+  event.preventDefault();
+  if (!collisionRect) return undefined;
+  const kolom: { id: UniqueIdentifier; r: ClientRect }[] = [];
+  const kartu: { id: UniqueIdentifier; r: ClientRect }[] = [];
+  for (const c of droppableContainers.getEnabled()) {
+    const r = droppableRects.get(c.id);
+    if (!r) continue;
+    if (statusDariIdKolom(c.id) !== null) kolom.push({ id: c.id, r });
+    else if (c.id !== active) kartu.push({ id: c.id, r });
+  }
+  const di = (r: ClientRect, k: ClientRect) => r.left >= k.left - 1 && r.right <= k.right + 1;
+  const tengah = collisionRect.left + collisionRect.width / 2;
+  const kini = kolom.find((k) => tengah >= k.r.left && tengah <= k.r.right);
+
+  if (event.code === "ArrowLeft" || event.code === "ArrowRight") {
+    const kanan = event.code === "ArrowRight";
+    const acuan = kini?.r.left ?? collisionRect.left;
+    const tujuan = kolom
+      .filter((k) => (kanan ? k.r.left > acuan : k.r.left < acuan))
+      .sort((a, b) => (kanan ? a.r.left - b.r.left : b.r.left - a.r.left))[0];
+    if (!tujuan) return undefined;
+    const isi = kartu.filter((x) => di(x.r, tujuan.r));
+    if (!isi.length) return { x: tujuan.r.left, y: tujuan.r.top };
+    const dekat = isi.reduce((a, b) => (Math.abs(b.r.top - collisionRect.top) < Math.abs(a.r.top - collisionRect.top) ? b : a));
+    return { x: dekat.r.left, y: dekat.r.top };
+  }
+
+  if (!kini) return undefined;
+  const bawah = event.code === "ArrowDown";
+  const berikut = kartu
+    .filter((x) => di(x.r, kini.r) && (bawah ? x.r.top > collisionRect.top + 1 : x.r.top < collisionRect.top - 1))
+    .sort((a, b) => (bawah ? a.r.top - b.r.top : b.r.top - a.r.top))[0];
+  return berikut ? { x: berikut.r.left, y: berikut.r.top } : undefined;
+};
 
 // Enter tetap membuka kartu (tautan); spasi mengangkat
 const KODE_KEYBOARD = { start: ["Space"], cancel: ["Escape"], end: ["Space", "Enter"] };
@@ -93,7 +139,7 @@ export function Papan({ data, tampak, tampilSelesai, adaFab }: Props) {
   const sensors = useSensors(
     useSensor(SensorPenunjuk, { activationConstraint: { distance: 4 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates, keyboardCodes: KODE_KEYBOARD }),
+    useSensor(KeyboardSensor, { coordinateGetter: koordinatKeyboard, keyboardCodes: KODE_KEYBOARD }),
   );
 
   // Penunjuk di dalam kolom → kolom itu; bila kolom berisi kartu, pilih kartu terdekat (pola multi-kontainer dnd-kit).

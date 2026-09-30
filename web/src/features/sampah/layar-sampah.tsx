@@ -51,7 +51,7 @@ export function LayarSampah() {
     try {
       await rpc(klienBrowser(), "web_pulihkan", { p_task: id });
       toast.success("Tugas dipulihkan");
-      segarkanTugas(qc, id);
+      void segarkanTugas(qc, id);
       void qc.invalidateQueries({ queryKey: kunci.sampah });
     } catch (e) {
       toast.error(pesanGalat(e));

@@ -8,13 +8,18 @@ import { kunci } from "@/lib/kunci-query";
 import { klienBrowser } from "@/lib/supabase/client";
 import type { Json } from "@/types/database";
 
-/** Segarkan semua tampilan tugas (daftar, Tugas Saya, cari, hitungan struktur) + detail kartu tertentu. */
+/**
+ * Segarkan semua tampilan tugas (daftar, Tugas Saya, cari, hitungan struktur) + detail kartu tertentu.
+ * Promise selesai setelah data segar termuat (pemanggil boleh menunggu, boleh juga tidak).
+ */
 export function segarkanTugas(qc: QueryClient, id?: string) {
-  void qc.invalidateQueries({ queryKey: kunci.semuaDaftar });
-  void qc.invalidateQueries({ queryKey: kunci.semuaTugasSaya });
-  void qc.invalidateQueries({ queryKey: kunci.semuaCari });
-  void qc.invalidateQueries({ queryKey: kunci.struktur });
-  if (id) void qc.invalidateQueries({ queryKey: kunci.detail(id) });
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: kunci.semuaDaftar }),
+    qc.invalidateQueries({ queryKey: kunci.semuaTugasSaya }),
+    qc.invalidateQueries({ queryKey: kunci.semuaCari }),
+    qc.invalidateQueries({ queryKey: kunci.struktur }),
+    id ? qc.invalidateQueries({ queryKey: kunci.detail(id) }) : null,
+  ]);
 }
 
 export type BodyUbahTugas = {

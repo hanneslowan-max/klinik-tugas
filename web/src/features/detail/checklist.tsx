@@ -24,9 +24,9 @@ function hitung(items: ButirChecklist[]): [number, number] {
 function DaftarButir({ items, anak = false }: { items: ButirChecklist[]; anak?: boolean }) {
   const urut = items.filter(Boolean).sort((a, b) => (Number(a.orderindex) || 0) - (Number(b.orderindex) || 0));
   return (
-    <ul className={cn("flex flex-wrap gap-1.5", anak && "basis-full pl-4")}>
+    <ul className={cn("flex flex-wrap items-start gap-1.5", anak && "basis-full pl-4")}>
       {urut.map((it, i) => (
-        <li key={it.id ?? i} className="flex max-w-full flex-wrap gap-1.5">
+        <li key={it.id ?? i} className="flex max-w-full flex-wrap items-start gap-1.5">
           <span
             className={cn(
               "inline-flex min-h-7 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium",

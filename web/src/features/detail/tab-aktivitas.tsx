@@ -68,7 +68,7 @@ export function TabAktivitas({ tabAwal }: { tabAwal: TabDetail }) {
   return (
     <section aria-label="Komentar dan riwayat">
       <Tabs value={tab} onValueChange={gantiTab} className="gap-3">
-        <TabsList variant="line" className="w-full justify-start border-b">
+        <TabsList variant="line" className="w-full justify-start border-b group-data-horizontal/tabs:h-auto">
           <TabsTrigger value="komentar" data-uji="tab-komentar" className="flex-none px-3">
             Komentar ({jumlahKomentar(d.komentar)})
           </TabsTrigger>

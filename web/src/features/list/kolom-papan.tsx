@@ -147,11 +147,16 @@ function IsiKartu({ tugas: t, tautanRef, petunjukSeret, statis }: PropsIsi) {
   );
 }
 
-/** Kartu yang melayang mengikuti jari/penunjuk selama diseret (DragOverlay). */
+/**
+ * Kartu yang melayang mengikuti jari/penunjuk selama diseret (DragOverlay). Kemiringan dipasang di elemen dalam:
+ * dnd-kit mengukur elemen terluar, dan kotak yang miring menggeser tepinya sehingga panah keyboard salah arah.
+ */
 export function KartuMelayang({ tugas }: { tugas: Tugas }) {
   return (
-    <div aria-hidden className={cn(kelasKartu(false), "rotate-2 cursor-grabbing shadow-lg ring-1 ring-primary/30")}>
-      <IsiKartu tugas={tugas} statis />
+    <div aria-hidden className="cursor-grabbing">
+      <div className={cn(kelasKartu(false), "rotate-2 shadow-lg ring-1 ring-primary/30")}>
+        <IsiKartu tugas={tugas} statis />
+      </div>
     </div>
   );
 }

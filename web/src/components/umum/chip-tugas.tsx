@@ -21,7 +21,7 @@ export function ChipDue({
   if (!info) return null;
   const nada = info.kategori && info.kategori in NADA_DUE ? NADA_DUE[info.kategori as keyof typeof NADA_DUE] : "biasa";
   return (
-    <Chip nada={nada} title={info.judul} data-due={info.kategori ?? "selesai"}>
+    <Chip nada={nada} title={info.judul} data-uji="chip-due-tugas" data-kategori-due={info.kategori ?? "selesai"}>
       <CalendarDays aria-hidden />
       {info.teks}
     </Chip>

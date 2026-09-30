@@ -41,7 +41,7 @@ export function usePindahKartu() {
       else for (const p of penomoran) await rpc(k, "web_urut", { p_task: p.id, p_orderindex: p.orderindex });
     },
     onSettled: async (_d, _e, v) => {
-      segarkanTugas(qc, v.tugas.id);
+      void segarkanTugas(qc, v.tugas.id);
       await qc.invalidateQueries({ queryKey: kunci.semuaDaftar }, { cancelRefetch: false });
     },
   });

@@ -56,7 +56,9 @@ export function useHapusPermanen() {
         { duration: 8000 },
       );
     }
-    segarkanTugas(qc, taskId);
+    // kartu sudah tidak ada: buang dari cache (bukan muat ulang → tidak ada kilasan 404 sebelum pindah halaman)
+    qc.removeQueries({ queryKey: kunci.detail(taskId) });
+    void segarkanTugas(qc);
     void qc.invalidateQueries({ queryKey: kunci.sampah });
     return r;
   };

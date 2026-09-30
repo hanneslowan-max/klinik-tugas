@@ -59,7 +59,7 @@ export function PenyediaDetail({ id, d, refetch, children }: Props) {
   const muat = useCallback(async () => (await refetch({ cancelRefetch: false })).data, [refetch]);
 
   const segarkan = useCallback(() => {
-    segarkanTugas(qc, id);
+    void segarkanTugas(qc, id);
     return muat();
   }, [qc, id, muat]);
 
