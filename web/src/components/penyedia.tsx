@@ -16,6 +16,7 @@ function buatQueryClient() {
         if (e instanceof GalatApi && e.sesiHabis && typeof window !== "undefined") {
           const lanjut = encodeURIComponent(location.pathname + location.search);
           // muat ulang penuh (bukan navigasi klien) supaya seluruh cache & state sesi lama terbuang
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- sengaja muat ulang penuh
           window.location.href = `/masuk?lanjut=${lanjut}`;
         }
       },

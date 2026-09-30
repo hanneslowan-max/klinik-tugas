@@ -59,3 +59,20 @@ export function Lembar({ buka, ubahBuka, judul, deskripsi, kaki, lebar, children
     </Drawer>
   );
 }
+
+/**
+ * Kaki lembar di DALAM isi (lengket di bawah area gulir) — untuk dialog yang state tombolnya ada di komponen isi.
+ * Tetap terlihat saat keyboard virtual terbuka.
+ */
+export function KakiLembar({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div
+      className={cn(
+        "sticky bottom-0 z-10 -mx-4 -mb-3 mt-4 flex justify-end gap-2 border-t bg-popover px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:-mx-5 md:-mb-4 md:px-5 md:pb-3",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
