@@ -1,0 +1,379 @@
+// tugas.mjs / clickup.mjs — satu file, DUA backend (salinan tools/clickup.mjs rhj-brain + mode aplikasi Tugas RHJ).
+//   Mode "tugas"  : REST aplikasi Tugas RHJ (Edge Function `api`, meniru ClickUp v2). Env TUGAS_API_URL
+//                   (…/functions/v1/api/v2) + TUGAS_API_TOKEN (rtk_…). Tanpa throttle; 429 → tunggu Retry-After.
+//   Mode "clickup": ClickUp REST v2, PERSIS seperti clickup.mjs lama (throttle 670 ms, CLICKUP_API_TOKEN).
+//   Pilih mode: nama file (tugas*.mjs → tugas, selain itu clickup); override TUGAS_BACKEND=tugas|clickup dari env
+//   proses ATAU file .env di folder skrip (di desktop: tools/.env; env proses menang). Cek: `backend`.
+//   brief(), getComments(), agenda, parser argumen, --dry-run, {deleted}, pesan galat = sama byte-per-byte
+//   dengan clickup.mjs; di mode tugas prefix pesan "clickup:" menjadi "tugas:".
+//   Tambahan KHUSUS mode tugas:
+//   node tools/tugas.mjs activity <task_id>                           riwayat kartu (siapa ubah apa, kapan)
+//   node tools/tugas.mjs resolve <id|url>                             ID/URL (app.clickup.com/t/…, URL list/board/folder/space
+//                                                                     ClickUp mis. /v/l/6-<list>-1, /v/b/6-<list>-2) → {type,id,url}
+//   node tools/tugas.mjs search "<q>" [--space id] [--closed]         cari nama/kode/isi/ID/URL (cek duplikat M6); URL list/
+//                                                                     folder/space → kartu di dalamnya
+//   node tools/tugas.mjs verify [--list id] [--folder id] [--space id] [--sumber clickup|app]   hitungan sensus
+//   node tools/tugas.mjs tenggat [--tanggal YYYY-MM-DD] [--folder id]    angka B10/B5 (telat, hari ini, ≤3 HK, H-1, beban)
+//   node tools/tugas.mjs comment <task_id> --reply-to <comment_id> --text "..." | --file <path> [--dry-run]   balasan thread
+//   audit-free tidak berlaku di mode tugas.
+//   node tools/<tugas|clickup>.mjs backend                             (KEDUA mode) backend aktif + asal pilihan mode
+//
+// clickup.mjs — Akses ClickUp lewat REST API v2 (BUKAN konektor MCP).
+// Kenapa: konektor MCP ClickUp punya kuota HARIAN per workspace (Free 50-100, Unlimited 300 panggilan/24 jam,
+// dibagi semua rutin & sesi). REST API cuma dibatasi 100 request/MENIT per token, tanpa batas harian.
+// Lihat memori/PELAJARAN-PIC.md 2026-09-23.
+//
+// Pemakaian (output JSON ke stdout):
+//   node tools/clickup.mjs whoami
+//   node tools/clickup.mjs tasks <list_id> [--closed] [--full]        semua halaman; ringkas kecuali --full
+//   node tools/clickup.mjs folder-tasks <folder_id> [--closed]        semua list di folder
+//   node tools/clickup.mjs task <task_id>                             detail + lampiran + custom field
+//   node tools/clickup.mjs comments <task_id> [--replies]                  --replies = ikut balasan thread (pagar M-CU)
+//   node tools/clickup.mjs agenda [folder_id] [--hours 26] [--all-comments] [--desc]
+//        sapuan Agen Data: kartu due hari ini / telat / berubah / ditutup dalam N jam + SEMUA komentar & balasannya
+//   node tools/clickup.mjs create <list_id> --name "..." [--desc "..."] [--assignee 123,456] [--due YYYY-MM-DD] [--priority 1-4] [--status "to do"]
+//   node tools/clickup.mjs update <task_id> [--name] [--desc] [--status] [--due YYYY-MM-DD|none] [--priority 1-4] [--add-assignee 123] [--rem-assignee 123] [--dry-run]
+//   node tools/clickup.mjs comment <task_id> --text "..." | --file <path> [--dry-run]
+//   --dry-run = cetak body yang AKAN dikirim, tanpa mengubah ClickUp
+//   node tools/clickup.mjs move <task_id> <list_id> [--dry-run]              pindah home list (API v3)
+//   node tools/clickup.mjs delete <task_id> --yes
+//   node tools/clickup.mjs fields <list_id>
+//   node tools/clickup.mjs audit-free                                 cek kelayakan paket Free (lampiran + custom field)
+//
+// Kredensial dari ENV (di cloud) — JANGAN commit:
+//   CLICKUP_API_TOKEN  (wajib; token pribadi "pk_...", ClickUp > Settings > Apps > API Token)
+//   CLICKUP_TEAM_ID    (opsional; default workspace pertama milik token)
+//   Mode tugas: TUGAS_API_URL + TUGAS_API_TOKEN (wajib), TUGAS_TEAM_ID (opsional). Fallback: file .env di folder ini
+//   (juga untuk TUGAS_BACKEND).
+
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+
+function loadEnv(file) {
+  const out = {};
+  try {
+    for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
+      if (/^\s*#/.test(line)) continue;
+      const m = line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*(.*)$/);
+      if (m) out[m[1]] = m[2].trim();
+    }
+  } catch { /* .env tak ada -> pakai process.env */ }
+  return out;
+}
+const env = loadEnv(path.join(HERE, ".env"));
+// Mode: env proses > .env di folder skrip (sama seperti TUGAS_API_URL/TOKEN; di desktop = tools/.env) > nama file.
+// Tanpa fallback .env, shim clickup.mjs di desktop diam-diam tetap memakai ClickUp walau .env berisi TUGAS_BACKEND.
+const MODE_ENV = (process.env.TUGAS_BACKEND || "").trim(), MODE_DOTENV = (env.TUGAS_BACKEND || "").trim();
+const MODE_DARI = MODE_ENV ? "env TUGAS_BACKEND" : MODE_DOTENV ? ".env TUGAS_BACKEND" : "nama file";
+const MODE = (MODE_ENV || MODE_DOTENV).toLowerCase()
+  || (path.basename(fileURLToPath(import.meta.url)).startsWith("tugas") ? "tugas" : "clickup");
+const TUGAS = MODE === "tugas";
+const NAMA = TUGAS ? "tugas" : "clickup"; // prefix pesan galat
+const BASE = TUGAS ? (process.env.TUGAS_API_URL || env.TUGAS_API_URL || "").trim().replace(/\/+$/, "") : "https://api.clickup.com/api/v2";
+const BASE_V3 = TUGAS ? BASE.replace(/\/v2$/, "/v3") : "https://api.clickup.com/api/v3";
+const BASE_X = BASE.replace(/\/v2$/, "/x"); // endpoint tambahan aplikasi Tugas
+const TOKEN = (TUGAS ? process.env.TUGAS_API_TOKEN || env.TUGAS_API_TOKEN || "" : process.env.CLICKUP_API_TOKEN || env.CLICKUP_API_TOKEN || "").trim();
+
+// --- HTTP: throttle <=~90 req/menit (hanya ClickUp), tunggu & ulang saat 429 ---
+let lastCall = 0;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function api(method, url, body) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (!TUGAS) {
+      const wait = lastCall + 670 - Date.now();
+      if (wait > 0) await sleep(wait);
+      lastCall = Date.now();
+    }
+    const res = await fetch((TUGAS ? /^https?:\/\//.test(url) : url.startsWith("https://")) ? url : BASE + url, {
+      method,
+      headers: { Authorization: TOKEN, "content-type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (res.status === 429 && TUGAS) {
+      const ra = Number(res.headers.get("retry-after"));
+      await sleep((Number.isFinite(ra) && ra > 0 ? Math.min(ra, 30) * 1000 : 1000) + 250);
+      continue;
+    }
+    if (res.status === 429) {
+      const reset = Number(res.headers.get("x-ratelimit-reset")) * 1000;
+      await sleep(Math.max(reset - Date.now(), 5000) + 1000);
+      continue;
+    }
+    const text = await res.text();
+    let j; try { j = text ? JSON.parse(text) : {}; } catch { j = { raw: text }; }
+    if (!res.ok) throw new Error(`${method} ${url} -> HTTP ${res.status}: ${j.err || j.ECODE || text.slice(0, 200)}`);
+    return j;
+  }
+  throw new Error(`${method} ${url} -> 429 terus setelah 4 percobaan`);
+}
+
+// --- argumen ---
+const [cmd, ...rest] = process.argv.slice(2);
+const pos = [], opt = {};
+for (let i = 0; i < rest.length; i++) {
+  if (rest[i].startsWith("--")) {
+    const k = rest[i].slice(2), v = rest[i + 1];
+    if (v === undefined || v.startsWith("--")) opt[k] = true; else { opt[k] = v; i++; }
+  } else pos.push(rest[i]);
+}
+const toMs = (d) => new Date(`${d}T12:00:00+07:00`).getTime(); // tanggal WIB
+const out = (x) => console.log(JSON.stringify(x, null, 2));
+const wibDate = (ms) => new Date(Number(ms) + 7 * 3600e3).toISOString().slice(0, 10); // tanggal WIB
+const brief = (t) => ({
+  id: t.id, name: t.name, status: t.status?.status,
+  assignees: (t.assignees || []).map((a) => a.username || a.email),
+  due: t.due_date ? wibDate(t.due_date) : null, // tanggal WIB (bukan UTC)
+  updated: t.date_updated ? new Date(Number(t.date_updated)).toISOString() : null,
+  list: t.list?.name, url: t.url,
+});
+
+async function getComments(taskId, withReplies) {
+  const j = await api("GET", `/task/${taskId}/comment`);
+  const res = [];
+  for (const c of j.comments || []) {
+    const row = { id: c.id, user: c.user?.username, date: new Date(Number(c.date)).toISOString(), text: c.comment_text, reply_count: Number(c.reply_count) || 0 };
+    if (withReplies && row.reply_count > 0) {
+      const r = await api("GET", `/comment/${c.id}/reply`);
+      row.replies = (r.comments || []).map((x) => ({ user: x.user?.username, date: new Date(Number(x.date)).toISOString(), text: x.comment_text }));
+    }
+    res.push(row);
+  }
+  return res;
+}
+
+async function allTasks(listId, closed) {
+  const tasks = [];
+  for (let page = 0; ; page++) {
+    const j = await api("GET", `/list/${listId}/task?page=${page}&subtasks=true&include_closed=${closed ? "true" : "false"}`);
+    tasks.push(...(j.tasks || []));
+    if (j.last_page === true || (j.tasks || []).length < 100) break;
+  }
+  return tasks;
+}
+async function teamId() {
+  if (TUGAS && process.env.TUGAS_TEAM_ID) return process.env.TUGAS_TEAM_ID;
+  if (!TUGAS && process.env.CLICKUP_TEAM_ID) return process.env.CLICKUP_TEAM_ID;
+  const j = await api("GET", "/team");
+  return j.teams?.[0]?.id;
+}
+async function allLists() {
+  const tid = await teamId();
+  const lists = [];
+  const { spaces = [] } = await api("GET", `/team/${tid}/space?archived=false`);
+  for (const s of spaces) {
+    const { folders = [] } = await api("GET", `/space/${s.id}/folder?archived=false`);
+    for (const f of folders) for (const l of f.lists || []) lists.push({ ...l, space: s.name, folder: f.name });
+    const { lists: loose = [] } = await api("GET", `/space/${s.id}/list?archived=false`);
+    for (const l of loose) lists.push({ ...l, space: s.name, folder: null });
+  }
+  return { tid, spaces, lists };
+}
+function customFieldValuesSet(t) {
+  let n = 0;
+  for (const f of t.custom_fields || []) {
+    if (f.value === undefined || f.value === null || f.value === "") continue;
+    n += Array.isArray(f.value) ? f.value.length : 1; // label: tiap label = 1 use
+  }
+  return n;
+}
+
+// --- tambahan KHUSUS mode tugas (endpoint /x aplikasi Tugas) ---
+const qs = (o) => new URLSearchParams(Object.entries(o).filter(([, v]) => typeof v === "string" && v !== "")).toString();
+const nilai = (k) => (typeof opt[k] === "string" ? opt[k] : undefined);
+function wajibNilai(c, k) {
+  if (opt[k] !== undefined && typeof opt[k] !== "string") throw new Error(`${c}: --${k} butuh nilai`);
+  return nilai(k);
+}
+const EKSTRA = {
+  async activity() {
+    if (!pos[0]) throw new Error("activity: <task_id> wajib");
+    return api("GET", `${BASE_X}/task/${encodeURIComponent(pos[0])}/activity`);
+  },
+  async resolve() {
+    if (!pos[0]) throw new Error("resolve: <id|url> wajib");
+    return api("GET", `${BASE_X}/resolve?${qs({ ref: pos[0] })}`);
+  },
+  async search() {
+    const q = pos.join(" ").trim();
+    if (!q) throw new Error('search: "<kata kunci>" wajib');
+    return api("GET", `${BASE_X}/search?${qs({ q, space: wajibNilai("search", "space"), include_closed: opt.closed ? "true" : "" })}`);
+  },
+  async verify() {
+    const f = { list: wajibNilai("verify", "list"), folder: wajibNilai("verify", "folder"), space: wajibNilai("verify", "space"), sumber: wajibNilai("verify", "sumber") };
+    return api("GET", `${BASE_X}/count?${qs(f)}`);
+  },
+  async tenggat() {
+    const tanggal = wajibNilai("tenggat", "tanggal");
+    if (tanggal && !/^\d{4}-\d{2}-\d{2}$/.test(tanggal)) throw new Error("tenggat: --tanggal harus YYYY-MM-DD");
+    return api("GET", `${BASE_X}/tenggat?${qs({ tanggal, folder: wajibNilai("tenggat", "folder") })}`);
+  },
+};
+
+async function main() {
+  if (!["tugas", "clickup"].includes(MODE)) { console.error(`${NAMA}: TUGAS_BACKEND harus "tugas" atau "clickup" (sekarang "${MODE}")`); process.exit(1); }
+  if (!cmd || cmd === "help") { console.error(`usage: lihat header tools/${NAMA}.mjs`); process.exit(1); }
+  if (cmd === "backend") { // diagnosa (kedua mode, tanpa request): backend mana yang aktif & dari mana dipilih
+    return out({ backend: MODE, dipilih_dari: MODE_DARI, api: BASE || null, token: TOKEN ? "ada" : "kosong" });
+  }
+  if (TUGAS) {
+    if (!TOKEN) { console.error("tugas: TUGAS_API_TOKEN kosong (set di environment cloud, lalu buka sesi baru)"); process.exit(1); }
+    if (!/^https?:\/\/.+\/v2$/.test(BASE)) { console.error("tugas: TUGAS_API_URL kosong/tidak sah (harus berakhiran /v2, mis. https://<ref>.supabase.co/functions/v1/api/v2)"); process.exit(1); }
+  }
+  if (!TOKEN) { console.error("clickup: CLICKUP_API_TOKEN kosong (set di environment cloud, lalu buka sesi baru)"); process.exit(1); }
+
+  switch (cmd) {
+    case "whoami": {
+      const u = await api("GET", "/user");
+      const t = await api("GET", "/team");
+      return out({ user: { id: u.user?.id, username: u.user?.username, email: u.user?.email },
+        workspaces: (t.teams || []).map((x) => ({ id: x.id, name: x.name, members: x.members?.length })) });
+    }
+    case "tasks": {
+      const ts = await allTasks(pos[0], opt.closed);
+      return out(opt.full ? ts : ts.map(brief));
+    }
+    case "folder-tasks": {
+      const { lists = [] } = await api("GET", `/folder/${pos[0]}/list?archived=false`);
+      const res = [];
+      for (const l of lists) res.push(...(await allTasks(l.id, opt.closed)).map(brief));
+      return out(res);
+    }
+    case "task": return out(await api("GET", `/task/${pos[0]}?include_markdown_description=true`));
+    case "comments": return out(await getComments(pos[0], opt.replies));
+    case "agenda": {
+      // Sapuan Agen Data: kartu yang perlu dilihat hari ini + semua komentarnya (pagar M-CU).
+      const folderId = pos[0] || "1100340000026652"; // RHJ Eksekusi
+      const hours = Number(opt.hours) || 26;
+      const since = Date.now() - hours * 3600e3;
+      const today = wibDate(Date.now());
+      const { lists = [] } = await api("GET", `/folder/${folderId}/list?archived=false`);
+      const all = [];
+      for (const l of lists) all.push(...(await allTasks(l.id, true)));
+      const isClosed = (t) => t.status?.type === "closed" || t.status?.type === "done";
+      const picked = [];
+      let openCount = 0;
+      for (const t of all) {
+        const tags = [];
+        const closedAt = Number(t.date_closed || t.date_done || 0);
+        if (isClosed(t)) { if (closedAt >= since) tags.push("ditutup_baru"); }
+        else {
+          openCount++;
+          if (t.due_date) {
+            const d = wibDate(t.due_date);
+            if (d === today) tags.push("due_hari_ini"); else if (d < today) tags.push("telat");
+          }
+          if (Number(t.date_updated) >= since) tags.push("berubah_baru");
+          if (opt["all-comments"]) tags.push("terbuka");
+        }
+        if (tags.length) picked.push({ t, tags });
+      }
+      const tasks = [];
+      for (const { t, tags } of picked) {
+        const row = { ...brief(t), kategori: tags, closed: t.date_closed ? new Date(Number(t.date_closed)).toISOString() : null };
+        if (opt.desc) row.description = (await api("GET", `/task/${t.id}?include_markdown_description=true`)).markdown_description || "(isi deskripsi tak terbaca)";
+        row.comments = await getComments(t.id, true);
+        row.komentar_baru = row.comments.filter((c) => Date.parse(c.date) >= since || (c.replies || []).some((r) => Date.parse(r.date) >= since)).length;
+        tasks.push(row);
+      }
+      const count = (k) => picked.filter((p) => p.tags.includes(k)).length;
+      return out({
+        tanggal_wib: today, sejak: new Date(since).toISOString(), folder: folderId,
+        ringkas: { terbuka: openCount, due_hari_ini: count("due_hari_ini"), telat: count("telat"), berubah_baru: count("berubah_baru"), ditutup_baru: count("ditutup_baru"), kartu_dengan_komentar_baru: tasks.filter((x) => x.komentar_baru > 0).length },
+        tasks,
+      });
+    }
+    case "create": {
+      if (!opt.name) throw new Error("create: --name wajib");
+      const body = { name: opt.name };
+      if (opt.desc) body.markdown_description = opt.desc;
+      if (opt.assignee) body.assignees = String(opt.assignee).split(",").map(Number);
+      if (opt.due) { body.due_date = toMs(opt.due); body.due_date_time = false; }
+      if (opt.priority) body.priority = Number(opt.priority);
+      if (opt.status) body.status = opt.status;
+      const t = await api("POST", `/list/${pos[0]}/task`, body);
+      return out(brief(t));
+    }
+    case "update": {
+      const body = {};
+      if (opt.name) body.name = opt.name;
+      if (opt.desc) body.markdown_description = opt.desc;
+      if (opt.status) body.status = opt.status;
+      if (opt.due === "none") body.due_date = null; // hapus due (parkir kartu)
+      else if (opt.due) { body.due_date = toMs(opt.due); body.due_date_time = false; }
+      if (opt.priority) body.priority = Number(opt.priority);
+      if (opt["add-assignee"] || opt["rem-assignee"]) body.assignees = {
+        add: opt["add-assignee"] ? String(opt["add-assignee"]).split(",").map(Number) : [],
+        rem: opt["rem-assignee"] ? String(opt["rem-assignee"]).split(",").map(Number) : [],
+      };
+      if (!Object.keys(body).length) throw new Error("update: tak ada field yang diubah");
+      if (opt["dry-run"]) return out({ dry_run: true, method: "PUT", task: pos[0], body });
+      return out(brief(await api("PUT", `/task/${pos[0]}`, body)));
+    }
+    case "comment": {
+      const text = opt.file ? fs.readFileSync(opt.file, "utf8") : opt.text;
+      if (!text) throw new Error("comment: --text atau --file wajib");
+      if (opt["reply-to"] !== undefined) {
+        // balasan thread: KHUSUS mode tugas (di mode clickup flag ini ditolak supaya tak jadi komentar top-level)
+        if (!TUGAS) throw new Error("comment: --reply-to hanya tersedia di mode tugas");
+        const rid = wajibNilai("comment", "reply-to");
+        if (!rid) throw new Error("comment: --reply-to <comment_id> wajib berisi id");
+        if (opt["dry-run"]) return out({ dry_run: true, method: "POST", task: pos[0], reply_to: rid, body: { comment_text: text, notify_all: false } });
+        return out(await api("POST", `/comment/${rid}/reply`, { comment_text: text, notify_all: false }));
+      }
+      if (opt["dry-run"]) return out({ dry_run: true, method: "POST", task: pos[0], body: { comment_text: text, notify_all: false } });
+      return out(await api("POST", `/task/${pos[0]}/comment`, { comment_text: text, notify_all: false }));
+    }
+    case "move": {
+      // Pindah "home list" kartu (API v2 tak punya; pakai v3). Kartu tetap satu, ID sama.
+      if (!pos[0] || !pos[1]) throw new Error("move: <task_id> <list_id> wajib");
+      const url = `${BASE_V3}/workspaces/${await teamId()}/tasks/${pos[0]}/home_list/${pos[1]}`;
+      if (opt["dry-run"]) return out({ dry_run: true, method: "PUT", url });
+      await api("PUT", url);
+      const t = await api("GET", `/task/${pos[0]}`);
+      return out(brief(t));
+    }
+    case "delete": {
+      if (!opt.yes) throw new Error("delete: tambahkan --yes (hapus permanen, tak bisa dibatalkan)");
+      await api("DELETE", `/task/${pos[0]}`);
+      return out({ deleted: pos[0] });
+    }
+    case "fields": return out((await api("GET", `/list/${pos[0]}/field`)).fields || []);
+    case "audit-free": {
+      if (TUGAS) { console.error("tugas: audit-free tidak berlaku di aplikasi Tugas (khusus paket ClickUp Free)"); process.exit(1); }
+      const { tid, spaces, lists } = await allLists();
+      let open = 0, closed = 0, cfUses = 0, attCount = 0, attBytes = 0, attNoSize = 0;
+      const files = [], cfByList = {};
+      for (const l of lists) {
+        const ts = await allTasks(l.id, true);
+        for (const t of ts) {
+          (t.status?.type === "closed" || t.status?.type === "done") ? closed++ : open++;
+          const n = customFieldValuesSet(t);
+          cfUses += n; if (n) cfByList[l.name] = (cfByList[l.name] || 0) + n;
+          // daftar task tak memuat lampiran -> ambil detail hanya bila perlu
+          const d = await api("GET", `/task/${t.id}`);
+          for (const a of d.attachments || []) {
+            attCount++;
+            const sz = Number(a.size);
+            if (Number.isFinite(sz) && sz > 0) attBytes += sz; else attNoSize++;
+            files.push({ task: t.name.slice(0, 60), file: a.title, bytes: Number.isFinite(sz) ? sz : null });
+          }
+        }
+      }
+      return out({
+        workspace: tid, spaces: spaces.length, lists: lists.length, tasks: { open, closed },
+        custom_field_values_now: cfUses, custom_field_by_list: cfByList,
+        note_cf: "Free Forever = 60 use SEUMUR workspace; angka ini batas BAWAH (nilai yang pernah diisi lalu dihapus tetap terhitung use).",
+        attachments: { count: attCount, total_mb: +(attBytes / 1048576).toFixed(2), without_size: attNoSize, files },
+        note_storage: "Free Forever ~60-100 MB total (sumber beda); lampiran komentar/Docs mungkin tak ikut terhitung di sini.",
+      });
+    }
+    default:
+      if (TUGAS && Object.hasOwn(EKSTRA, cmd)) return out(await EKSTRA[cmd]());
+      console.error(`${NAMA}: perintah tak dikenal "${cmd}"`); process.exit(1);
+  }
+}
+
+main().catch((e) => { console.error(`${NAMA}: GAGAL ->`, e.message); process.exit(1); });

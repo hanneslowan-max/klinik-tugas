@@ -1,0 +1,214 @@
+{
+  "_catatan": [
+    "Fixture SINTETIS untuk server ClickUp tiruan (impor/uji/mock-clickup.mjs). Semua nama orang, kartu, dan email FIKTIF (@contoh.test).",
+    "ID team = 1100340000004525 (workspace tunggal kontrak ARSITEKTUR §1) dan nama sama dengan data_awal, supaya impor tidak mengganti nama workspace di DB bersama.",
+    "ID lain sengaja berawalan unik: user 882000xx, space/folder/list 9018220000xx, task 86b2xxxxx, komentar 901822000xxxxx, lampiran b2xxxxxx-….",
+    "Tanggal: 'YYYY-MM-DD' = due tanpa jam (disajikan sebagai ms 12:00 WIB, due_date_time=false); ISO dengan jam = due berjam (due_date_time=true).",
+    "Waktu beku uji banding = 'sekarang' (Selasa 29 Sep 2026 09:00 WIB).",
+    "Space privat: `anggota` di list = jawaban GET /list/{id}/member tiruan (asumsi P2, wajib diprobe). Lampiran b2a00304 = CSV dari Windows (mime application/vnd.ms-excel, P3)."
+  ],
+  "sekarang": "2026-09-29T02:00:00.000Z",
+  "team": { "id": "1100340000004525", "name": "Roda Hammerindo Workspace", "color": "#7b68ee" },
+  "pemilik_token": 88200001,
+  "users": [
+    { "id": 88200001, "username": "Hana Wijaya", "email": "hana.uji@contoh.test", "color": "#7b68ee", "initials": "HW",
+      "profilePicture": "https://attachments.clickup.com/profilePictures/88200001_tiruan.jpg", "role": 1, "tim": true },
+    { "id": 88200002, "username": "rudi hartono", "email": "rudi.uji@contoh.test", "color": "#e5484d", "initials": "RH", "role": 3, "tim": true },
+    { "id": 88200003, "username": "Sari Kusuma", "email": "sari.uji@contoh.test", "email_di_tim": false, "color": "#04a9f4", "initials": "SK", "role": 3, "tim": true },
+    { "id": 88200004, "username": "Tono Prasetyo", "email": "tono.uji@contoh.test", "color": "#f9d900", "initials": "TP", "role": 2, "tim": true },
+    { "id": 88200005, "username": "Wati Anggraini", "email": "wati.uji@contoh.test", "color": "#81b1ff", "initials": "WA", "role": 3, "tim": true },
+    { "id": 88200006, "username": "Yoga Pratama", "email": "yoga.uji@contoh.test", "color": "#aa2fff", "initials": "YP", "role": 3, "tim": false }
+  ],
+  "status_set": {
+    "standar": [
+      { "status": "to do", "type": "open", "color": "#d3d3d3" },
+      { "status": "in progress", "type": "custom", "color": "#4194f6" },
+      { "status": "review", "type": "custom", "color": "#a875ff" },
+      { "status": "complete", "type": "closed", "color": "#6bc950" }
+    ],
+    "kustom": [
+      { "status": "BACKLOG", "type": "open", "color": "#d3d3d3" },
+      { "status": "dikerjakan", "type": "custom", "color": "#ff7800" },
+      { "status": "selesai qc", "type": "done", "color": "#2ecd6f" },
+      { "status": "Closed", "type": "closed", "color": "#6bc950" }
+    ]
+  },
+  "spaces": [
+    { "id": "901822000001", "name": "Ruang Fiktif B2", "private": false, "archived": false, "color": "#7b68ee" },
+    { "id": "901822000002", "name": "Ruang Arsip B2", "private": true, "archived": true, "color": "#aa2fff" }
+  ],
+  "folders": [
+    { "id": "901822000011", "space": "901822000001", "name": "Eksekusi Fiktif", "hidden": false, "archived": false, "orderindex": 0 },
+    { "id": "901822000012", "space": "901822000001", "name": "Arsip Tersembunyi", "hidden": true, "archived": false, "orderindex": 1 },
+    { "id": "901822000013", "space": "901822000001", "name": "Folder Diarsip", "hidden": false, "archived": true, "orderindex": 2 },
+    { "id": "901822000014", "space": "901822000001", "name": "Gudang Fiktif", "hidden": false, "archived": false, "orderindex": 3 },
+    { "id": "901822000021", "space": "901822000002", "name": "Folder Ruang Arsip", "hidden": false, "archived": false, "orderindex": 0 }
+  ],
+  "lists": [
+    { "id": "901822000101", "space": "901822000001", "folder": "901822000011", "name": "Fase Fiktif 1", "orderindex": 0, "statuses": "standar", "content": "Kartu eksekusi fase 1 (fiktif)." },
+    { "id": "901822000102", "space": "901822000001", "folder": "901822000011", "name": "Fase Fiktif 2", "orderindex": 1, "statuses": "kustom" },
+    { "id": "901822000103", "space": "901822000001", "folder": "901822000011", "name": "Di luar periode", "orderindex": 2, "statuses": "standar", "archived": true },
+    { "id": "901822000104", "space": "901822000001", "folder": "901822000012", "name": "Catatan Tersembunyi", "orderindex": 0, "statuses": "standar" },
+    { "id": "901822000105", "space": "901822000001", "folder": "901822000013", "name": "List di Folder Arsip", "orderindex": 0, "statuses": "standar" },
+    { "id": "901822000106", "space": "901822000001", "folder": null, "folder_hidden_id": "901822000019", "name": "Uji Coba Fiktif", "orderindex": 0, "statuses": "standar" },
+    { "id": "901822000107", "space": "901822000001", "folder": null, "folder_hidden_id": "901822000019", "name": "Coretan Lama", "orderindex": 1, "statuses": "standar", "archived": true },
+    { "id": "901822000108", "space": "901822000001", "folder": "901822000014", "name": "Gudang Ide", "orderindex": 0, "statuses": "standar" },
+    { "id": "901822000201", "space": "901822000002", "folder": "901822000021", "name": "List Ruang Arsip", "orderindex": 0, "statuses": "standar",
+      "anggota": [88200002, 88200003] }
+  ],
+  "tasks": [
+    { "id": "86b2a0001", "list": "901822000101", "name": "A1 · Susun rencana konten mingguan", "status": "in progress",
+      "creator": 88200001, "assignees": [88200001, 88200002], "priority": 2, "due": "2026-09-29", "start": "2026-09-26",
+      "created": "2026-09-20T03:00:00Z", "updated": "2026-09-28T09:15:00Z", "orderindex": "1.00000000000000000000000000000000",
+      "md": "**Tujuan**: rencana konten minggu 40.\n\n- Selesai kalau: kalender terisi 5 slot\n- Cara dicek: MANUAL",
+      "teks": "Tujuan: rencana konten minggu 40.\n\nSelesai kalau: kalender terisi 5 slot\nCara dicek: MANUAL\n" },
+    { "id": "86b2a0002", "list": "901822000101", "name": "A2 · Audit tautan rusak", "status": "to do",
+      "creator": 88200002, "assignees": [88200003], "priority": 3, "due": "2026-09-25",
+      "created": "2026-09-10T02:00:00Z", "updated": "2026-09-27T08:00:00Z", "orderindex": "2.00000000000000000000000000000000",
+      "md": "Cek semua tautan 404 di situs uji.", "teks": "Cek semua tautan 404 di situs uji." },
+    { "id": "86b2a0003", "list": "901822000101", "name": "A3 · Rekap iklan — minggu 39", "status": "complete",
+      "creator": 88200004, "assignees": [88200004], "due": "2026-09-27",
+      "created": "2026-09-15T04:00:00Z", "updated": "2026-09-28T10:00:00Z", "closed": "2026-09-28T10:00:00Z", "orderindex": "3",
+      "md": "Rekap angka iklan minggu 39 (fiktif).", "teks": "Rekap angka iklan minggu 39 (fiktif).",
+      "attachments": [
+        { "id": "b2a00301-0000-4000-8000-000000000001.png", "title": "grafik-rekap.png", "berkas": "grafik.png", "mimetype": "image/png", "user": 88200004, "date": "2026-09-28T09:50:00Z" },
+        { "id": "b2a00302-0000-4000-8000-000000000002.csv", "title": "rekap-uji.csv", "berkas": "rekap.csv", "mimetype": "text/csv", "user": 88200004, "date": "2026-09-28T09:51:00Z" },
+        { "id": "b2a00304-0000-4000-8000-000000000007.csv", "title": "ekspor-windows.csv", "berkas": "ekspor-windows.csv", "mimetype": "application/vnd.ms-excel", "user": 88200004, "date": "2026-09-28T09:52:00Z" }
+      ] },
+    { "id": "86b2a0004", "list": "901822000101", "name": "[Claude] A4 · Draf balasan pelanggan fiktif", "status": "review",
+      "creator": 88200001, "assignees": [], "priority": 4, "due": "2026-10-01T15:30:00+07:00", "start": "2026-09-28T09:00:00+07:00",
+      "created": "2026-09-28T01:00:00Z", "updated": "2026-09-28T23:00:00Z", "orderindex": "4",
+      "md": "Draf balasan untuk pelanggan fiktif.\n\n> kutipan contoh", "teks": "Draf balasan untuk pelanggan fiktif.\n\nkutipan contoh\n" },
+    { "id": "86b2a0005", "list": "901822000101", "parent": "86b2a0001", "name": "A5 · Subtugas dari A1", "status": "to do",
+      "creator": 88200001, "assignees": [88200002], "created": "2026-09-21T03:00:00Z", "orderindex": "5" },
+    { "id": "86b2a0006", "list": "901822000101", "name": "A6 · Kartu yang diarsipkan", "status": "to do", "archived": true,
+      "creator": 88200002, "assignees": [], "created": "2026-09-05T03:00:00Z", "updated": "2026-09-12T03:00:00Z", "orderindex": "6" },
+    { "id": "86b2a0007", "list": "901822000101", "name": "A7 · Deskripsi tak terbaca", "status": "to do",
+      "creator": 88200005, "assignees": [88200005], "due": "2026-09-28",
+      "created": "2026-09-18T03:00:00Z", "updated": "2026-09-19T03:00:00Z", "orderindex": "7",
+      "md": "", "teks": "Isi polos saja, markdown kosong." },
+    { "id": "86b2a0008", "list": "901822000101", "name": "A8 · BERSYARAT tunggu keputusan pemilik", "status": "to do",
+      "creator": 88200001, "assignees": [88200002], "due": "2026-10-06",
+      "created": "2026-09-22T03:00:00Z", "updated": "2026-09-22T03:00:00Z", "orderindex": "8" },
+    { "id": "86b2a0009", "list": "901822000101", "name": "A9 · Kartu dengan tag dan checklist", "status": "in progress",
+      "creator": 88200001, "assignees": [88200001], "due": "2026-10-02", "priority": 3,
+      "created": "2026-09-23T03:00:00Z", "updated": "2026-09-24T03:00:00Z", "orderindex": "9",
+      "md": "Kartu dengan checklist.", "teks": "Kartu dengan checklist.",
+      "tags": [ { "name": "prioritas", "tag_fg": "#ffffff", "tag_bg": "#e50000", "creator": 88200001 } ],
+      "checklists": [ { "id": "b2c10001-0000-4000-8000-000000000001", "task_id": "86b2a0009", "name": "Langkah kerja",
+        "date_created": "1790132400000", "orderindex": 0, "creator": 88200001, "resolved": 1, "unresolved": 1,
+        "items": [
+          { "id": "b2c10002-0000-4000-8000-000000000002", "name": "Siapkan draf", "orderindex": 0, "assignee": null, "group_assignee": null,
+            "resolved": true, "parent": null, "date_created": "1790132400000", "children": [] },
+          { "id": "b2c10003-0000-4000-8000-000000000003", "name": "Kirim ke pemilik", "orderindex": 1, "assignee": null, "group_assignee": null,
+            "resolved": false, "parent": null, "date_created": "1790132400000", "children": [] } ] } ] },
+    { "id": "86b2a0010", "list": "901822000101", "name": "A10 · Dibuat mantan anggota", "status": "to do",
+      "creator": 88200006, "assignees": [88200003], "due": "2026-09-29T17:00:00Z", "due_jam": false,
+      "created": "2026-08-15T03:00:00Z", "updated": "2026-09-01T03:00:00Z", "orderindex": "10" },
+    { "id": "86b2a0011", "list": "901822000101", "parent": "86b2a0005", "name": "A11 · Subtugas tingkat dua", "status": "to do",
+      "creator": 88200002, "assignees": [88200002], "created": "2026-09-21T04:00:00Z", "orderindex": "11" },
+    { "id": "86b2a0012", "list": "901822000101", "name": "A12 · Selesai bulan ini", "status": "complete",
+      "creator": 88200005, "assignees": [88200005], "due": "2026-09-10",
+      "created": "2026-09-01T03:00:00Z", "updated": "2026-09-10T05:00:00Z", "closed": "2026-09-10T05:00:00Z", "orderindex": "12" },
+    { "id": "86b2a0013", "list": "901822000101", "name": "A13 · Prioritas mendesak berjam", "status": "in progress",
+      "creator": 88200004, "assignees": [88200001, 88200004], "priority": 1, "due": "2026-09-29T08:00:00+07:00",
+      "created": "2026-09-27T03:00:00Z", "updated": "2026-09-27T05:00:00Z", "orderindex": "13" },
+
+    { "id": "86b2b0001", "list": "901822000102", "name": "B1 · Antrean BACKLOG", "status": "BACKLOG",
+      "creator": 88200004, "assignees": [88200004], "created": "2026-09-11T03:00:00Z", "orderindex": "1" },
+    { "id": "86b2b0002", "list": "901822000102", "name": "B2 · Sedang dikerjakan berdua", "status": "dikerjakan",
+      "creator": 88200004, "assignees": [88200004, 88200005], "due": "2026-10-01", "priority": 2,
+      "created": "2026-09-12T03:00:00Z", "updated": "2026-09-28T12:00:00Z", "orderindex": "2" },
+    { "id": "86b2b0003", "list": "901822000102", "name": "B3 · Lolos QC", "status": "selesai qc",
+      "creator": 88200005, "assignees": [88200005], "due": "2026-09-28",
+      "created": "2026-09-13T03:00:00Z", "updated": "2026-09-28T12:00:00Z", "done": "2026-09-28T12:00:00Z", "orderindex": "3" },
+    { "id": "86b2b0004", "list": "901822000102", "name": "B4 · Ditutup tanpa QC", "status": "Closed",
+      "creator": 88200005, "assignees": [], "created": "2026-09-14T03:00:00Z", "updated": "2026-09-20T12:00:00Z",
+      "closed": "2026-09-20T12:00:00Z", "orderindex": "4" },
+    { "id": "86b2b0005", "list": "901822000102", "name": "B5 · CADANGAN ide cadangan", "status": "BACKLOG",
+      "creator": 88200004, "assignees": [], "due": "2026-10-10", "created": "2026-09-15T03:00:00Z", "orderindex": "5" },
+    { "id": "86b2b0006", "list": "901822000102", "name": "B6 · Diskusi dengan mention", "status": "dikerjakan",
+      "creator": 88200005, "assignees": [88200002, 88200005], "created": "2026-09-16T03:00:00Z", "updated": "2026-09-26T03:00:00Z", "orderindex": "6" },
+
+    { "id": "86b2c0001", "list": "901822000103", "name": "C1 · Kontrak lama fiktif", "status": "to do",
+      "creator": 88200001, "assignees": [88200001], "due": "2026-08-31", "created": "2026-08-01T03:00:00Z", "orderindex": "1" },
+    { "id": "86b2c0002", "list": "901822000103", "name": "C2 · Tagihan lama", "status": "complete",
+      "creator": 88200001, "assignees": [], "created": "2026-08-02T03:00:00Z", "updated": "2026-08-20T03:00:00Z",
+      "closed": "2026-08-20T03:00:00Z", "orderindex": "2" },
+
+    { "id": "86b2d0001", "list": "901822000104", "name": "D1 · Catatan internal fiktif", "status": "to do",
+      "creator": 88200001, "assignees": [], "priority": 4, "created": "2026-09-02T03:00:00Z", "orderindex": "1" },
+    { "id": "86b2d0002", "list": "901822000104", "name": "D2 · Arsip catatan", "status": "complete",
+      "creator": 88200001, "assignees": [88200001], "created": "2026-09-03T03:00:00Z", "updated": "2026-09-04T03:00:00Z",
+      "closed": "2026-09-04T03:00:00Z", "orderindex": "2" },
+    { "id": "86b2d0003", "list": "901822000104", "name": "D3 · Catatan berkomentar", "status": "in progress",
+      "creator": 88200002, "assignees": [88200002], "due": "2026-09-30", "created": "2026-09-04T03:00:00Z",
+      "updated": "2026-09-28T06:00:00Z", "orderindex": "3" },
+
+    { "id": "86b2e0001", "list": "901822000105", "name": "E1 · Tugas di folder arsip", "status": "to do",
+      "creator": 88200004, "assignees": [88200004], "created": "2026-07-01T03:00:00Z", "orderindex": "1" },
+    { "id": "86b2e0002", "list": "901822000105", "name": "E2 · Tugas arsip selesai", "status": "complete",
+      "creator": 88200004, "assignees": [], "created": "2026-07-02T03:00:00Z", "updated": "2026-07-03T03:00:00Z",
+      "closed": "2026-07-03T03:00:00Z", "orderindex": "2" },
+
+    { "id": "86b2f0001", "list": "901822000106", "name": "U1 · Coba kartu tanpa folder", "status": "to do",
+      "creator": 88200003, "assignees": [88200003], "due": "2026-10-05", "created": "2026-09-24T03:00:00Z", "orderindex": "1" },
+    { "id": "86b2f0002", "list": "901822000106", "name": "U2 · Coba lampiran gagal", "status": "to do",
+      "creator": 88200003, "assignees": [], "created": "2026-09-24T04:00:00Z", "updated": "2026-09-24T05:00:00Z", "orderindex": "2",
+      "attachments": [
+        { "id": "b2f00201-0000-4000-8000-000000000005.pdf", "title": "hilang.pdf", "berkas": null, "mimetype": "application/pdf", "ukuran": 1200, "user": 88200003, "date": "2026-09-24T04:30:00Z" },
+        { "id": "b2f00202-0000-4000-8000-000000000006.svg", "title": "ikon.svg", "berkas": "ikon.svg", "mimetype": "image/svg+xml", "user": 88200003, "date": "2026-09-24T04:31:00Z" }
+      ] },
+    { "id": "86b2f0003", "list": "901822000106", "name": "U3 · Coba selesai", "status": "complete",
+      "creator": 88200003, "assignees": [88200003], "created": "2026-09-24T05:00:00Z", "updated": "2026-09-25T05:00:00Z",
+      "closed": "2026-09-25T05:00:00Z", "orderindex": "3" },
+    { "id": "86b2f0004", "list": "901822000106", "parent": "86b2f0001", "name": "U4 · Coba subtugas", "status": "in progress",
+      "creator": 88200003, "assignees": [88200003], "created": "2026-09-24T06:00:00Z", "orderindex": "4" },
+
+    { "id": "86b2f0101", "list": "901822000107", "name": "V1 · Coretan fiktif", "status": "to do",
+      "creator": 88200002, "assignees": [], "created": "2026-06-01T03:00:00Z", "orderindex": "1" },
+
+    { "id": "86b2h0001", "list": "901822000201", "name": "H1 · Tugas ruang arsip", "status": "to do",
+      "creator": 88200001, "assignees": [88200001], "created": "2026-05-01T03:00:00Z", "orderindex": "1" },
+    { "id": "86b2h0002", "list": "901822000201", "name": "H2 · Tugas ruang arsip selesai", "status": "complete",
+      "creator": 88200001, "assignees": [], "created": "2026-05-02T03:00:00Z", "updated": "2026-05-03T03:00:00Z",
+      "closed": "2026-05-03T03:00:00Z", "orderindex": "2" }
+  ],
+  "generate": [
+    { "list": "901822000108", "jumlah": 110, "awalan_id": "86b2g", "nama": "G{nnn} · Ide konten fiktif nomor {n}",
+      "creator": 88200002, "assignee_tiap": 3, "assignee": 88200002, "selesai_tiap": 7, "arsip_tiap": 26,
+      "dibuat_mulai": "2026-07-01T01:00:00Z", "jarak_jam": 6 }
+  ],
+  "comments": [
+    { "id": "90182200000101", "task": "86b2a0001", "user": 88200002, "date": "2026-09-26T03:00:00Z",
+      "parts": [ { "text": "Draf kalender sudah di folder bersama, " }, { "tag": 88200001 }, { "text": " tolong cek." } ] },
+    { "id": "90182200000102", "task": "86b2a0001", "reply_to": "90182200000101", "user": 88200001, "date": "2026-09-26T05:00:00Z", "teks": "Sudah saya cek, lanjut." },
+    { "id": "90182200000103", "task": "86b2a0001", "reply_to": "90182200000101", "user": 88200002, "date": "2026-09-28T04:00:00Z", "teks": "Siap, slot 5 menyusul." },
+    { "id": "90182200000104", "task": "86b2a0001", "user": 88200001, "date": "2026-09-28T08:00:00Z", "teks": "Deadline tetap hari ini ya." },
+    { "id": "90182200000105", "task": "86b2a0001", "user": 88200006, "date": "2026-09-21T03:00:00Z", "teks": "Catatan dari anggota lama." },
+
+    { "id": "90182200000301", "task": "86b2a0003", "user": 88200004, "date": "2026-09-28T09:55:00Z",
+      "parts": [ { "text": "Laporan terlampir " }, { "lampiran": { "id": "b2a00303-0000-4000-8000-000000000003.pdf", "title": "laporan-fiktif.pdf",
+        "berkas": "laporan.pdf", "mimetype": "application/pdf", "jenis": "attachment" } } ] },
+
+    { "id": "90182200000901", "task": "86b2a0009", "user": 88200001, "date": "2026-09-24T03:00:00Z", "teks": "Checklist langkah 1 selesai." },
+    { "id": "90182200001001", "task": "86b2a0010", "user": 88200006, "date": "2026-08-16T03:00:00Z", "teks": "Dibuat sebelum saya keluar tim." },
+
+    { "id": "90182200000601", "task": "86b2b0006", "user": 88200005, "date": "2026-09-25T03:00:00Z",
+      "parts": [ { "tag": 88200002 }, { "text": " mohon review bagian 2." } ] },
+    { "id": "90182200000602", "task": "86b2b0006", "reply_to": "90182200000601", "user": 88200002, "date": "2026-09-25T06:00:00Z", "teks": "Oke, saya review sore ini." },
+    { "id": "90182200000603", "task": "86b2b0006", "user": 88200004, "date": "2026-09-26T03:00:00Z",
+      "parts": [ { "text": "Tangkapan layar: " }, { "lampiran": { "id": "b2b00601-0000-4000-8000-000000000004.png", "title": "tangkapan.png",
+        "berkas": "tangkapan.png", "mimetype": "image/png", "jenis": "image" } } ] },
+
+    { "id": "90182200001301", "task": "86b2d0003", "user": 88200002, "date": "2026-09-27T03:00:00Z", "teks": "Catatan tersembunyi pertama." },
+    { "id": "90182200001302", "task": "86b2d0003", "user": 88200001, "date": "2026-09-28T06:00:00Z", "teks": "Catatan tersembunyi kedua, https://contoh.test/tautan-uji" },
+    { "id": "90182200001401", "task": "86b2f0002", "user": 88200003, "date": "2026-09-24T04:35:00Z", "teks": "Lampiran PDF di kartu ini sengaja rusak (uji gagal salin)." },
+    { "id": "90182200001501", "task": "86b2h0001", "user": 88200001, "date": "2026-05-02T03:00:00Z", "teks": "Komentar di ruang arsip." }
+  ],
+  "komentar_banyak": [
+    { "task": "86b2a0002", "jumlah": 30, "awalan_id": "901822000002", "mulai": "2026-09-27T00:00:00Z", "jarak_menit": 60,
+      "users": [88200003, 88200002], "teks": "Catatan audit ke-{n}.", "balasan_pada": 11,
+      "balasan": { "id": "90182200000299", "user": 88200001, "date": "2026-09-27T12:00:00Z", "teks": "Balasan untuk catatan ke-11." } }
+  ]
+}
