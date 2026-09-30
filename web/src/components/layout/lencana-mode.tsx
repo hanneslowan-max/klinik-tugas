@@ -14,14 +14,12 @@ export function LencanaMode() {
   if (!cermin) return null;
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setBuka(true)}
-        className="inline-flex h-7 items-center gap-1 rounded-full bg-cermin-lembut px-2.5 text-xs font-semibold text-cermin"
-        data-uji="lencana-mode"
-      >
-        <Lock className="size-3" aria-hidden />
-        Mode cermin
+      {/* area sentuh 44px; pil yang terlihat lebih kecil */}
+      <button type="button" onClick={() => setBuka(true)} className="inline-flex min-h-11 items-center px-0.5" data-uji="lencana-mode">
+        <span className="inline-flex h-7 items-center gap-1 rounded-full bg-cermin-lembut px-2.5 text-xs font-semibold text-cermin">
+          <Lock className="size-3" aria-hidden />
+          Mode cermin
+        </span>
       </button>
       <Lembar buka={buka} ubahBuka={setBuka} judul="Mode cermin" kaki={<Button onClick={() => setBuka(false)}>Mengerti</Button>}>
         <div className="space-y-2 text-sm">

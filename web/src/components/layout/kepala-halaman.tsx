@@ -41,7 +41,7 @@ export function KepalaHalaman({ judul, judulDokumen, kembali, aksi, className }:
           type="button"
           aria-label="Kembali"
           onClick={() => (adaRiwayatDalam() ? router.back() : router.push(kembali))}
-          className="inline-flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-muted"
+          className="inline-flex size-11 shrink-0 items-center justify-center rounded-full hover:bg-muted"
         >
           <ChevronLeft className="size-5" aria-hidden />
         </button>
