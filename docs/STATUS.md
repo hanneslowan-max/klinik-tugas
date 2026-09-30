@@ -2,6 +2,24 @@
 
 Diperbarui 29 Sep 2026 (verifikasi akhir sesudah putaran poles DB P1–P6 + poles web W1–W8, sekitar 11.00 UTC). Kontrak: `docs/ARSITEKTUR.md` + rincian DB `docs/KONTRAK-DB.md`.
 
+## Sesi deploy 30 Sep 2026 (branch `claude/rhj-task-management-deploy-gwc6t5`)
+Keputusan Hannes (30/9): region project = **Sydney** (bukan Singapore seperti prasyarat lama); web diganti **Next.js + Tailwind** (App Router, TypeScript) di **Hostinger Business, Node.js Web Apps** sebagai tahap tersendiri SESUDAH langkah 0–6. Langkah 7 lama (web statis + `.htaccess`) tidak dipakai lagi. Backend (DB, Edge, importer, CLI) tidak berubah.
+
+| Langkah | Hasil |
+|---|---|
+| 0 Pagar | Terpasang di container sesi ini: `~/.claude/hooks/supabase-readonly.sh` + `~/.claude/settings.json` (deny 10 tool MCP Supabase penulis + 34 tool MCP ClickUp penulis). Uji: `select 1 -- drop table uji` lewat `mcp__Supabase__execute_sql` ditolak hook. Container baru = pasang ulang |
+| 1 Target | PAT hanya melihat 1 project: "RHJ ClickUp" `admhlyurfvodfyedgaio`, `ap-southeast-2` (Sydney), Postgres 17.6, ACTIVE_HEALTHY = `SUPABASE_PROJECT_REF`. DB kosong: 0 tabel `public`, 0 bucket, tanpa riwayat migrasi, **0 user Auth** |
+| 2 Skema | **Tertahan.** `supabase link` jalan, tetapi `db push` macet (TCP Postgres 5432 tidak lewat proxy sesi cloud; hanya HTTPS). Jalur pengganti = kirim tiap migrasi lewat Management API `POST /database/query` + catat versi di `supabase_migrations.schema_migrations`, tetapi aksi itu ditolak auto-mode classifier sesi. Menunggu izin Hannes |
+| 3 Bootstrap | Belum. Akun Auth Hannes belum ada di project ini (0 user) |
+| 4 Probe | Selesai (GET saja), lihat di bawah. Crawl `sinkron.mjs --mode penuh --dry-run` exit 0, 541 permintaan, 0 kali 429 |
+| 5–6 | Belum (butuh skema) |
+
+Probe ClickUp asli (30 Sep):
+- `/team`: 9 anggota, semua email = tabel langkah 6. **Rengga sudah bergabung** (Masalah #4 gugur). Email Michael = `michael@rodahammerindo.com` (asumsi terbukti).
+- Space: 3 aktif (`Space`, `RHJ Space`, `RHJ Online Sales`), 0 diarsip. Hanya `RHJ Online Sales` (`1100340000050704`) privat. `GET /team/{id}/space` **memuat `members`** untuk space privat (3: Riksa, Michael, Hannes), sama persis dengan gabungan `GET /list/{id}/member` kedua list-nya. Asumsi P2 terbukti; importer tidak perlu diubah.
+- Folder `RHJ Eksekusi` = `1100340000026652` (6 list) = default `tenggat_folder_ids` (Masalah #6 selesai).
+- Sensus ClickUp: 11 list, 239 tugas (152 open, 87 closed, 0 diarsip, 0 subtugas), 261 komentar + 11 balasan, 87 lampiran (14 di tugas, 73 di komentar), 248 tautan assignee.
+
 ## Verdict
 - Kode Fase 1 (F1–F4 + kode F5: sinkron, backup, workflow) **jadi dan lulus semua suite lokal** dari `supabase db reset` (verifikasi akhir 29 Sep): DB 1016 cek (16 berkas), kontrak Edge+CLI 469 cek, importer 119 cek, web 69 tes Playwright, vendor cocok. Banding `clickup.mjs` ↔ `tugas.mjs`: kode keluar identik di 340/340 (awal) dan 344/344 (ubah) perintah, **sisa beda 0** (exit 0 tanpa `--izinkan-diketahui`; PR-1 selesai).
 - Putaran perbaikan poles DB (P1–P6) selesai: tags/checklists kartu impor (PR-1), anggota space privat dari impor, allowlist lampiran (CSV Windows dll.), normalisasi nama status Admin, wadah diarsip keluar dari Tugas Saya/TENGGAT/beban, URL tampilan ClickUp di resolve/cari. Rincian `docs/KONTRAK-DB.md` §10.
@@ -118,7 +136,7 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
 14. **Git**: commit `c8b3d6b` "WIP: putaran perbaikan (sedang berjalan)" (09:28 UTC, patch migrasi setengah jadi dari run yang terputus, sesi yang sama) sudah ada di branch `claude/rhj-task-management-app-cc50bk` dan origin. Semua hasil putaran poles DB + web + dokumen ini belum di-commit (33 berkas diubah + 3 baru). Commit/push menunggu keputusan Hannes; commit berikutnya di atas `c8b3d6b` sudah memuat versi final migrasi, jadi WIP itu tidak perlu di-revert.
 
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)
-Prasyarat dari Hannes: project Supabase baru `rhj-tugas` (akun/org baru, Singapore, Free); env cloud `SUPABASE_ACCESS_TOKEN` (PAT akun baru) + `SUPABASE_PROJECT_REF`; `CLICKUP_API_TOKEN` (sudah ada); sesi baru supaya env terbaca. Semua langkah ke ClickUp **GET saja**. Tidak memakai MCP Supabase (itu ERP).
+Prasyarat dari Hannes: project Supabase baru `rhj-tugas` (akun/org baru, Sydney `ap-southeast-2` per keputusan 30/9, Free); env cloud `SUPABASE_ACCESS_TOKEN` (PAT akun baru) + `SUPABASE_PROJECT_REF`; `CLICKUP_API_TOKEN` (sudah ada); sesi baru supaya env terbaca. Semua langkah ke ClickUp **GET saja**. Tidak memakai MCP Supabase (itu ERP).
 
 ### 0. Pagar & alat (PALING AWAL, sebelum apa pun)
 1. **Supabase lama (akun/org palletmeshindonesia: ERP `rhj-tracker` + `rhj-tacker.dev`) = BACA-SAJA, perintah Hannes 29/9.** Pengaman di sesi build tinggal di container lama, jadi pasang ulang di `~/.claude/`:
