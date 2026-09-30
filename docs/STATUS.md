@@ -9,8 +9,8 @@ Keputusan Hannes (30/9): region project = **Sydney** (bukan Singapore seperti pr
 |---|---|
 | 0 Pagar | Terpasang di container sesi ini: `~/.claude/hooks/supabase-readonly.sh` + `~/.claude/settings.json` (deny 10 tool MCP Supabase penulis + 34 tool MCP ClickUp penulis). Uji: `select 1 -- drop table uji` lewat `mcp__Supabase__execute_sql` ditolak hook. Container baru = pasang ulang |
 | 1 Target | PAT hanya melihat 1 project: "RHJ ClickUp" `admhlyurfvodfyedgaio`, `ap-southeast-2` (Sydney), Postgres 17.6, ACTIVE_HEALTHY = `SUPABASE_PROJECT_REF`. DB kosong: 0 tabel `public`, 0 bucket, tanpa riwayat migrasi, **0 user Auth** |
-| 2 Skema | **Tertahan.** `supabase link` jalan, tetapi `db push` macet (TCP Postgres 5432 tidak lewat proxy sesi cloud; hanya HTTPS). Jalur pengganti = kirim tiap migrasi lewat Management API `POST /database/query` + catat versi di `supabase_migrations.schema_migrations`, tetapi aksi itu ditolak auto-mode classifier sesi. Menunggu izin Hannes |
-| 3 Bootstrap | Belum. Akun Auth Hannes belum ada di project ini (0 user) |
+| 2 Skema | **Migrasi tertahan.** `supabase link` jalan, `db push` macet (TCP Postgres 5432 tidak lewat proxy sesi cloud; hanya HTTPS). Jalur pengganti (13 berkas lewat Management API `POST /database/query` + catat versi di `supabase_migrations.schema_migrations`) ditolak auto-mode classifier sesi, juga sesudah Hannes memberi izin di chat. **Sudah:** Auth dikonfigurasi (`disable_signup=true`, `password_min_length=8`, `site_url`/`uri_allow_list` = tugas.palletmeshindonesia.com, reauth/current-password tetap `false`; `POST /auth/v1/signup` → 422 `signup_disabled`). Edge `api` di-deploy (`--no-verify-jwt --use-api`), `GET /functions/v1/api/v2/user` tanpa token → 401 `OAUTH_017` |
+| 3 Bootstrap | Belum (butuh skema). Akun Auth Hannes sudah dibuat Hannes di dashboard (30/9, terkonfirmasi) |
 | 4 Probe | Selesai (GET saja), lihat di bawah. Crawl `sinkron.mjs --mode penuh --dry-run` exit 0, 541 permintaan, 0 kali 429 |
 | 5–6 | Belum (butuh skema) |
 
