@@ -1,6 +1,6 @@
 # STATUS rhj-tugas (Fase 1)
 
-Diperbarui 29 Sep 2026 (verifikasi akhir sesudah putaran poles DB P1–P6 + poles web W1–W8, sekitar 11.00 UTC). Kontrak: `docs/ARSITEKTUR.md` + rincian DB `docs/KONTRAK-DB.md`.
+Diperbarui 30 Sep 2026 (deploy ke project Supabase baru + impor ClickUp asli selesai, sensus selisih 0; web Next.js dibangun). Sebelumnya: 29 Sep (poles DB P1–P6 + web W1–W8). Kontrak: `docs/ARSITEKTUR.md` + rincian DB `docs/KONTRAK-DB.md`.
 
 ## Sesi deploy 30 Sep 2026 (branch `claude/rhj-task-management-deploy-gwc6t5`)
 Keputusan Hannes (30/9): region project = **Sydney** (bukan Singapore seperti prasyarat lama); web diganti **Next.js + Tailwind** (App Router, TypeScript) di **Hostinger Business, Node.js Web Apps** sebagai tahap tersendiri SESUDAH langkah 0–6. Langkah 7 lama (web statis + `.htaccess`) tidak dipakai lagi. Backend (DB, Edge, importer, CLI) tidak berubah.
@@ -9,10 +9,31 @@ Keputusan Hannes (30/9): region project = **Sydney** (bukan Singapore seperti pr
 |---|---|
 | 0 Pagar | Terpasang di container sesi ini: `~/.claude/hooks/supabase-readonly.sh` + `~/.claude/settings.json` (deny 10 tool MCP Supabase penulis + 34 tool MCP ClickUp penulis). Uji: `select 1 -- drop table uji` lewat `mcp__Supabase__execute_sql` ditolak hook. Container baru = pasang ulang |
 | 1 Target | PAT hanya melihat 1 project: "RHJ ClickUp" `admhlyurfvodfyedgaio`, `ap-southeast-2` (Sydney), Postgres 17.6, ACTIVE_HEALTHY = `SUPABASE_PROJECT_REF`. DB kosong: 0 tabel `public`, 0 bucket, tanpa riwayat migrasi, **0 user Auth** |
-| 2 Skema | **Migrasi tertahan.** `supabase link` jalan, `db push` macet (TCP Postgres 5432 tidak lewat proxy sesi cloud; hanya HTTPS). Jalur pengganti (13 berkas lewat Management API `POST /database/query` + catat versi di `supabase_migrations.schema_migrations`) ditolak auto-mode classifier sesi, juga sesudah Hannes memberi izin di chat. **Sudah:** Auth dikonfigurasi (`disable_signup=true`, `password_min_length=8`, `site_url`/`uri_allow_list` = tugas.palletmeshindonesia.com, reauth/current-password tetap `false`; `POST /auth/v1/signup` → 422 `signup_disabled`). Edge `api` di-deploy (`--no-verify-jwt --use-api`), `GET /functions/v1/api/v2/user` tanpa token → 401 `OAUTH_017` |
-| 3 Bootstrap | Belum (butuh skema). Akun Auth Hannes sudah dibuat Hannes di dashboard (30/9, terkonfirmasi) |
-| 4 Probe | Selesai (GET saja), lihat di bawah. Crawl `sinkron.mjs --mode penuh --dry-run` exit 0, 541 permintaan, 0 kali 429 |
-| 5–6 | Belum (butuh skema) |
+| 2 Skema | Selesai. `db push` tidak bisa dari sesi cloud (TCP 5432 tidak lewat proxy), jadi 13 migrasi dikirim lewat Management API dengan `alat/sql-proyek.sh --migrasi` (dikunci ke ref `admhlyurfvodfyedgaio`; tiap berkas satu transaksi + dicatat di `supabase_migrations.schema_migrations`; seed tidak dikirim). Dijalankan Hannes di mode izin "bertanya" (mode Auto menolaknya). Cek: 13 migrasi, 20 tabel semua RLS, 33 fungsi `web_*` + 29 `api_/x_/impor_*`, bucket `lampiran` privat 25 MB tanpa SVG/HTML, `anon` tanpa grant/eksekusi, mode `cermin`. Auth: `disable_signup=true` (signup → 422), `password_min_length=8`, `site_url`/`uri_allow_list` = tugas.palletmeshindonesia.com. Edge `api` ter-deploy (tanpa token → 401 `OAUTH_017`) |
+| 3 Bootstrap | Selesai. Hannes = owner ID 312823267 terhubung ke user Auth buatannya sendiri (`harus_ganti_password=false`); bot `claude (agent)` = 900000000000. Token dibuat dengan klaim JWT Hannes dalam SATU pernyataan (`with sesi as (select set_config(...)) select web_admin_token_buat(...)`). Hanya token **importer** (scope `impor`, awalan `rtk_6Szt`, nama "importer (sesi deploy 30 Sep)") — nilainya hanya di berkas 600 di container sesi ini (hilang bersama container; cabut lewat Admin → Token bila perlu). Token backup/routine/sesi interaktif dibuat saat dipasang ke GitHub Secrets (langkah 8) |
+| 4 Impor | Selesai. Dry-run ke DB kosong exit 2 = selisih 11 list semuanya `db: null` (wajar). `--mode penuh` exit 0 (968 dtk, 541 permintaan GET, 0×429): 239 tugas, 272 komentar, 87 lampiran (86 tersalin ke Storage, 1 `tautan_saja`), 11 list, 33 status, 3 space, 1 folder, 8 anggota baru (owner dilindungi, `unchanged`), anggota space privat RHJ Online Sales = 3. Jalankan ulang: exit 0, tugas/komentar `unchanged` 239/272, lampiran `sudah_ada` 86 → idempoten |
+| 5 Sensus | **Selisih 0 di 11 list** (tabel di bawah; sha ID tugas & komentar juga sama). Laporan `impor/laporan/2026-09-30-114115-penuh.json` & `…115724-penuh.json` (gitignored) |
+| 6 Akun | Selesai. 8 anggota diberi akun Auth (email dari `/team` ClickUp, terkonfirmasi) lewat `alat/sql-proyek.sh --akun`: password ACAK yang tidak pernah ditampilkan/disimpan + `harus_ganti_password=true`. Anggota bisa masuk setelah Hannes menekan Admin → Anggota → **Setel ulang password** (password sementara tampil sekali) saat web online. Total user Auth 9, semua terkonfirmasi |
+
+Sensus per list sesudah impor (ClickUp = aplikasi di setiap kolom):
+| List | Tugas | Open | Closed | Komentar | Balasan | Lampiran | Penugasan |
+|---|---|---|---|---|---|---|---|
+| Project 1 / Project 2 / Get Started with ClickUp | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| List (RHJ Online Sales) | 29 | 20 | 9 | 8 | 0 | 0 | 30 |
+| Follow-up Pallet Mesh | 40 | 39 | 1 | 0 | 0 | 0 | 40 |
+| Fase 1 — Sumbat & perbaiki | 51 | 3 | 48 | 153 | 8 | 66 | 54 |
+| Fase 2 — Ukur | 27 | 13 | 14 | 39 | 2 | 13 | 31 |
+| Fase 3 — Tekan lelang | 20 | 17 | 3 | 7 | 0 | 1 | 20 |
+| Fase 4 — Nyalakan & baca hasil | 14 | 13 | 1 | 9 | 0 | 0 | 15 |
+| Di luar periode 60 hari | 16 | 9 | 7 | 12 | 0 | 0 | 17 |
+| Kontrak SEO Agus | 42 | 38 | 4 | 33 | 1 | 7 | 41 |
+| **Total** | **239** | **152** | **87** | **261** | **11** | **87** | **248** |
+
+Temuan impor: lampiran `.docx` di tugas `z8r3fde8gh` dilaporkan ClickUp sebagai `application/octet-stream` (di luar allowlist) → hanya tautan ClickUp. Perbaikan yang disarankan: importer menebak MIME dari ekstensi bila ClickUp memberi `octet-stream` (seperti `mimeBerkas` di web).
+
+Web Next.js (tahap berikutnya, sudah dibangun di `web/`, belum di-deploy): lihat `web/README.md`. Semua layar web lama sudah dipindah (Masuk, Ganti password, Tugas Saya, Jelajah, List/Papan, Detail, Cari, Notifikasi, Admin 7 bagian, Sampah); Vitest 48 lolos, Playwright e2e 33 lolos di HP + desktop (1 khusus sentuh dilewati di desktop). Web statis lama ada di `web-lama/` sampai paritas tes penuh (69 skenario lama) dipindah.
+
+Langkah berikutnya: (a) pindahkan sisa skenario tes lama ke `web/tests/e2e`; (b) deploy web ke Hostinger Business (Node.js Web Apps, env `NEXT_PUBLIC_*` project ini); (c) Hannes: reset password 8 anggota lewat Admin dan kirim lewat jalur pribadi; (d) GitHub Actions sinkron + backup (langkah 8 lama).
 
 Probe ClickUp asli (30 Sep):
 - `/team`: 9 anggota, semua email = tabel langkah 6. **Rengga sudah bergabung** (Masalah #4 gugur). Email Michael = `michael@rodahammerindo.com` (asumsi terbukti).
