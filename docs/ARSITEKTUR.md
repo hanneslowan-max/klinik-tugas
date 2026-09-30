@@ -5,7 +5,7 @@ Dokumen ini = pegangan WAJIB semua kode. Kalau kode dan dokumen ini berbeda, per
 ## 0. Prinsip
 - Project Supabase khusus → semua objek di schema `public`.
 - UI Bahasa Indonesia; nama teknis tabel/kolom bahasa Inggris (peta 1:1 ke field ClickUp).
-- Tidak ada secret di repo. Kunci publik (URL project + publishable/anon key) boleh di `web/config.js`.
+- Tidak ada secret di repo. Kunci publik (URL project + publishable/anon key) boleh di konfigurasi web (`NEXT_PUBLIC_*`).
 - Semua tulis data lewat fungsi SQL `SECURITY DEFINER` (`set search_path = ''`, nama objek full-qualified). Tabel tidak punya policy INSERT/UPDATE/DELETE untuk `authenticated`/`anon`.
 - Riwayat (`activity`) & notifikasi diisi TRIGGER, bukan klien.
 - Waktu: simpan `timestamptz`; tanggal WIB = `Asia/Jakarta`. Keluaran API kompatibel ClickUp: string ms epoch.
@@ -133,17 +133,21 @@ Admin (owner): `web_admin_anggota_simpan(p jsonb)`, `web_admin_status_simpan(p_l
 - Sensus dihitung dari payload yang sama (tanpa panggil ClickUp lagi), dibandingkan `x_sensus` → tulis `sync_runs` + laporan `impor/laporan/<tanggal>.md` (JANGAN commit laporan berisi nama kartu; hanya angka per list boleh).
 - Tes: server ClickUp tiruan `impor/uji/mock-clickup.mjs` + fixture sintetis (nama palsu).
 
-## 11. Web `web/`
-- Statis tanpa build: `index.html`, `css/`, `js/` (ES modules), `vendor/` (supabase-js ESM/UMD, markdown-it, DOMPurify, SortableJS — disimpan lokal), `config.js` (SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL), `manifest.webmanifest`, `sw.js` (cache aset saja, bukan data), `.htaccess` (rewrite `/t/*` dst ke index.html, header noindex/CSP), `robots.txt` (Disallow: /).
-- Routing path: `/`, `/saya`, `/l/<list>` (+`?v=board`), `/t/<id>`, `/cari`, `/notif`, `/admin`, `/sampah`, `/masuk`. Tanpa sesi → `/masuk?lanjut=<path>`.
-- Markdown dirender markdown-it `html:false` + DOMPurify. CSP `script-src 'self'`.
-- Mobile-first (lebar 360px), Bahasa Indonesia, zona WIB.
+## 11. Web `web/` (Next.js; keputusan Hannes 30 Sep)
+- Next.js 16 App Router + React 19 + TypeScript + Tailwind 4 + shadcn/ui, di-hosting Hostinger Business (Node.js Web Apps, output `standalone`). Rincian stack, struktur folder, dan cara deploy: `web/README.md`.
+- Sesi Supabase di cookie (`@supabase/ssr`); `src/proxy.ts` menyegarkan sesi, mengalihkan tamu ke `/masuk?lanjut=<path>`, dan memasang CSP ber-nonce per permintaan (`script-src 'self' 'nonce-…' 'strict-dynamic'`). Header statis (noindex, no-referrer, nosniff, DENY frame) di `next.config.ts`; `robots.txt` Disallow: /.
+- Routing path sama dengan web lama: `/`, `/saya`, `/jelajah`, `/l/<list>` (+`?v=board`), `/t/<id>`, `/cari`, `/notif`, `/admin/<tab>` (`/admin?tab=` lama dialihkan), `/sampah`, `/masuk`, `/ganti-password`.
+- Semua data lewat `rpc(klien, "web_…")` bertipe (`src/types/database.ts` hasil `supabase gen types` + `src/types/domain.ts`) dengan sesi pengguna; tidak ada secret key di web. Admin akun/reset/purge lewat Edge `/x/admin/*` dengan JWT sesi.
+- Markdown dirender markdown-it `html:false` + DOMPurify (satu-satunya HTML mentah). Service worker hanya cache aset statis `/_next/static`.
+- Mobile-first (lebar 360px, target sentuh ≥44px, input 16px di layar sentuh), Bahasa Indonesia, zona WIB.
+- Web statis lama tetap di `web-lama/` sampai web baru lulus paritas tes; lalu dihapus.
 
 ## 12. Tes
 - `uji/db/*.sql` (psql ke DB lokal `postgresql://postgres:postgres@127.0.0.1:54322/postgres`), runner `uji/db/jalankan.sh`. Simulasi user: `set local role authenticated; select set_config('request.jwt.claims', '{"sub":"<uuid>","role":"authenticated"}', true);`.
 - `uji/kontrak/*.mjs`: jalankan CLI mode tugas terhadap `supabase functions serve` lokal.
 - `uji/banding.mjs`: clickup.mjs (BASE diarahkan ke mock ClickUp) vs tugas.mjs (setelah impor fixture yang sama) → diff harus kosong kecuali normalisasi yang dicatat.
-- `uji/web/*.spec` Playwright (chromium `/opt/pw-browsers`), viewport 390×844.
+- `uji/web/*.spec` Playwright untuk `web-lama/` (chromium `/opt/pw-browsers`), viewport 390×844.
+- `web/`: `npm run cek` (typecheck + lint + Vitest) dan `npm run uji:e2e` (Playwright `web/tests/e2e`, HP 390×844 + desktop).
 
 ## 13. Lingkungan lokal
 - Supabase CLI: `/tmp/sbcli/node_modules/.bin/supabase` (atau `npx supabase`). Stack lokal: API `http://127.0.0.1:54321`, DB port 54322. Kunci lokal: `supabase status -o env`.

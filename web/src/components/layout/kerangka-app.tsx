@@ -75,15 +75,15 @@ function Sidebar({ path }: { path: string }) {
       </nav>
       <div className="space-y-3 border-t p-4">
         <KartuAkun />
-        <div className="flex gap-1">
-          <Link href="/ganti-password" className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md text-xs font-medium hover:bg-muted">
+        <div className="grid grid-cols-2 gap-1">
+          <Link href="/ganti-password" className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md text-xs font-medium whitespace-nowrap hover:bg-muted">
             <KeyRound className="size-3.5" aria-hidden />
-            Ganti password
+            Password
           </Link>
           <button
             type="button"
             onClick={() => keluar()}
-            className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md text-xs font-medium text-telat hover:bg-telat-lembut"
+            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md text-xs font-medium text-telat hover:bg-telat-lembut"
             data-uji="keluar"
           >
             <LogOut className="size-3.5" aria-hidden />

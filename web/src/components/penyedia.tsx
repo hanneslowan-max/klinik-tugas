@@ -3,6 +3,7 @@
 import { QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 
+import { DaftarSW } from "@/components/daftar-sw";
 import { KonfirmasiProvider } from "@/components/umum/konfirmasi";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -39,6 +40,7 @@ export function Penyedia({ children }: { children: ReactNode }) {
       <TooltipProvider delayDuration={400}>
         <KonfirmasiProvider>{children}</KonfirmasiProvider>
         <Toaster position="top-center" richColors closeButton />
+        <DaftarSW />
       </TooltipProvider>
     </QueryClientProvider>
   );

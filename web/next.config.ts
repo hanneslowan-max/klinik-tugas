@@ -17,7 +17,11 @@ const nextConfig: NextConfig = {
   // server dev diakses lewat 127.0.0.1 (tes Playwright)
   allowedDevOrigins: ["127.0.0.1"],
   async headers() {
-    return [{ source: "/:path*", headers: headerKeamanan }];
+    return [
+      { source: "/:path*", headers: headerKeamanan },
+      // service worker: jangan di-cache browser supaya versi baru langsung terpasang
+      { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }] },
+    ];
   },
 };
 
