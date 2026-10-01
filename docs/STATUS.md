@@ -41,6 +41,11 @@ Probe ClickUp asli (30 Sep):
 - Folder `RHJ Eksekusi` = `1100340000026652` (6 list) = default `tenggat_folder_ids` (Masalah #6 selesai).
 - Sensus ClickUp: 11 list, 239 tugas (152 open, 87 closed, 0 diarsip, 0 subtugas), 261 komentar + 11 balasan, 87 lampiran (14 di tugas, 73 di komentar), 248 tautan assignee.
 
+## Sesi 1 Okt 2026: real-time + deploy otomatis
+- **Real-time**: migrasi `20261001090000_realtime.sql` terpasang di project RHJ ClickUp (14 migrasi; publikasi `supabase_realtime` = 9 tabel). Web berlangganan perubahan (status, komentar, assignee, lampiran, struktur, notifikasi) dan menyegarkan layar terdampak; ditahan selama mengedit/menyeret. Tes `web/tests/e2e/realtime.spec.ts` (6/6 HP+desktop); suite e2e penuh 39 lolos, Vitest 51 lolos.
+- **Deploy otomatis**: `.github/workflows/web.yml` — PR/push: typecheck, lint, Vitest, build, e2e (Supabase lokal di runner); push ke `main` yang lolos → `web/` diterbitkan ke branch `hostinger` → Hostinger (Node.js Web Apps, branch `hostinger`) build & deploy otomatis. Langkah hPanel: `web/README.md` bagian Deploy.
+- Belum: pemasangan hPanel + domain oleh Hannes; secrets GitHub untuk sinkron/backup harian.
+
 ## Verdict
 - Kode Fase 1 (F1–F4 + kode F5: sinkron, backup, workflow) **jadi dan lulus semua suite lokal** dari `supabase db reset` (verifikasi akhir 29 Sep): DB 1016 cek (16 berkas), kontrak Edge+CLI 469 cek, importer 119 cek, web 69 tes Playwright, vendor cocok. Banding `clickup.mjs` ↔ `tugas.mjs`: kode keluar identik di 340/340 (awal) dan 344/344 (ubah) perintah, **sisa beda 0** (exit 0 tanpa `--izinkan-diketahui`; PR-1 selesai).
 - Putaran perbaikan poles DB (P1–P6) selesai: tags/checklists kartu impor (PR-1), anggota space privat dari impor, allowlist lampiran (CSV Windows dll.), normalisasi nama status Admin, wadah diarsip keluar dari Tugas Saya/TENGGAT/beban, URL tampilan ClickUp di resolve/cari. Rincian `docs/KONTRAK-DB.md` §10.

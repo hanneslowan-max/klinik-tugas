@@ -1,0 +1,143 @@
+# Web Next.js (web/): cek otomatis, lalu terbitkan ke branch `hostinger` yang dipantau Hostinger.
+#
+#   Pull request yang menyentuh web/ atau supabase/ → cek + tes end-to-end (gerbang sebelum merge).
+#   Push ke main yang menyentuh web/ atau supabase/ → cek + tes end-to-end; bila SEMUA lolos, isi web/ diterbitkan
+#     ke branch `hostinger` (akar branch = isi web/). Hostinger (Node.js Web Apps, terhubung ke branch `hostinger`)
+#     otomatis build & deploy setiap ada push ke branch itu. Kode yang gagal tes tidak pernah sampai ke Hostinger.
+#   Manual (Actions → Web → Run workflow di main): cek + terbitkan ulang tanpa perubahan kode.
+#
+# Tidak ada secret di workflow ini: tes memakai stack Supabase LOKAL di runner (seed sintetis), dan nilai
+# NEXT_PUBLIC_* produksi diisi di environment variables aplikasi Hostinger.
+name: Web
+
+on:
+  pull_request:
+    paths: ["web/**", "supabase/**", ".github/workflows/web.yml"]
+  push:
+    branches: [main]
+    paths: ["web/**", "supabase/**", ".github/workflows/web.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cek:
+    name: Typecheck, lint, tes unit, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: web
+    env:
+      # hanya supaya build lolos di CI (bukan nilai produksi)
+      NEXT_PUBLIC_SUPABASE_URL: https://contoh-ci.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-bukan-kunci-asli
+      NEXT_PUBLIC_APP_BASE_URL: https://tugas.palletmeshindonesia.com
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Tes unit (Vitest)
+        run: npm run uji
+      - name: Build produksi
+        run: npm run build
+
+  e2e:
+    name: Tes end-to-end (Supabase lokal + Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Stack Supabase lokal (migrasi + seed sintetis, termasuk Realtime)
+        run: supabase start -x studio,imgproxy,vector,logflare,supavisor,mailpit
+
+      - name: Konfigurasi web ke stack lokal
+        run: |
+          set -euo pipefail
+          eval "$(supabase status -o env | grep -E '^(API_URL|PUBLISHABLE_KEY)=')"
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY"
+            echo "NEXT_PUBLIC_APP_BASE_URL=http://127.0.0.1:3000"
+          } > web/.env.production.local
+
+      - name: Pasang & build
+        working-directory: web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npm run build
+
+      - name: Jalankan build produksi
+        working-directory: web
+        run: |
+          nohup npx next start -H 127.0.0.1 -p 3000 > next.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf -o /dev/null http://127.0.0.1:3000/masuk && exit 0; sleep 1; done
+          cat next.log; exit 1
+
+      - name: Playwright (HP + desktop)
+        working-directory: web
+        env:
+          E2E_BASE_URL: http://127.0.0.1:3000
+        run: npx playwright test -c tests/e2e/playwright.config.ts
+
+      - name: Simpan laporan bila gagal
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: laporan-e2e
+          path: |
+            web/tests/e2e/hasil/
+            web/next.log
+          retention-days: 7
+
+  terbitkan:
+    name: Terbitkan web/ ke branch hostinger
+    needs: [cek, e2e]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    concurrency:
+      group: terbitkan-hostinger
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Split web/ → hostinger
+        run: |
+          set -euo pipefail
+          git subtree split --prefix=web -b hostinger-baru
+          git push origin hostinger-baru:refs/heads/hostinger --force
+          {
+            echo "### Diterbitkan ke branch \`hostinger\`"
+            echo "- commit: \`$(git rev-parse --short hostinger-baru)\` (dari main \`$(git rev-parse --short HEAD)\`)"
+            echo "- Hostinger akan build & deploy otomatis dari branch ini."
+          } >> "$GITHUB_STEP_SUMMARY"

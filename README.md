@@ -17,7 +17,7 @@ Repo ini berisi seluruh sistem, bukan hanya website. **Yang di-deploy ke Hosting
 | `uji/` | Tes database, kontrak API, banding CLI, tes web lama | Lokal / sesi pengembangan |
 | `docs/` | Arsitektur, kontrak database, status & langkah berikutnya (`docs/STATUS.md`) | — |
 | `web-lama/` | Website statis versi lama; dihapus setelah web baru lulus semua tes | — (tidak dipakai) |
-| `.github/workflows/` | Jadwal sinkron ClickUp & backup | GitHub Actions |
+| `.github/workflows/` | `web.yml`: cek + tes web lalu terbitkan ke branch `hostinger` (auto-deploy); `sinkron.yml` & `backup.yml`: jadwal sinkron ClickUp & backup | GitHub Actions |
 
 ## Menjalankan website di komputer (Windows / macOS)
 
@@ -47,6 +47,11 @@ Buka http://127.0.0.1:3000 dan masuk dengan akun Anda. Perhatian: ini memakai **
 (kartu dari ClickUp hanya-baca selama mode cermin).
 
 Mode produksi di komputer sendiri: `npm run build` lalu `npm run start`.
+
+## Deploy
+
+Merge ke `main` → GitHub Actions menjalankan cek & tes → bila lolos, isi `web/` diterbitkan ke branch `hostinger` →
+Hostinger build & deploy otomatis. Pemasangan pertama di hPanel: `web/README.md` bagian "Deploy".
 
 ## Dokumen penting
 

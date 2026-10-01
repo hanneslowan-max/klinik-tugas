@@ -63,16 +63,47 @@ npm run uji:e2e                 # Playwright (butuh stack lokal + seed)
 
 Setelah skema berubah: `supabase gen types typescript --local --schema public > src/types/database.ts`.
 
+## Real-time
+
+Perubahan dari anggota lain langsung tampil tanpa muat ulang (status pindah kolom di Papan, komentar baru, assignee,
+lampiran, judul, lonceng notifikasi). Mekanisme: Supabase Realtime `postgres_changes` (migrasi
+`supabase/migrations/20261001090000_realtime.sql`) + satu kanal per tab di `src/features/realtime/penyimak-realtime.tsx`
+yang menandai data TanStack Query basi (dikumpulkan 400 ms). RLS diperiksa per pelanggan, jadi space privat tetap
+aman. Selama pengguna sedang mengedit kartu atau menyeret kartu di Papan, perubahan orang lain ditahan lalu dimuat
+begitu selesai (`src/features/realtime/tahanan.ts`), supaya cek versi (409 "sudah diubah orang lain") tetap bekerja.
+Tes: `tests/e2e/realtime.spec.ts`.
+
 ## Deploy (Hostinger Business, Node.js Web Apps)
 
-1. hPanel → Websites → Add website → Node.js app → sambungkan repo GitHub `rhj-tugas`.
-   - Bila hPanel bisa memilih *root directory*: isi `web`.
-   - Bila tidak: pakai branch khusus berisi isi `web/` saja:
-     `git subtree split --prefix=web -b web-app && git push origin web-app`, lalu pilih branch `web-app`.
-2. Build command `npm run build`, start `npm run start` (Node 22). Output `standalone` sudah diatur di
-   `next.config.ts`.
-3. Environment variables (dipakai saat build): `NEXT_PUBLIC_SUPABASE_URL`,
-   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_APP_BASE_URL=https://tugas.palletmeshindonesia.com`.
-4. Domain/subdomain `tugas.palletmeshindonesia.com` + SSL di hPanel.
-5. Uji: `/masuk` tampil tanpa galat CSP di konsol, header `X-Robots-Tag: noindex`, login → wajib ganti
-   password, `/t/<id ClickUp>` membuka kartu.
+Alur otomatis (`.github/workflows/web.yml`):
+
+```
+PR ke main ──► GitHub Actions: typecheck · lint · tes unit · build · tes end-to-end (Supabase lokal di runner)
+merge/push ke main ──► cek yang sama ──► lolos? ──► isi web/ diterbitkan ke branch `hostinger`
+branch `hostinger` berubah ──► Hostinger otomatis build (npm run build) & menjalankan versi baru
+```
+
+Tidak perlu build harian: halaman dirender di server dan data selalu dibaca langsung dari Supabase. Pekerjaan harian
+yang ada adalah sinkron ClickUp & backup (`.github/workflows/sinkron.yml`, `backup.yml`), bukan build web.
+
+### Pemasangan pertama di hPanel (sekali saja)
+1. Pastikan branch `hostinger` sudah ada (dibuat otomatis oleh workflow Web setelah perubahan web masuk `main`; atau
+   jalankan manual: GitHub → Actions → Web → Run workflow di `main`).
+2. hPanel → **Websites → Add Website → Deploy Web App → Import Git Repository** → izinkan akses GitHub →
+   pilih repo `rhj-tugas`, **branch `hostinger`**.
+3. **Configure build settings**: framework **Next.js** (application type `next`), Node **22.x**, build script
+   `build`, output directory `.next`. Hostinger menerapkan `output: "standalone"` sendiri.
+4. **Environment Variables** (isi SEBELUM deploy pertama; nilainya dipakai saat build):
+   - `NEXT_PUBLIC_SUPABASE_URL` = `https://admhlyurfvodfyedgaio.supabase.co`
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` = kunci *publishable* (Supabase → Project Settings → API Keys)
+   - `NEXT_PUBLIC_APP_BASE_URL` = `https://tugas.palletmeshindonesia.com`
+5. Deploy, lalu sambungkan domain **`tugas.palletmeshindonesia.com`** + SSL. Domain harus sama dengan
+   `app_settings.app_base_url`: Edge hanya menerima tombol admin (aktifkan login, setel ulang password, hapus permanen)
+   dari domain itu (dan localhost).
+6. Uji: `/masuk` tampil (bukan "Konfigurasi aplikasi belum diisi" — kalau muncul, environment belum terbaca saat build:
+   isi lalu **Settings & Redeploy**), login owner, buka `/t/<id ClickUp>`, header `X-Robots-Tag: noindex`, buka dua
+   browser dan ubah status satu kartu → browser lain ikut berubah.
+
+### Sesudahnya
+Cukup merge PR ke `main`. Kalau tes gagal, branch `hostinger` tidak berubah dan situs tetap versi terakhir yang lolos.
+Riwayat deploy & log build ada di hPanel (**Last deployment details**); riwayat cek ada di GitHub Actions.
