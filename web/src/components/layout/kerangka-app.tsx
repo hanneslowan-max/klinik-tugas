@@ -14,6 +14,7 @@ import { Chip } from "@/components/umum/chip";
 import { Lembar } from "@/components/umum/lembar";
 import { useKeluar } from "@/features/auth/keluar";
 import { useProfil } from "@/features/profil/penyedia-profil";
+import { PenyimakRealtime } from "@/features/realtime/penyimak-realtime";
 import { LABEL_PERAN } from "@/lib/konstanta";
 import { cn } from "@/lib/utils";
 
@@ -183,6 +184,7 @@ export function KerangkaApp({ children }: { children: ReactNode }) {
         </main>
       </div>
       <NavBawah path={path} />
+      <PenyimakRealtime />
     </div>
   );
 }

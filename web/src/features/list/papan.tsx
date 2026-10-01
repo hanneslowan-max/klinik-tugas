@@ -29,13 +29,14 @@ import {
   type UniqueIdentifier,
 } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
-import { useCallback, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { toast } from "sonner";
 
 import { KartuMelayang, KolomPapan, statusDariIdKolom } from "@/features/list/kolom-papan";
 import { usePindahKartu } from "@/features/list/queries";
 import { kolomKartu, rencanaUrut, statusSelesai, susunanDari, urutStatus, type Susunan } from "@/features/list/urutan";
 import { useTerkunci } from "@/features/profil/penyedia-profil";
+import { aturTahanan } from "@/features/realtime/tahanan";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { GalatApi, pesanGalat } from "@/lib/api/galat";
 import { cn } from "@/lib/utils";
@@ -243,6 +244,11 @@ export function Papan({ data, tampak, tampilSelesai, adaFab }: Props) {
   }
 
   const menyeret = aktifId !== null;
+  // perubahan real-time dari orang lain ditunda selama kartu diseret, lalu dimuat begitu kartu dilepas
+  useEffect(() => {
+    aturTahanan("daftar", menyeret);
+    return () => aturTahanan("daftar", false);
+  }, [menyeret]);
   const kartuAktif = aktifId ? peta.get(aktifId) : undefined;
   const kolomAktif = aktifId ? kolomKartu(susunan, aktifId) : undefined;
 

@@ -2,12 +2,14 @@
 
 // Data & aksi bersama layar detail tugas (web_detail). Semua simpan field lewat web_ubah_tugas dengan cek versi:
 // 409 KONFLIK_001 → pesan + muat ulang. Sesudah ubah assignee/due → peringatan B5 bila ada assignee kelebihan beban.
-// Penyegaran saat tab browser terlihat lagi ditunda selama pengguna sedang mengedit (deskripsi, balas/ubah komentar).
+// Penyegaran saat tab browser terlihat lagi DAN perubahan real-time dari orang lain ditunda selama pengguna sedang
+// mengedit (deskripsi, balas/ubah komentar).
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useEffectEvent, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { useProfil } from "@/features/profil/penyedia-profil";
+import { aturTahanan } from "@/features/realtime/tahanan";
 import { segarkanTugas, useUbahTugas, type BodyUbahTugas } from "@/features/tugas/mutasi";
 import { GalatApi, pesanGalat } from "@/lib/api/galat";
 import { rpc } from "@/lib/api/rpc";
@@ -63,10 +65,15 @@ export function PenyediaDetail({ id, d, refetch, children }: Props) {
     return muat();
   }, [qc, id, muat]);
 
-  const tandaiEdit = useCallback((k: string, aktif: boolean) => {
-    if (aktif) pengedit.current.add(k);
-    else pengedit.current.delete(k);
-  }, []);
+  const tandaiEdit = useCallback(
+    (k: string, aktif: boolean) => {
+      if (aktif) pengedit.current.add(k);
+      else pengedit.current.delete(k);
+      // perubahan real-time dari orang lain ditahan selama ada bagian yang diedit (cek versi tetap bekerja)
+      aturTahanan(`detail:${id}`, pengedit.current.size > 0);
+    },
+    [id],
+  );
 
   const saatTerlihat = useEffectEvent(() => {
     if (document.visibilityState === "visible" && pengedit.current.size === 0) void muat();
