@@ -106,6 +106,8 @@ SWC native Next.js 16 butuh glibc 2.29, jadi di Hostinger Next.js memakai SWC WA
 - `npm run build` = `next build --webpack` (Turbopack butuh SWC native). `npm run dev` tetap Turbopack.
 - Konfigurasi `next.config.mjs` (JavaScript), bukan `next.config.ts` (transpilasinya gagal di WASM).
 - `outputFileTracingRoot` = folder `web/`, supaya `server.js` standalone tetap di `.next/standalone/`.
+- `postbuild` (`scripts/lengkapi-standalone.mjs`) menyalin `public/` dan `.next/static` ke `.next/standalone/` (Next.js
+  tidak menyalinnya sendiri), jadi `node .next/standalone/server.js` langsung lengkap.
 - Dependensi native baru harus lolos job **build-hostinger** di CI (AlmaLinux 8, sama dengan server).
 
 ### Uji sesudah deploy

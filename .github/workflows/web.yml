@@ -78,18 +78,27 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Konfigurasi aman untuk SWC WASM
+        run: |
+          # Hostinger membungkus next.config.ts dengan config TypeScript buatannya; di SWC WASM bungkus itu gagal dimuat
+          # (ERR_MODULE_NOT_FOUND). next.config.mjs dimuat Node langsung. Turbopack butuh SWC native → build --webpack.
+          if [ -e next.config.ts ]; then echo "::error::pakai next.config.mjs, bukan next.config.ts (lihat web/README.md)"; exit 1; fi
+          grep -q '"build": "next build --webpack"' package.json || { echo "::error::script build harus next build --webpack"; exit 1; }
       - name: Pasang dependensi seperti Hostinger (npm install)
         run: npm install --no-audit --no-fund
-      - name: Build (npm run build)
+      - name: Build (npm run build, termasuk postbuild)
         run: npm run build 2>&1 | tee build.log
-      - name: Server standalone jalan
+      - name: Server standalone melayani halaman, CSS/JS, dan berkas public
         run: |
           grep -q "GLIBC_2.29" build.log || echo "::warning::SWC native termuat: job ini tidak lagi meniru server Hostinger"
           test -f .next/standalone/server.js
-          cp -r public .next/standalone/ && cp -r .next/static .next/standalone/.next/
           (cd .next/standalone && PORT=3000 HOSTNAME=127.0.0.1 nohup node server.js > ../../server.log 2>&1 &)
-          for _ in $(seq 1 60); do curl -sf -o /dev/null http://127.0.0.1:3000/masuk && exit 0; sleep 1; done
-          cat server.log; exit 1
+          for _ in $(seq 1 60); do curl -sf -o /dev/null http://127.0.0.1:3000/masuk && break; sleep 1; done
+          html=$(curl -sf http://127.0.0.1:3000/masuk) || { cat server.log; exit 1; }
+          for berkas in $(echo "$html" | grep -o '/_next/static/[^"]*\.\(css\|js\)' | head -3) /icon.svg /sw.js /manifest.webmanifest; do
+            kode=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:3000$berkas")
+            echo "$berkas → $kode"; [ "$kode" = 200 ] || { cat server.log; exit 1; }
+          done
 
   e2e:
     name: Tes end-to-end (Supabase lokal + Playwright)
