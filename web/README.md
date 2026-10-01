@@ -73,43 +73,42 @@ aman. Selama pengguna sedang mengedit kartu atau menyeret kartu di Papan, peruba
 begitu selesai (`src/features/realtime/tahanan.ts`), supaya cek versi (409 "sudah diubah orang lain") tetap bekerja.
 Tes: `tests/e2e/realtime.spec.ts`.
 
-## Deploy (Hostinger Business, Node.js Web Apps, lewat API)
+## Deploy (Hostinger Business, Node.js Web App, Git)
 
-Integrasi Git di hPanel terkunci untuk akun hosting yang dikelola sebagai klien, jadi deploy memakai **API resmi
-Hostinger** dari GitHub Actions (`../alat/hostinger.mjs`, workflow `../.github/workflows/web.yml`):
+Node.js Web App di hPanel terhubung ke repo ini lewat Git dan memantau branch `main`:
 
 ```
-PR ke main ──► GitHub Actions: typecheck · lint · tes unit · build · tes end-to-end (Supabase lokal di runner)
-merge/push ke main ──► cek yang sama ──► lolos? ──► sumber web/ (commit itu) diunggah ke Hostinger
-                   ──► Hostinger build (npm run build, Node 22) ──► workflow menunggu situs menyajikan commit itu
+PR ke main ──► GitHub Actions (../.github/workflows/web.yml): typecheck · lint · tes unit · build ·
+               build seperti server Hostinger (glibc 2.28) · tes end-to-end (Supabase lokal di runner)
+merge ke main ──► Hostinger clone repo ──► npm install + npm run build di folder web/ ──► versi baru berjalan
 ```
 
-- Kode yang gagal tes tidak pernah dikirim. Build Hostinger yang gagal tidak mengganti situs (tetap versi terakhir
-  yang sukses); workflow merah + analisis Hostinger di log.
-- Nilai `NEXT_PUBLIC_*` disisipkan sebagai `.env.production` ke arsip (URL Supabase & URL aplikasi dikunci ke
-  produksi; kunci harus *publishable*, secret key ditolak). `NEXT_PUBLIC_VERSI` = commit → `<meta name="rhj-versi">`.
-- Pengaman: domain dikunci ke `tugas.palletmeshindonesia.com` (situs lain di akun, termasuk ERP, tidak tersentuh);
-  situs yang belum app Node.js tidak pernah ditimpa tanpa centang manual `timpa_situs_lama`; arsip sumber di server
-  dikosongkan setelah build dan workflow gagal bila berkas sumber bisa diunduh dari situs.
-- Tidak perlu build harian: halaman dirender di server dan data selalu dibaca langsung dari Supabase (real-time).
-  Pekerjaan harian yang ada adalah sinkron ClickUp & backup (`sinkron.yml`, `backup.yml`), bukan build web.
-- Tes alat deploy (server tiruan, tanpa jaringan): `node --test ../alat/hostinger.test.mjs` (juga jalan di CI).
+Merge PR hanya bila semua cek hijau: Hostinger tidak menunggu GitHub Actions. Tidak perlu build harian: halaman
+dirender di server dan data selalu dibaca langsung dari Supabase (real-time). Pekerjaan harian yang ada adalah
+sinkron ClickUp & backup (`sinkron.yml`, `backup.yml`), bukan build web.
 
-### Pemasangan pertama (sekali saja)
-1. **Token API**: hPanel (akun Anda sendiri) → ikon profil → **API** → buat token (beri masa berlaku, mis. 1 tahun).
-   Token mewarisi akses Anda ke akun hosting klien. Simpan langsung ke GitHub → repo → Settings → Secrets and
-   variables → Actions → **Secrets**: `HOSTINGER_API_TOKEN`. Jangan ditempel di chat/berkas.
-2. Di halaman yang sama, tab **Variables**: `SUPABASE_PUBLISHABLE_KEY` = publishable key (Supabase → Project Settings
-   → API Keys, diawali `sb_publishable_`).
-3. **Cek baca-saja**: Actions → **Hostinger (cek)** → Run workflow. Ringkasan run menampilkan situs yang terlihat
-   token, jenis situs `tugas.`, isi document root, SSL, riwayat build. Tidak mengubah apa pun.
-4. **Deploy pertama** (menimpa situs `tugas.` lama — saat ini halaman default Hostinger — secara permanen): variabel
-   `HOSTINGER_AKTIF` = `1`, lalu Actions → **Web** → Run workflow (branch `main`) dengan centang **timpa_situs_lama**.
-5. Uji: `/masuk` tampil, login owner, buka `/t/<id ClickUp>`, header `X-Robots-Tag: noindex`, buka dua browser dan
-   ubah status satu kartu → browser lain ikut berubah. Domain harus sama dengan `app_settings.app_base_url` (Edge
-   hanya menerima tombol admin dari domain itu dan localhost).
+### Pengaturan di hPanel (Add Website → Node.js Web App → Import Git Repository)
+| Kolom | Nilai |
+|---|---|
+| Repository / Branch | `rhj-tugas` / `main` |
+| Preset framework | **Next.js** |
+| Versi Node | **22.x** |
+| Root directory | **`web`** (bukan `./`: akar repo bukan aplikasi web) |
+| Build & output | default Next.js (`npm run build`, output `.next`). Daftar pilihan build command di hPanel dibaca dari `package.json` akar; abaikan, cukup default |
+| Variabel environment (isi SEBELUM deploy; nilainya dikunci saat build) | `NEXT_PUBLIC_SUPABASE_URL` = `https://admhlyurfvodfyedgaio.supabase.co`<br>`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` = publishable key (Supabase → Project Settings → API Keys, `sb_publishable_…`; JANGAN secret key)<br>`NEXT_PUBLIC_APP_BASE_URL` = `https://tugas.palletmeshindonesia.com` |
 
-### Sesudahnya
-Cukup merge PR ke `main`. Riwayat & log deploy ada di GitHub Actions (ringkasan run: commit, build, durasi, SSL);
-log build/runtime juga di hPanel. Deploy ulang tanpa perubahan kode: Actions → Web → Run workflow (tanpa centang).
-Mematikan deploy otomatis: hapus/kosongkan variabel `HOSTINGER_AKTIF`.
+Domain: `tugas.palletmeshindonesia.com` + SSL; harus sama dengan `app_settings.app_base_url` (Edge hanya menerima
+tombol admin dari domain itu dan localhost). Mengubah variabel environment → deploy ulang (nilai `NEXT_PUBLIC_*`
+masuk saat build).
+
+### Batasan server build Hostinger (glibc 2.28)
+SWC native Next.js 16 butuh glibc 2.29, jadi di Hostinger Next.js memakai SWC WASM. Akibatnya:
+- `npm run build` = `next build --webpack` (Turbopack butuh SWC native). `npm run dev` tetap Turbopack.
+- Konfigurasi `next.config.mjs` (JavaScript), bukan `next.config.ts` (transpilasinya gagal di WASM).
+- `outputFileTracingRoot` = folder `web/`, supaya `server.js` standalone tetap di `.next/standalone/`.
+- Dependensi native baru harus lolos job **build-hostinger** di CI (AlmaLinux 8, sama dengan server).
+
+### Uji sesudah deploy
+`/masuk` tampil (bukan "Konfigurasi aplikasi belum diisi" — kalau muncul, variabel environment belum terbaca saat
+build: isi lalu deploy ulang), login owner, buka `/t/<id ClickUp>`, header `X-Robots-Tag: noindex`, buka dua browser
+dan ubah status satu kartu → browser lain ikut berubah.

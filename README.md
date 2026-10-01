@@ -13,11 +13,11 @@ Repo ini berisi seluruh sistem, bukan hanya website. **Yang di-deploy ke Hosting
 | `supabase/` | Database: migrasi SQL (tabel, RLS, fungsi), Edge Function `api`, konfigurasi | Supabase (project "RHJ ClickUp") |
 | `impor/` | Sinkron data ClickUp → aplikasi (hanya membaca ClickUp) + backup | GitHub Actions (terjadwal) |
 | `cli/` | `tugas.mjs`: alat baris perintah untuk agent/routine (pengganti `clickup.mjs`) | rhj-brain / routine |
-| `alat/` | Skrip deploy: database lewat Management API (`sql-proyek.sh`), web ke Hostinger lewat API (`hostinger.mjs`) | Sesi deploy / GitHub Actions |
+| `alat/` | Skrip deploy database lewat Management API (`sql-proyek.sh`) | Sesi deploy |
 | `uji/` | Tes database, kontrak API, banding CLI, tes web lama | Lokal / sesi pengembangan |
 | `docs/` | Arsitektur, kontrak database, status & langkah berikutnya (`docs/STATUS.md`) | — |
 | `web-lama/` | Website statis versi lama; dihapus setelah web baru lulus semua tes | — (tidak dipakai) |
-| `.github/workflows/` | `web.yml`: cek + tes web lalu deploy ke Hostinger lewat API; `hostinger-cek.yml`: cek baca-saja Hostinger; `sinkron.yml` & `backup.yml`: jadwal sinkron ClickUp & backup | GitHub Actions |
+| `.github/workflows/` | `web.yml`: cek + tes web (gerbang sebelum merge; Hostinger deploy sendiri dari `main`); `sinkron.yml` & `backup.yml`: jadwal sinkron ClickUp & backup | GitHub Actions |
 
 ## Menjalankan website di komputer (Windows / macOS)
 
@@ -50,9 +50,9 @@ Mode produksi di komputer sendiri: `npm run build` lalu `npm run start`.
 
 ## Deploy
 
-Merge ke `main` → GitHub Actions menjalankan cek & tes → bila lolos, sumber `web/` diunggah ke Hostinger lewat API →
-Hostinger build → workflow menunggu situs menyajikan commit itu. Pemasangan pertama (token API, cek baca-saja, deploy
-pertama): `web/README.md` bagian "Deploy".
+Hostinger (Node.js Web App, Git) memantau branch `main` dengan root directory `web`: setiap merge ke `main` langsung
+di-build dan dijalankan. GitHub Actions (`web.yml`) menjalankan cek & tes di setiap PR; merge hanya bila hijau.
+Pengaturan hPanel dan batasan server build: `web/README.md` bagian "Deploy".
 
 ## Dokumen penting
 

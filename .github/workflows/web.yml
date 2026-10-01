@@ -1,40 +1,31 @@
-# Web Next.js (web/): cek otomatis, lalu deploy ke Hostinger lewat API (alat/hostinger.mjs).
+# Web Next.js (web/): cek otomatis untuk setiap pull request dan push ke main.
 #
-#   Pull request yang menyentuh web/, supabase/ atau alat deploy → cek + tes end-to-end (gerbang sebelum merge).
-#   Push ke main → cek + tes end-to-end; bila SEMUA lolos dan variabel HOSTINGER_AKTIF=1, web/ di-deploy ke
-#     tugas.palletmeshindonesia.com: sumber diunggah, Hostinger build (npm run build), lalu workflow menunggu sampai
-#     situs menyajikan commit ini. Kode yang gagal tes tidak pernah sampai ke Hostinger; build Hostinger yang gagal
-#     tidak mengganti situs (tetap versi terakhir yang sukses).
-#   Manual (Actions → Web → Run workflow di main): cek + deploy ulang tanpa perubahan kode. Centang
-#     `timpa_situs_lama` HANYA untuk deploy pertama (situs belum app Node.js → isi lamanya ditimpa permanen).
+# Deploy dilakukan Hostinger sendiri: Node.js Web App di hPanel terhubung ke repo ini lewat Git (branch `main`, root
+# directory `web`), jadi setiap push ke main langsung di-build & dijalankan Hostinger. Workflow ini adalah GERBANG
+# SEBELUM MERGE: merge PR hanya bila semua job hijau.
 #
-# Settings → Secrets and variables → Actions:
-#   secret   HOSTINGER_API_TOKEN       token API hPanel (Profil → API)
-#   variabel SUPABASE_PUBLISHABLE_KEY  publishable key project produksi (publik: memang ikut terkirim ke browser)
-#   variabel HOSTINGER_AKTIF=1         saklar deploy; kosong = hanya cek & tes
-# Tes tidak memakai secret: stack Supabase LOKAL di runner (seed sintetis).
+#   cek              typecheck, lint, tes unit, build (Ubuntu)
+#   build-hostinger  npm install + npm run build + jalankan server standalone di AlmaLinux 8 (glibc 2.28), sama dengan
+#                    server build Hostinger: SWC native Next.js butuh glibc 2.29 sehingga di sana Next memakai SWC WASM
+#                    + webpack. Menangkap perubahan yang hanya gagal di Hostinger (mis. dependensi native baru).
+#   e2e              Supabase lokal di runner (seed sintetis) + Playwright HP & desktop terhadap build produksi
+# Tidak ada secret di workflow ini.
 name: Web
 
 on:
   pull_request:
-    paths: ["web/**", "supabase/**", "alat/hostinger*.mjs", ".github/workflows/web.yml"]
+    paths: ["web/**", "supabase/**", ".github/workflows/web.yml"]
   push:
     branches: [main]
-    paths: ["web/**", "supabase/**", "alat/hostinger*.mjs", ".github/workflows/web.yml"]
+    paths: ["web/**", "supabase/**", ".github/workflows/web.yml"]
   workflow_dispatch:
-    inputs:
-      timpa_situs_lama:
-        description: "Deploy PERTAMA saja: izinkan menimpa situs tugas.palletmeshindonesia.com yang belum app Node.js (isi lama hilang permanen)"
-        type: boolean
-        default: false
 
 permissions:
   contents: read
 
 concurrency:
   group: web-${{ github.ref }}
-  # run main tidak dibatalkan di tengah deploy; run baru menunggu
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 jobs:
   cek:
@@ -66,9 +57,39 @@ jobs:
         run: npm run uji
       - name: Build produksi
         run: npm run build
-      - name: Tes alat deploy Hostinger (server tiruan)
-        working-directory: .
-        run: node --test alat/hostinger.test.mjs
+
+  build-hostinger:
+    name: Build seperti server Hostinger (AlmaLinux 8, glibc 2.28)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: public.ecr.aws/docker/library/almalinux:8
+    defaults:
+      run:
+        shell: bash
+        working-directory: web
+    env:
+      # hanya supaya build lolos di CI (bukan nilai produksi)
+      NEXT_PUBLIC_SUPABASE_URL: https://contoh-ci.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-bukan-kunci-asli
+      NEXT_PUBLIC_APP_BASE_URL: https://tugas.palletmeshindonesia.com
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Pasang dependensi seperti Hostinger (npm install)
+        run: npm install --no-audit --no-fund
+      - name: Build (npm run build)
+        run: npm run build 2>&1 | tee build.log
+      - name: Server standalone jalan
+        run: |
+          grep -q "GLIBC_2.29" build.log || echo "::warning::SWC native termuat: job ini tidak lagi meniru server Hostinger"
+          test -f .next/standalone/server.js
+          cp -r public .next/standalone/ && cp -r .next/static .next/standalone/.next/
+          (cd .next/standalone && PORT=3000 HOSTNAME=127.0.0.1 nohup node server.js > ../../server.log 2>&1 &)
+          for _ in $(seq 1 60); do curl -sf -o /dev/null http://127.0.0.1:3000/masuk && exit 0; sleep 1; done
+          cat server.log; exit 1
 
   e2e:
     name: Tes end-to-end (Supabase lokal + Playwright)
@@ -129,24 +150,3 @@ jobs:
             web/tests/e2e/hasil/
             web/next.log
           retention-days: 7
-
-  deploy:
-    name: Deploy ke Hostinger (API)
-    needs: [cek, e2e]
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.HOSTINGER_AKTIF == '1'
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    concurrency:
-      group: deploy-hostinger
-      cancel-in-progress: false
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - name: Unggah sumber, build di Hostinger, tunggu situs menyajikan commit ini
-        env:
-          HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY || secrets.SUPABASE_PUBLISHABLE_KEY }}
-          IZINKAN_TIMPA_SITUS_LAMA: ${{ github.event_name == 'workflow_dispatch' && inputs.timpa_situs_lama && 'ya' || '' }}
-        run: node alat/hostinger.mjs deploy

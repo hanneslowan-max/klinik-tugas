@@ -135,12 +135,12 @@ Admin (owner): `web_admin_anggota_simpan(p jsonb)`, `web_admin_status_simpan(p_l
 
 ## 11. Web `web/` (Next.js; keputusan Hannes 30 Sep)
 - Next.js 16 App Router + React 19 + TypeScript + Tailwind 4 + shadcn/ui, di-hosting Hostinger Business (Node.js Web Apps, output `standalone`). Rincian stack, struktur folder, dan cara deploy: `web/README.md`.
-- Sesi Supabase di cookie (`@supabase/ssr`); `src/proxy.ts` menyegarkan sesi, mengalihkan tamu ke `/masuk?lanjut=<path>`, dan memasang CSP ber-nonce per permintaan (`script-src 'self' 'nonce-…' 'strict-dynamic'`). Header statis (noindex, no-referrer, nosniff, DENY frame) di `next.config.ts`; `robots.txt` Disallow: /.
+- Sesi Supabase di cookie (`@supabase/ssr`); `src/proxy.ts` menyegarkan sesi, mengalihkan tamu ke `/masuk?lanjut=<path>`, dan memasang CSP ber-nonce per permintaan (`script-src 'self' 'nonce-…' 'strict-dynamic'`). Header statis (noindex, no-referrer, nosniff, DENY frame) di `next.config.mjs`; `robots.txt` Disallow: /.
 - Routing path sama dengan web lama: `/`, `/saya`, `/jelajah`, `/l/<list>` (+`?v=board`), `/t/<id>`, `/cari`, `/notif`, `/admin/<tab>` (`/admin?tab=` lama dialihkan), `/sampah`, `/masuk`, `/ganti-password`.
 - Semua data lewat `rpc(klien, "web_…")` bertipe (`src/types/database.ts` hasil `supabase gen types` + `src/types/domain.ts`) dengan sesi pengguna; tidak ada secret key di web. Admin akun/reset/purge lewat Edge `/x/admin/*` dengan JWT sesi.
 - Markdown dirender markdown-it `html:false` + DOMPurify (satu-satunya HTML mentah). Service worker hanya cache aset statis `/_next/static`.
 - Real-time: Supabase Realtime `postgres_changes` (publikasi `supabase_realtime`: tasks, task_assignees, comments, attachments, notifications, spaces, folders, lists, list_statuses; migrasi `20261001090000_realtime.sql`). Web berlangganan INSERT/UPDATE saja (RLS diperiksa per pelanggan; DELETE tidak). Perubahan orang lain ditahan selama pengguna mengedit/menyeret supaya cek versi tetap bekerja.
-- Deploy: `.github/workflows/web.yml` (cek + e2e → `alat/hostinger.mjs deploy`: unggah sumber `web/` + `.env.production` publik lewat API Hostinger → build Node.js di Hostinger → tunggu `<meta name="rhj-versi">` = commit). Git hPanel tidak dipakai (terkunci untuk akun klien). Domain dikunci ke `tugas.palletmeshindonesia.com`; situs non-Node.js hanya ditimpa dengan centang manual.
+- Deploy: Hostinger Node.js Web App terhubung lewat Git ke branch `main`, root `web`, preset Next.js, Node 22; env `NEXT_PUBLIC_*` diisi di hPanel. `.github/workflows/web.yml` = gerbang PR (cek, build glibc 2.28, e2e). Server build Hostinger glibc 2.28 → SWC WASM: build `next build --webpack`, `next.config.mjs`, `outputFileTracingRoot` = `web/`.
 - Mobile-first (lebar 360px, target sentuh ≥44px, input 16px di layar sentuh), Bahasa Indonesia, zona WIB.
 - Web statis lama tetap di `web-lama/` sampai web baru lulus paritas tes; lalu dihapus.
 
