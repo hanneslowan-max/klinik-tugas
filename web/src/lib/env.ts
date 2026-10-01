@@ -12,6 +12,8 @@ export const env = {
   apiUrl: (process.env.NEXT_PUBLIC_API_URL ?? `${supabaseUrl}/functions/v1/api`).replace(/\/$/, ""),
   /** Dasar tautan kartu yang disalin (sama dengan app_settings.app_base_url). */
   appBaseUrl: (process.env.NEXT_PUBLIC_APP_BASE_URL ?? "").replace(/\/$/, ""),
+  /** Commit yang sedang berjalan (diisi alat/hostinger.mjs saat deploy; kosong di lokal). */
+  versi: process.env.NEXT_PUBLIC_VERSI ?? "",
 };
 
 /** false bila konfigurasi belum diisi → layar menampilkan pesan, bukan halaman kosong. */

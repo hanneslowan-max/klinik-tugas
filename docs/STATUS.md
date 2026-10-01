@@ -1,6 +1,6 @@
 # STATUS rhj-tugas (Fase 1)
 
-Diperbarui 30 Sep 2026 (deploy ke project Supabase baru + impor ClickUp asli selesai, sensus selisih 0; web Next.js dibangun). Sebelumnya: 29 Sep (poles DB P1–P6 + web W1–W8). Kontrak: `docs/ARSITEKTUR.md` + rincian DB `docs/KONTRAK-DB.md`.
+Diperbarui 1 Okt 2026 (real-time + deploy ke Hostinger lewat API; lihat "Sesi 1 Okt"). Sebelumnya 30 Sep (deploy ke project Supabase baru + impor ClickUp asli selesai, sensus selisih 0; web Next.js dibangun). Sebelumnya: 29 Sep (poles DB P1–P6 + web W1–W8). Kontrak: `docs/ARSITEKTUR.md` + rincian DB `docs/KONTRAK-DB.md`.
 
 ## Sesi deploy 30 Sep 2026 (branch `claude/rhj-task-management-deploy-gwc6t5`)
 Keputusan Hannes (30/9): region project = **Sydney** (bukan Singapore seperti prasyarat lama); web diganti **Next.js + Tailwind** (App Router, TypeScript) di **Hostinger Business, Node.js Web Apps** sebagai tahap tersendiri SESUDAH langkah 0–6. Langkah 7 lama (web statis + `.htaccess`) tidak dipakai lagi. Backend (DB, Edge, importer, CLI) tidak berubah.
@@ -43,8 +43,9 @@ Probe ClickUp asli (30 Sep):
 
 ## Sesi 1 Okt 2026: real-time + deploy otomatis
 - **Real-time**: migrasi `20261001090000_realtime.sql` terpasang di project RHJ ClickUp (14 migrasi; publikasi `supabase_realtime` = 9 tabel). Web berlangganan perubahan (status, komentar, assignee, lampiran, struktur, notifikasi) dan menyegarkan layar terdampak; ditahan selama mengedit/menyeret. Tes `web/tests/e2e/realtime.spec.ts` (6/6 HP+desktop); suite e2e penuh 39 lolos, Vitest 51 lolos.
-- **Deploy otomatis**: `.github/workflows/web.yml` — PR/push: typecheck, lint, Vitest, build, e2e (Supabase lokal di runner); push ke `main` yang lolos → `web/` diterbitkan ke branch `hostinger` → Hostinger (Node.js Web Apps, branch `hostinger`) build & deploy otomatis. Langkah hPanel: `web/README.md` bagian Deploy.
-- Belum: pemasangan hPanel + domain oleh Hannes; secrets GitHub untuk sinkron/backup harian.
+- **Deploy otomatis**: `.github/workflows/web.yml` — PR/push: typecheck, lint, Vitest, build, e2e (Supabase lokal di runner); push ke `main` yang lolos → deploy ke Hostinger.
+- **Git hPanel tidak bisa dipakai**: "Deployment Git dinonaktifkan saat mengelola klien" (akun hosting milik pemilik lain, Hannes = pengelola; instalasi GitHub harus milik pemilik akun). Keputusan Hannes (1/10): pakai **API Hostinger** tanpa melibatkan pemilik. `alat/hostinger.mjs` (`cek` = baca-saja; `deploy` = arsip sumber `web/` + `.env.production` publik → unggah TUS → build Node.js 22 → pantau log → kosongkan arsip → tunggu situs menyajikan commit). Pengaman: domain dikunci `tugas.palletmeshindonesia.com`, kunci Supabase harus publishable, situs non-Node.js hanya ditimpa lewat centang `timpa_situs_lama`, gagal bila berkas sumber bisa diunduh publik. Tes `alat/hostinger.test.mjs` (16, server tiruan) di CI. Workflow `hostinger-cek.yml` (manual, baca-saja). Branch `hostinger` tidak dipakai lagi.
+- Belum: Hannes membuat token API hPanel → secret `HOSTINGER_API_TOKEN`, variabel `SUPABASE_PUBLISHABLE_KEY`, jalankan **Hostinger (cek)**; sesudah hasilnya diperiksa: `HOSTINGER_AKTIF=1` + deploy pertama dengan centang. Belum terverifikasi sampai cek jalan: token pengelola boleh menulis ke akun klien, dan API menerima build Node.js di situs `tugas.` yang sekarang (bila ditolak: situs Node.js baru lewat API). Secrets GitHub untuk sinkron/backup harian juga belum.
 
 ## Verdict
 - Kode Fase 1 (F1–F4 + kode F5: sinkron, backup, workflow) **jadi dan lulus semua suite lokal** dari `supabase db reset` (verifikasi akhir 29 Sep): DB 1016 cek (16 berkas), kontrak Edge+CLI 469 cek, importer 119 cek, web 69 tes Playwright, vendor cocok. Banding `clickup.mjs` ↔ `tugas.mjs`: kode keluar identik di 340/340 (awal) dan 344/344 (ubah) perintah, **sisa beda 0** (exit 0 tanpa `--izinkan-diketahui`; PR-1 selesai).

@@ -13,11 +13,11 @@ Repo ini berisi seluruh sistem, bukan hanya website. **Yang di-deploy ke Hosting
 | `supabase/` | Database: migrasi SQL (tabel, RLS, fungsi), Edge Function `api`, konfigurasi | Supabase (project "RHJ ClickUp") |
 | `impor/` | Sinkron data ClickUp → aplikasi (hanya membaca ClickUp) + backup | GitHub Actions (terjadwal) |
 | `cli/` | `tugas.mjs`: alat baris perintah untuk agent/routine (pengganti `clickup.mjs`) | rhj-brain / routine |
-| `alat/` | Skrip deploy database lewat Management API (`sql-proyek.sh`) | Sesi deploy |
+| `alat/` | Skrip deploy: database lewat Management API (`sql-proyek.sh`), web ke Hostinger lewat API (`hostinger.mjs`) | Sesi deploy / GitHub Actions |
 | `uji/` | Tes database, kontrak API, banding CLI, tes web lama | Lokal / sesi pengembangan |
 | `docs/` | Arsitektur, kontrak database, status & langkah berikutnya (`docs/STATUS.md`) | — |
 | `web-lama/` | Website statis versi lama; dihapus setelah web baru lulus semua tes | — (tidak dipakai) |
-| `.github/workflows/` | `web.yml`: cek + tes web lalu terbitkan ke branch `hostinger` (auto-deploy); `sinkron.yml` & `backup.yml`: jadwal sinkron ClickUp & backup | GitHub Actions |
+| `.github/workflows/` | `web.yml`: cek + tes web lalu deploy ke Hostinger lewat API; `hostinger-cek.yml`: cek baca-saja Hostinger; `sinkron.yml` & `backup.yml`: jadwal sinkron ClickUp & backup | GitHub Actions |
 
 ## Menjalankan website di komputer (Windows / macOS)
 
@@ -50,8 +50,9 @@ Mode produksi di komputer sendiri: `npm run build` lalu `npm run start`.
 
 ## Deploy
 
-Merge ke `main` → GitHub Actions menjalankan cek & tes → bila lolos, isi `web/` diterbitkan ke branch `hostinger` →
-Hostinger build & deploy otomatis. Pemasangan pertama di hPanel: `web/README.md` bagian "Deploy".
+Merge ke `main` → GitHub Actions menjalankan cek & tes → bila lolos, sumber `web/` diunggah ke Hostinger lewat API →
+Hostinger build → workflow menunggu situs menyajikan commit itu. Pemasangan pertama (token API, cek baca-saja, deploy
+pertama): `web/README.md` bagian "Deploy".
 
 ## Dokumen penting
 

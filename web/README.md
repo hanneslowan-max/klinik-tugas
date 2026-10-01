@@ -73,37 +73,43 @@ aman. Selama pengguna sedang mengedit kartu atau menyeret kartu di Papan, peruba
 begitu selesai (`src/features/realtime/tahanan.ts`), supaya cek versi (409 "sudah diubah orang lain") tetap bekerja.
 Tes: `tests/e2e/realtime.spec.ts`.
 
-## Deploy (Hostinger Business, Node.js Web Apps)
+## Deploy (Hostinger Business, Node.js Web Apps, lewat API)
 
-Alur otomatis (`.github/workflows/web.yml`):
+Integrasi Git di hPanel terkunci untuk akun hosting yang dikelola sebagai klien, jadi deploy memakai **API resmi
+Hostinger** dari GitHub Actions (`../alat/hostinger.mjs`, workflow `../.github/workflows/web.yml`):
 
 ```
 PR ke main ──► GitHub Actions: typecheck · lint · tes unit · build · tes end-to-end (Supabase lokal di runner)
-merge/push ke main ──► cek yang sama ──► lolos? ──► isi web/ diterbitkan ke branch `hostinger`
-branch `hostinger` berubah ──► Hostinger otomatis build (npm run build) & menjalankan versi baru
+merge/push ke main ──► cek yang sama ──► lolos? ──► sumber web/ (commit itu) diunggah ke Hostinger
+                   ──► Hostinger build (npm run build, Node 22) ──► workflow menunggu situs menyajikan commit itu
 ```
 
-Tidak perlu build harian: halaman dirender di server dan data selalu dibaca langsung dari Supabase. Pekerjaan harian
-yang ada adalah sinkron ClickUp & backup (`.github/workflows/sinkron.yml`, `backup.yml`), bukan build web.
+- Kode yang gagal tes tidak pernah dikirim. Build Hostinger yang gagal tidak mengganti situs (tetap versi terakhir
+  yang sukses); workflow merah + analisis Hostinger di log.
+- Nilai `NEXT_PUBLIC_*` disisipkan sebagai `.env.production` ke arsip (URL Supabase & URL aplikasi dikunci ke
+  produksi; kunci harus *publishable*, secret key ditolak). `NEXT_PUBLIC_VERSI` = commit → `<meta name="rhj-versi">`.
+- Pengaman: domain dikunci ke `tugas.palletmeshindonesia.com` (situs lain di akun, termasuk ERP, tidak tersentuh);
+  situs yang belum app Node.js tidak pernah ditimpa tanpa centang manual `timpa_situs_lama`; arsip sumber di server
+  dikosongkan setelah build dan workflow gagal bila berkas sumber bisa diunduh dari situs.
+- Tidak perlu build harian: halaman dirender di server dan data selalu dibaca langsung dari Supabase (real-time).
+  Pekerjaan harian yang ada adalah sinkron ClickUp & backup (`sinkron.yml`, `backup.yml`), bukan build web.
+- Tes alat deploy (server tiruan, tanpa jaringan): `node --test ../alat/hostinger.test.mjs` (juga jalan di CI).
 
-### Pemasangan pertama di hPanel (sekali saja)
-1. Pastikan branch `hostinger` sudah ada (dibuat otomatis oleh workflow Web setelah perubahan web masuk `main`; atau
-   jalankan manual: GitHub → Actions → Web → Run workflow di `main`).
-2. hPanel → **Websites → Add Website → Deploy Web App → Import Git Repository** → izinkan akses GitHub →
-   pilih repo `rhj-tugas`, **branch `hostinger`**.
-3. **Configure build settings**: framework **Next.js** (application type `next`), Node **22.x**, build script
-   `build`, output directory `.next`. Hostinger menerapkan `output: "standalone"` sendiri.
-4. **Environment Variables** (isi SEBELUM deploy pertama; nilainya dipakai saat build):
-   - `NEXT_PUBLIC_SUPABASE_URL` = `https://admhlyurfvodfyedgaio.supabase.co`
-   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` = kunci *publishable* (Supabase → Project Settings → API Keys)
-   - `NEXT_PUBLIC_APP_BASE_URL` = `https://tugas.palletmeshindonesia.com`
-5. Deploy, lalu sambungkan domain **`tugas.palletmeshindonesia.com`** + SSL. Domain harus sama dengan
-   `app_settings.app_base_url`: Edge hanya menerima tombol admin (aktifkan login, setel ulang password, hapus permanen)
-   dari domain itu (dan localhost).
-6. Uji: `/masuk` tampil (bukan "Konfigurasi aplikasi belum diisi" — kalau muncul, environment belum terbaca saat build:
-   isi lalu **Settings & Redeploy**), login owner, buka `/t/<id ClickUp>`, header `X-Robots-Tag: noindex`, buka dua
-   browser dan ubah status satu kartu → browser lain ikut berubah.
+### Pemasangan pertama (sekali saja)
+1. **Token API**: hPanel (akun Anda sendiri) → ikon profil → **API** → buat token (beri masa berlaku, mis. 1 tahun).
+   Token mewarisi akses Anda ke akun hosting klien. Simpan langsung ke GitHub → repo → Settings → Secrets and
+   variables → Actions → **Secrets**: `HOSTINGER_API_TOKEN`. Jangan ditempel di chat/berkas.
+2. Di halaman yang sama, tab **Variables**: `SUPABASE_PUBLISHABLE_KEY` = publishable key (Supabase → Project Settings
+   → API Keys, diawali `sb_publishable_`).
+3. **Cek baca-saja**: Actions → **Hostinger (cek)** → Run workflow. Ringkasan run menampilkan situs yang terlihat
+   token, jenis situs `tugas.`, isi document root, SSL, riwayat build. Tidak mengubah apa pun.
+4. **Deploy pertama** (menimpa situs `tugas.` lama — saat ini halaman default Hostinger — secara permanen): variabel
+   `HOSTINGER_AKTIF` = `1`, lalu Actions → **Web** → Run workflow (branch `main`) dengan centang **timpa_situs_lama**.
+5. Uji: `/masuk` tampil, login owner, buka `/t/<id ClickUp>`, header `X-Robots-Tag: noindex`, buka dua browser dan
+   ubah status satu kartu → browser lain ikut berubah. Domain harus sama dengan `app_settings.app_base_url` (Edge
+   hanya menerima tombol admin dari domain itu dan localhost).
 
 ### Sesudahnya
-Cukup merge PR ke `main`. Kalau tes gagal, branch `hostinger` tidak berubah dan situs tetap versi terakhir yang lolos.
-Riwayat deploy & log build ada di hPanel (**Last deployment details**); riwayat cek ada di GitHub Actions.
+Cukup merge PR ke `main`. Riwayat & log deploy ada di GitHub Actions (ringkasan run: commit, build, durasi, SSL);
+log build/runtime juga di hPanel. Deploy ulang tanpa perubahan kode: Actions → Web → Run workflow (tanpa centang).
+Mematikan deploy otomatis: hapus/kosongkan variabel `HOSTINGER_AKTIF`.

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 
 import { Penyedia } from "@/components/penyedia";
+import { env } from "@/lib/env";
 
 import "./globals.css";
 
@@ -11,6 +12,8 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false, nocache: true },
   referrer: "no-referrer",
   appleWebApp: { capable: true, title: "Tugas RHJ", statusBarStyle: "default" },
+  // penanda versi: deploy menunggu sampai situs menyajikan commit ini
+  ...(env.versi ? { other: { "rhj-versi": env.versi } } : {}),
 };
 
 export const viewport: Viewport = {

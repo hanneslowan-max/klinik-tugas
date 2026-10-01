@@ -140,7 +140,7 @@ Admin (owner): `web_admin_anggota_simpan(p jsonb)`, `web_admin_status_simpan(p_l
 - Semua data lewat `rpc(klien, "web_…")` bertipe (`src/types/database.ts` hasil `supabase gen types` + `src/types/domain.ts`) dengan sesi pengguna; tidak ada secret key di web. Admin akun/reset/purge lewat Edge `/x/admin/*` dengan JWT sesi.
 - Markdown dirender markdown-it `html:false` + DOMPurify (satu-satunya HTML mentah). Service worker hanya cache aset statis `/_next/static`.
 - Real-time: Supabase Realtime `postgres_changes` (publikasi `supabase_realtime`: tasks, task_assignees, comments, attachments, notifications, spaces, folders, lists, list_statuses; migrasi `20261001090000_realtime.sql`). Web berlangganan INSERT/UPDATE saja (RLS diperiksa per pelanggan; DELETE tidak). Perubahan orang lain ditahan selama pengguna mengedit/menyeret supaya cek versi tetap bekerja.
-- Deploy: `.github/workflows/web.yml` (cek + e2e → terbitkan `web/` ke branch `hostinger`) → Hostinger auto-deploy.
+- Deploy: `.github/workflows/web.yml` (cek + e2e → `alat/hostinger.mjs deploy`: unggah sumber `web/` + `.env.production` publik lewat API Hostinger → build Node.js di Hostinger → tunggu `<meta name="rhj-versi">` = commit). Git hPanel tidak dipakai (terkunci untuk akun klien). Domain dikunci ke `tugas.palletmeshindonesia.com`; situs non-Node.js hanya ditimpa dengan centang manual.
 - Mobile-first (lebar 360px, target sentuh ≥44px, input 16px di layar sentuh), Bahasa Indonesia, zona WIB.
 - Web statis lama tetap di `web-lama/` sampai web baru lulus paritas tes; lalu dihapus.
 

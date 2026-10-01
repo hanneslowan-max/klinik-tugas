@@ -1,29 +1,40 @@
-# Web Next.js (web/): cek otomatis, lalu terbitkan ke branch `hostinger` yang dipantau Hostinger.
+# Web Next.js (web/): cek otomatis, lalu deploy ke Hostinger lewat API (alat/hostinger.mjs).
 #
-#   Pull request yang menyentuh web/ atau supabase/ → cek + tes end-to-end (gerbang sebelum merge).
-#   Push ke main yang menyentuh web/ atau supabase/ → cek + tes end-to-end; bila SEMUA lolos, isi web/ diterbitkan
-#     ke branch `hostinger` (akar branch = isi web/). Hostinger (Node.js Web Apps, terhubung ke branch `hostinger`)
-#     otomatis build & deploy setiap ada push ke branch itu. Kode yang gagal tes tidak pernah sampai ke Hostinger.
-#   Manual (Actions → Web → Run workflow di main): cek + terbitkan ulang tanpa perubahan kode.
+#   Pull request yang menyentuh web/, supabase/ atau alat deploy → cek + tes end-to-end (gerbang sebelum merge).
+#   Push ke main → cek + tes end-to-end; bila SEMUA lolos dan variabel HOSTINGER_AKTIF=1, web/ di-deploy ke
+#     tugas.palletmeshindonesia.com: sumber diunggah, Hostinger build (npm run build), lalu workflow menunggu sampai
+#     situs menyajikan commit ini. Kode yang gagal tes tidak pernah sampai ke Hostinger; build Hostinger yang gagal
+#     tidak mengganti situs (tetap versi terakhir yang sukses).
+#   Manual (Actions → Web → Run workflow di main): cek + deploy ulang tanpa perubahan kode. Centang
+#     `timpa_situs_lama` HANYA untuk deploy pertama (situs belum app Node.js → isi lamanya ditimpa permanen).
 #
-# Tidak ada secret di workflow ini: tes memakai stack Supabase LOKAL di runner (seed sintetis), dan nilai
-# NEXT_PUBLIC_* produksi diisi di environment variables aplikasi Hostinger.
+# Settings → Secrets and variables → Actions:
+#   secret   HOSTINGER_API_TOKEN       token API hPanel (Profil → API)
+#   variabel SUPABASE_PUBLISHABLE_KEY  publishable key project produksi (publik: memang ikut terkirim ke browser)
+#   variabel HOSTINGER_AKTIF=1         saklar deploy; kosong = hanya cek & tes
+# Tes tidak memakai secret: stack Supabase LOKAL di runner (seed sintetis).
 name: Web
 
 on:
   pull_request:
-    paths: ["web/**", "supabase/**", ".github/workflows/web.yml"]
+    paths: ["web/**", "supabase/**", "alat/hostinger*.mjs", ".github/workflows/web.yml"]
   push:
     branches: [main]
-    paths: ["web/**", "supabase/**", ".github/workflows/web.yml"]
+    paths: ["web/**", "supabase/**", "alat/hostinger*.mjs", ".github/workflows/web.yml"]
   workflow_dispatch:
+    inputs:
+      timpa_situs_lama:
+        description: "Deploy PERTAMA saja: izinkan menimpa situs tugas.palletmeshindonesia.com yang belum app Node.js (isi lama hilang permanen)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
   group: web-${{ github.ref }}
-  cancel-in-progress: true
+  # run main tidak dibatalkan di tengah deploy; run baru menunggu
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   cek:
@@ -55,6 +66,9 @@ jobs:
         run: npm run uji
       - name: Build produksi
         run: npm run build
+      - name: Tes alat deploy Hostinger (server tiruan)
+        working-directory: .
+        run: node --test alat/hostinger.test.mjs
 
   e2e:
     name: Tes end-to-end (Supabase lokal + Playwright)
@@ -97,7 +111,7 @@ jobs:
         working-directory: web
         run: |
           nohup npx next start -H 127.0.0.1 -p 3000 > next.log 2>&1 &
-          for i in $(seq 1 60); do curl -sf -o /dev/null http://127.0.0.1:3000/masuk && exit 0; sleep 1; done
+          for _ in $(seq 1 60); do curl -sf -o /dev/null http://127.0.0.1:3000/masuk && exit 0; sleep 1; done
           cat next.log; exit 1
 
       - name: Playwright (HP + desktop)
@@ -116,28 +130,23 @@ jobs:
             web/next.log
           retention-days: 7
 
-  terbitkan:
-    name: Terbitkan web/ ke branch hostinger
+  deploy:
+    name: Deploy ke Hostinger (API)
     needs: [cek, e2e]
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.HOSTINGER_AKTIF == '1'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
+    timeout-minutes: 40
     concurrency:
-      group: terbitkan-hostinger
+      group: deploy-hostinger
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          fetch-depth: 0
-      - name: Split web/ → hostinger
-        run: |
-          set -euo pipefail
-          git subtree split --prefix=web -b hostinger-baru
-          git push origin hostinger-baru:refs/heads/hostinger --force
-          {
-            echo "### Diterbitkan ke branch \`hostinger\`"
-            echo "- commit: \`$(git rev-parse --short hostinger-baru)\` (dari main \`$(git rev-parse --short HEAD)\`)"
-            echo "- Hostinger akan build & deploy otomatis dari branch ini."
-          } >> "$GITHUB_STEP_SUMMARY"
+          node-version: "22"
+      - name: Unggah sumber, build di Hostinger, tunggu situs menyajikan commit ini
+        env:
+          HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY || secrets.SUPABASE_PUBLISHABLE_KEY }}
+          IZINKAN_TIMPA_SITUS_LAMA: ${{ github.event_name == 'workflow_dispatch' && inputs.timpa_situs_lama && 'ya' || '' }}
+        run: node alat/hostinger.mjs deploy

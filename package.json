@@ -12,7 +12,8 @@
     "web:vendor": "node uji/web/salin-vendor.mjs",
     "web:vendor:cek": "node uji/web/salin-vendor.mjs --cek",
     "web:serve": "node uji/web/server.mjs",
-    "uji:web": "playwright test -c uji/web/playwright.config.mjs"
+    "uji:web": "playwright test -c uji/web/playwright.config.mjs",
+    "uji:alat": "node --test alat/hostinger.test.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",
