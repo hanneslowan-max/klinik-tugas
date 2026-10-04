@@ -25,7 +25,7 @@ export function KepalaHalaman({ judul, judulDokumen, kembali, aksi, className }:
   const teksJudul = judulDokumen ?? (typeof judul === "string" ? judul : undefined);
 
   useEffect(() => {
-    if (teksJudul) document.title = `${teksJudul} · Tugas RHJ`;
+    if (teksJudul) document.title = `${teksJudul} · Anvil`;
   }, [teksJudul]);
 
   return (

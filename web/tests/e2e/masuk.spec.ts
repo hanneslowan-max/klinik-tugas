@@ -6,7 +6,7 @@ import { AKUN, SANDI, SEED, diHp, keluar, masuk, sqlLokal } from "./bantu";
 test("tanpa sesi diarahkan ke Masuk, lalu kembali ke tautan yang dituju", async ({ page }) => {
   await page.goto(`/cari?q=uji`);
   await expect(page).toHaveURL(/\/masuk\?lanjut=%2Fcari%3Fq%3Duji$/);
-  await expect(page.getByRole("heading", { name: "Tugas RHJ" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Anvil" })).toBeVisible();
   await expect(page.getByText("Silakan masuk untuk melanjutkan.")).toBeVisible();
 
   await page.locator("#email").fill(AKUN.owner.email);

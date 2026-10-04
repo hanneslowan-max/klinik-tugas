@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Tugas RHJ",
-    short_name: "Tugas",
-    description: "Aplikasi tugas internal PT Roda Hammerindo Jaya",
+    name: "Anvil",
+    short_name: "Anvil",
+    description: "Anvil, aplikasi tugas internal PT Roda Hammerindo Jaya",
     lang: "id",
     dir: "ltr",
     start_url: "/saya",

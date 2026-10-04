@@ -61,7 +61,7 @@ function Sidebar({ path }: { path: string }) {
         {/* eslint-disable-next-line @next/next/no-img-element -- ikon SVG kecil statis */}
         <img src="/icon.svg" alt="" className="size-7 rounded-md" />
         <div className="leading-tight">
-          <div className="text-sm font-bold">Tugas RHJ</div>
+          <div className="text-sm font-bold">Anvil</div>
           <div className="text-[11px] text-muted-foreground">PT Roda Hammerindo Jaya</div>
         </div>
       </div>
