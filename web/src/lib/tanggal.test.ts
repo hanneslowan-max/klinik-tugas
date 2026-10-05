@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { hariKerja, infoDue, kategoriDue, peringatanTanggal, selisihHari, tambahHari, tanggalWib } from "@/lib/tanggal";
+import {
+  hariKerja,
+  infoDue,
+  kategoriDue,
+  peringatanTanggal,
+  selisihHari,
+  tambahHari,
+  tanggalHariKerjaKe,
+  tanggalWib,
+  tenggatUntukKategori,
+} from "@/lib/tanggal";
+import type { KategoriDue } from "@/types/domain";
 import { lanjutAman, pecahUrl, ukuranBerkas, urlAman } from "@/lib/teks";
 
 describe("tanggal WIB", () => {
@@ -48,6 +59,37 @@ describe("kategoriDue", () => {
     expect(peringatanTanggal("2026-10-03")).toMatch(/Sabtu/);
     expect(peringatanTanggal("2026-10-01", new Set(["2026-10-01"]))).toMatch(/libur/);
     expect(peringatanTanggal("2026-10-02")).toBeNull();
+  });
+});
+
+describe("tanggalHariKerjaKe (target tenggat Papan Tugas Saya)", () => {
+  // 2026-09-30 = Rabu; Okt 1 Kam, 2 Jum, 3 Sab, 4 Min, 5 Sen, 6 Sel
+  it("hari kerja berikutnya, melewati akhir pekan & libur", () => {
+    expect(tanggalHariKerjaKe("2026-09-30", 1)).toBe("2026-10-01");
+    expect(tanggalHariKerjaKe("2026-10-02", 1)).toBe("2026-10-05"); // Jum → Sen
+    expect(tanggalHariKerjaKe("2026-09-30", 1, new Set(["2026-10-01"]))).toBe("2026-10-02");
+    expect(tanggalHariKerjaKe("2026-09-30", 4)).toBe("2026-10-06");
+  });
+});
+
+describe("tenggatUntukKategori", () => {
+  const hi = "2026-09-30";
+  it("memetakan kolom ke tenggat; 'telat' bukan target", () => {
+    expect(tenggatUntukKategori("tanpa_due", hi)).toBeNull();
+    expect(tenggatUntukKategori("hari_ini", hi)).toBe(hi);
+    expect(tenggatUntukKategori("tiga_hk", hi)).toBe("2026-10-01");
+    expect(tenggatUntukKategori("nanti", hi)).toBe("2026-10-06");
+    expect(tenggatUntukKategori("telat", hi)).toBeUndefined();
+  });
+
+  // Jaminan inti: kartu yang dijatuhkan ke sebuah kolom benar-benar masuk kolom itu setelah server mengelompokkan ulang.
+  it("bolak-balik dengan kategoriDue konsisten (tanpa & dengan libur)", () => {
+    for (const libur of [undefined, new Set(["2026-10-01"])]) {
+      for (const k of ["hari_ini", "tiga_hk", "nanti", "tanpa_due"] as const satisfies readonly KategoriDue[]) {
+        const due_wib = tenggatUntukKategori(k, hi, libur) ?? null;
+        expect(kategoriDue({ selesai: false, due_wib }, hi, libur)).toBe(k);
+      }
+    }
   });
 });
 
