@@ -10,7 +10,7 @@ import { KepalaHalaman } from "@/components/layout/kepala-halaman";
 import { TAB_ADMIN, tabDariPath } from "@/features/admin/tab";
 import { cn } from "@/lib/utils";
 
-/** KepalaHalaman "Admin"; judul dokumen ikut tab ("Admin · Token API · Tugas RHJ"). */
+/** KepalaHalaman "Admin"; judul dokumen ikut tab ("Admin · Token API · Anvil"). */
 export function KepalaAdmin() {
   const tab = tabDariPath(usePathname());
   return <KepalaHalaman judul="Admin" judulDokumen={tab ? `Admin · ${tab.label}` : "Admin"} kembali="/saya" />;

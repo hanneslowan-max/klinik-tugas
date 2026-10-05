@@ -1,4 +1,4 @@
-# Web Tugas RHJ (Next.js)
+# Web Anvil, aplikasi tugas RHJ (Next.js)
 
 Antarmuka web aplikasi tugas internal PT RHJ (pengganti ClickUp). Seluruh logika bisnis & hak akses ada di
 database Supabase (RLS + fungsi `web_*` SECURITY DEFINER, lihat `../docs/ARSITEKTUR.md`); web ini hanya

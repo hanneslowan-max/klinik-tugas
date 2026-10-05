@@ -56,7 +56,7 @@ test("manifest & service worker tersedia", async ({ request }) => {
   const m = await request.get("/manifest.webmanifest");
   expect(m.status()).toBe(200);
   const isi = await m.json();
-  expect(isi.name).toBe("Tugas RHJ");
+  expect(isi.name).toBe("Anvil");
   expect(isi.start_url).toBe("/saya");
   for (const ikon of isi.icons) expect((await request.get(ikon.src)).status()).toBe(200);
   const sw = await request.get("/sw.js");

@@ -1,4 +1,4 @@
-// Service worker Tugas RHJ: HANYA cache aset statis (JS/CSS Next.js yang ber-hash dan ikon), cache-first.
+// Service worker Anvil (aplikasi tugas RHJ): HANYA cache aset statis (JS/CSS Next.js yang ber-hash dan ikon), cache-first.
 // Halaman & data selalu dari jaringan (butuh login; data tidak pernah disimpan di cache).
 const CACHE = "rhj-tugas-aset-v1";
 

@@ -5,12 +5,12 @@ import { Penyedia } from "@/components/penyedia";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "Tugas RHJ", template: "%s · Tugas RHJ" },
+  title: { default: "Anvil", template: "%s · Anvil" },
   description: "Aplikasi tugas internal PT Roda Hammerindo Jaya",
-  applicationName: "Tugas RHJ",
+  applicationName: "Anvil",
   robots: { index: false, follow: false, nocache: true },
   referrer: "no-referrer",
-  appleWebApp: { capable: true, title: "Tugas RHJ", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "Anvil", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

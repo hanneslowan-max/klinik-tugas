@@ -33,7 +33,7 @@ export default async function HalamanMasuk({ searchParams }: PageProps<"/masuk">
         {/* eslint-disable-next-line @next/next/no-img-element -- ikon SVG kecil statis */}
         <img src="/icon.svg" alt="" className="size-11 rounded-xl" />
         <div>
-          <h1 className="text-xl font-bold">Tugas RHJ</h1>
+          <h1 className="text-xl font-bold">Anvil</h1>
           <p className="text-sm text-muted-foreground">PT Roda Hammerindo Jaya</p>
         </div>
       </div>
