@@ -40,7 +40,7 @@ Bentuk galat `{err, ECODE}` dengan status HTTP:
 | GET / PUT / DELETE | `/v2/task/{id}` (`?include_markdown_description=true`) | `api_task` (lampiran → signed URL 24 jam) / `api_update_task` / `api_delete_task` |
 | GET / POST | `/v2/task/{id}/comment` (`?start&start_id`) | `api_task_comments` (semua komentar; `start` menyaring yang lebih tua) / `api_create_comment` |
 | GET / POST | `/v2/comment/{id}/reply` | `api_comment_replies` / `api_create_reply` |
-| POST | `/v2/task/{id}/attachment` | 501 `APP_501` (ditunda Fase 1) |
+| POST | `/v2/task/{id}/attachment` (scope `tulis`, `multipart/form-data`: `file` wajib, `title`/`comment_id` opsional) | Unggah SATU berkas: service role menaruh ke Storage `t/<task>/<rand>-<nama>` lalu `x_lampiran_catat`. Allowlist MIME + 25 MB (bucket); kartu ClickUp saat mode cermin → ditolak trigger (`CERMIN_001`); tugas tak terlihat → 404. Balas objek lampiran + `url` (signed 24 jam). Kirim `Content-Type` berkas yang benar (tanpa itu jadi `application/octet-stream` → ditolak allowlist) |
 | PUT | `/v3/workspaces/{tid}/tasks/{id}/home_list/{list}` | `api_move_task` |
 | GET | `/x/task/{id}/activity` (alias `/x/activity/{id}`) | `x_activity` |
 | GET | `/x/resolve?ref=` · `/x/search?q=&space=&include_closed=` | `x_resolve` · `x_search` |

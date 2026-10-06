@@ -451,6 +451,7 @@ Objek Storage **tidak** terhapus dari SQL karena trigger `storage.protect_object
   - Path harus `t/<p_task>/…`.
   - `p_comment` (boleh null) harus komentar di tugas itu.
 - Idempoten per path. Hasil = lampiran web.
+- Logika perekam dipisah ke `inti_lampiran_catat` (pembantu internal, hanya dipanggil setelah konteks aktor diset). `web_lampiran_catat` = `mulai_web()` + inti; `x_lampiran_catat(p_aktor, …)` = `mulai_api(p_aktor,'api','tulis')` + inti (dipakai Edge `POST /v2/task/{id}/attachment`, service role). Aturan mode cermin & atribusi pengunggah ditegakkan trigger `attachments_sebelum`, jadi berlaku sama untuk web dan API.
 
 **Admin (owner)**
 

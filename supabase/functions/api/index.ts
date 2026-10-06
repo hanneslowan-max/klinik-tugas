@@ -267,6 +267,14 @@ async function lampiranTerisi(task: Obj): Promise<Obj> {
   return task;
 }
 
+// Satu lampiran (hasil x_lampiran_catat) → bentuk respons: tambah signed URL 24 jam, buang storage_path & clickup_url.
+async function lampiranSatu(a: Obj): Promise<Obj> {
+  const { storage_path, clickup_url, ...sisa } = a;
+  const sp = typeof storage_path === "string" ? storage_path : "";
+  sisa.url = (sp && (await signedUrls([sp])).get(sp)) || (typeof clickup_url === "string" && clickup_url) || null;
+  return sisa;
+}
+
 // Paginasi ClickUp `start`(ms) + `start_id`: API ini mengembalikan SEMUA komentar di halaman pertama;
 // permintaan lanjutan hanya berisi komentar yang lebih tua dari penanda (urut date desc, id desc).
 function saringStart(data: Obj, q: URLSearchParams): Obj {
@@ -559,9 +567,64 @@ const RUTE: Rute[] = [
       rpc("api_create_reply", { p_aktor: A(c), p_comment: d(g[0]), p_body: await c.body(), p_idem: idem(c.req) }, T(c)),
   },
   {
+    // Unggah lampiran dalam SATU panggilan: multipart/form-data, field `file` (opsional `title`, `comment_id`).
+    // Edge (service role) menaruh berkas ke Storage lalu x_lampiran_catat mencatat barisnya. Allowlist MIME + 25 MB
+    // ditegakkan bucket; mode cermin (kartu ClickUp tak bisa dilampiri) & atribusi pengunggah oleh trigger. Objek
+    // yatim dibersihkan bila pencatatan gagal.
     m: "POST", p: /^\/v2\/task\/([^/]+)\/attachment$/, perlu: "tulis",
-    h: () => {
-      throw new GalatApi(501, "Unggah lampiran lewat API belum tersedia (Fase 1): pakai aplikasi web", "APP_501");
+    h: async (c, g) => {
+      const task = d(g[0]);
+      if (!/^multipart\/form-data/i.test(c.req.headers.get("content-type") ?? "")) {
+        throw new GalatApi(400, "Kirim berkas sebagai multipart/form-data dengan field 'file'", "INPUT_001");
+      }
+      let form: FormData;
+      try {
+        form = await c.req.formData();
+      } catch {
+        throw new GalatApi(400, "Isi multipart/form-data tidak valid", "INPUT_001");
+      }
+      const f = form.get("file") ?? form.get("attachment");
+      if (!(f instanceof File)) throw new GalatApi(400, "Field 'file' wajib berisi sebuah berkas", "INPUT_001");
+      if (f.size === 0) throw new GalatApi(400, "Berkas kosong", "INPUT_001");
+      if (f.size > 26214400) throw new GalatApi(413, "Berkas melebihi 25 MB", "INPUT_001");
+      const title = (form.get("title") as string | null)?.toString().trim() || "";
+      const comment = (form.get("comment_id") as string | null)?.toString().trim() || "";
+      // deno-lint-ignore no-control-regex -- tolak karakter kontrol di nama objek
+      const nama = ((f.name || title || "lampiran").replace(/[\/\\]/g, "_").replace(/[\x00-\x1f]/g, "").trim() || "lampiran").slice(0, 200);
+      const mime = f.type || "application/octet-stream";
+      const path = `t/${task}/${crypto.randomUUID().slice(0, 8)}-${nama}`;
+
+      // 1) unggah ke Storage (service role). Bucket menolak tipe di luar allowlist & berkas > 25 MB.
+      const up = await http(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${encPath(path)}`, {
+        method: "POST",
+        headers: { ...kunciService(), "content-type": mime, "x-upsert": "false" },
+        body: new Uint8Array(await f.arrayBuffer()),
+        timeoutMs: 300_000,
+      });
+      if (!up.res.ok) {
+        const pesan = String((up.data as Obj)?.message ?? (up.data as Obj)?.error ?? up.text ?? "").slice(0, 200);
+        if (/mime|not allowed|invalid.?mime|content.?type/i.test(pesan)) {
+          throw new GalatApi(400, `Tipe berkas tidak diizinkan: ${mime}`, "INPUT_001");
+        }
+        if (up.res.status === 413 || /exceed|too large|maximum size/i.test(pesan)) {
+          throw new GalatApi(413, "Berkas melebihi 25 MB", "INPUT_001");
+        }
+        if (up.res.status === 409) throw new GalatApi(409, "Berkas dengan nama itu sudah ada", "KONFLIK_001");
+        console.error(`unggah lampiran gagal: HTTP ${up.res.status} ${pesan}`);
+        throw new GalatApi(502, "Storage gagal menerima berkas", "APP_502");
+      }
+
+      // 2) catat baris (cek tugas terlihat/editable + trigger cermin). Bersihkan objek bila gagal.
+      try {
+        const hasil = await rpc("x_lampiran_catat", {
+          p_aktor: A(c), p_task: task, p_comment: comment || null, p_path: path,
+          p_title: title || null, p_mime: mime, p_size: f.size,
+        }, T(c));
+        return await lampiranSatu(hasil as Obj);
+      } catch (e) {
+        await http(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${encPath(path)}`, { method: "DELETE", headers: kunciService() }).catch(() => {});
+        throw e;
+      }
     },
   },
   // ---- v3: pindah home list

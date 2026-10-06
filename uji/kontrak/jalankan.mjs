@@ -49,6 +49,11 @@ const ATT_KEYS = [
   "id", "date", "title", "type", "source", "version", "extension", "thumbnail_small", "thumbnail_large", "is_folder",
   "mimetype", "hidden", "parent_id", "size", "total_comments", "resolved_comments", "user", "deleted", "orientation", "url",
 ];
+// Respons POST /v2/task/{id}/attachment = bentuk j_lampiran_web tanpa storage_path/clickup_url, + url (signed 24 jam).
+const LAMPIRAN_API_KEYS = [
+  "id", "task_id", "comment_id", "title", "extension", "mimetype", "size", "status_salin", "sumber", "uploaded_by",
+  "created_at", "deleted_at", "url",
+];
 
 const DB_URL = process.env.DB_URL || "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 const LIST_CU = "1100340000900101"; // list seed asal ClickUp ("Fase Uji 1"), wadah kartu ClickUp sementara
@@ -742,8 +747,48 @@ async function ujiImporLampiran() {
   x = await apiEdge(cfg, st.tok.tulis)("POST", "/x/impor/upload-url", { body: { task_id: "z8r3uj0002", nama: "a.png" } });
   sama("upload-url scope tulis → 403", x.status, 403);
   await ujiLampiranClickup(imp);
-  x = await apiEdge(cfg, st.tok.tulis)("POST", `/v2/task/${T1}/attachment`, { body: {} });
-  sama("POST attachment (Fase 1 ditunda) → 501", [x.status, x.json?.ECODE], [501, "APP_501"]);
+}
+
+// POST /v2/task/{id}/attachment: unggah SATU berkas (multipart) lewat API. Edge (service role) menaruh ke Storage lalu
+// x_lampiran_catat mencatat. Kartu app T1 dipakai; T1 di-purge saat bersihkan (storage_path lampiran ikut terangkut).
+function berkasForm(buf, nama, mime) {
+  const fd = new FormData();
+  fd.append("file", new Blob([buf], { type: mime }), nama);
+  return fd;
+}
+async function ujiLampiranApi() {
+  bagian("POST /v2/task/{id}/attachment: unggah lampiran via API (multipart)");
+  const T1 = st.T.T1;
+  const api = apiEdge(cfg, st.tok.tulis);
+
+  let x = await api("POST", `/v2/task/${T1}/attachment`, { raw: true, body: berkasForm(PNG, `uji-b1-api-${RUN}.png`, "image/png") });
+  cek("unggah via API (scope tulis) → 200", x.status === 200, x.text);
+  const att = x.json || {};
+  kunciSama("respons: kunci lampiran (url, tanpa storage_path/clickup_url)", att, LAMPIRAN_API_KEYS);
+  sama("respons: mimetype/size/extension/sumber", [att.mimetype, att.size, att.extension, att.sumber], ["image/png", PNG.length, "png", "app"]);
+  sama("respons: pengunggah = pemilik token (bot)", att.uploaded_by?.id, ID.bot);
+  cek("respons: url = signed URL Storage (24 jam)", /\/storage\/v1\/object\/sign\/lampiran\/t\//.test(att.url || ""), att.url);
+  const dl = att.url ? await http("GET", att.url) : { status: 0, buf: Buffer.alloc(0) };
+  cek("unduh url respons tanpa auth → berkas identik", dl.status === 200 && dl.buf.equals(PNG), dl.status);
+  const rt = await tugas(cfg, st.tok.baca, ["task", T1]);
+  const di = (rt.json?.attachments || []).find((z) => z.id === att.id);
+  cek("task: lampiran API muncul di daftar lampiran tugas", !!di && di.mimetype === "image/png", di);
+
+  // judul opsional
+  x = await api("POST", `/v2/task/${T1}/attachment`, { raw: true, body: (() => { const fd = berkasForm(PNG, `uji-b1-j-${RUN}.png`, "image/png"); fd.append("title", "Judul Uji"); return fd; })() });
+  sama("title opsional dipakai", [x.status, x.json?.title], [200, "Judul Uji"]);
+
+  // negatif
+  x = await apiEdge(cfg, st.tok.baca)("POST", `/v2/task/${T1}/attachment`, { raw: true, body: berkasForm(PNG, "uji-b1.png", "image/png") });
+  sama("scope baca → 403 ACCESS_001", [x.status, x.json?.ECODE], [403, "ACCESS_001"]);
+  x = await api("POST", `/v2/task/${T1}/attachment`, { raw: true, body: berkasForm(Buffer.from("<b>uji</b>"), "uji-b1.html", "text/html") });
+  sama("MIME di luar allowlist (text/html) → 400 INPUT_001", [x.status, x.json?.ECODE], [400, "INPUT_001"]);
+  x = await api("POST", `/v2/task/${T1}/attachment`, { raw: true, body: (() => { const fd = new FormData(); fd.append("title", "tanpa berkas"); return fd; })() });
+  sama("tanpa field file → 400 INPUT_001", [x.status, x.json?.ECODE], [400, "INPUT_001"]);
+  x = await api("POST", `/v2/task/${T1}/attachment`, { body: { file: "bukan multipart" } });
+  sama("body JSON (bukan multipart) → 400 INPUT_001", [x.status, x.json?.ECODE], [400, "INPUT_001"]);
+  x = await api("POST", `/v2/task/rt-tidak-ada/attachment`, { raw: true, body: berkasForm(PNG, "uji-b1.png", "image/png") });
+  sama("tugas tak ada → 404 ITEM_013 (objek yatim dibersihkan)", [x.status, x.json?.ECODE], [404, "ITEM_013"]);
 }
 
 // Salinan lampiran importer di kartu asal ClickUp (kartu sementara dibuat lewat /x/impor/batch, seperti importer).
@@ -806,6 +851,16 @@ async function ujiLampiranClickup(imp) {
     st.storage.add(pSvg);
     const svg = x.json?.url ? await http("PUT", x.json.url, { body: Buffer.from("<svg xmlns='http://www.w3.org/2000/svg'/>"), raw: true, headers: { "content-type": "image/svg+xml" } }) : { status: 0 };
     cek("SVG ditolak bucket (mime allowlist)", svg.status >= 400, svg.status);
+
+    // POST /v2/task/{id}/attachment ke kartu ClickUp saat mode cermin → trigger menolak (CERMIN_001); objek yang sudah
+    // terunggah service role harus dibersihkan handler (tidak meninggalkan yatim).
+    const sblm = psql(`select count(*) from storage.objects where bucket_id = 'lampiran' and name like 't/${id}/%'`);
+    const ca = await apiEdge(cfg, st.tok.tulis)("POST", `/v2/task/${id}/attachment`, { raw: true, body: berkasForm(PNG, `uji-b1-apicu-${RUN}.png`, "image/png") });
+    sama("attachment via API ke kartu ClickUp (cermin) → 409 CERMIN_001", [ca.status, ca.json?.ECODE], [409, "CERMIN_001"]);
+    if (!sblm.error) {
+      const ssdh = psql(`select count(*) from storage.objects where bucket_id = 'lampiran' and name like 't/${id}/%'`);
+      sama("objek yatim dibersihkan setelah pencatatan ditolak", ssdh.stdout.trim(), sblm.stdout.trim());
+    }
   } finally {
     await hapusKartuCu();
   }
@@ -1050,7 +1105,7 @@ async function utama() {
   try {
     await siapkan();
     for (const f of [ujiModeDanPesan, ujiWhoami, ujiCreate, ujiUpdate, ujiComment, ujiMove, ujiDelete, ujiBaca, ujiAgenda,
-      ujiTambahan, ujiToken, ujiImporLampiran, ujiHttp, ujiAdmin, ujiAdminPurge, ujiBanding, ujiRetry429]) {
+      ujiTambahan, ujiToken, ujiImporLampiran, ujiLampiranApi, ujiHttp, ujiAdmin, ujiAdminPurge, ujiBanding, ujiRetry429]) {
       try {
         await f();
       } catch (e) {
