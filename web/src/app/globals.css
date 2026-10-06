@@ -177,13 +177,22 @@
   body {
     min-height: 100dvh;
   }
-  /* Layar sentuh (termasuk iPad): input ≥16px supaya iOS tidak zoom; target sentuh ≥44px (sama dengan web lama). */
+  /* Layar sentuh (HP/tablet): perbesar skala dasar. Karena ukuran teks & jarak Tailwind berbasis rem, menaikkan
+     font-size akar membesarkan teks, jarak antar-elemen, dan target sentuh secara proporsional di SEMUA layar
+     sekaligus (desktop/mouse tidak terpengaruh). */
   @media (pointer: coarse) {
+    :root {
+      /* Skala menyesuaikan lebar layar sentuh: HP sempit (~360px) tetap 16px (aman dari gulir samping), makin lebar
+         makin besar sampai 22px untuk layar lebar (foldable/tablet) yang kalau tidak, teksnya terasa kecil. Semua
+         ukuran teks/jarak/target Tailwind berbasis rem, jadi ikut membesar proporsional. */
+      font-size: clamp(16px, 10px + 1.7vw, 22px);
+    }
+    /* input tetap ≥16px supaya iOS tidak zoom saat fokus; 1rem (≈19px) sudah di atas ambang itu */
     input,
     textarea,
     select,
     [data-slot="select-trigger"] {
-      font-size: 16px !important;
+      font-size: max(16px, 1rem) !important;
     }
     [data-slot="button"],
     [data-slot="select-trigger"],
