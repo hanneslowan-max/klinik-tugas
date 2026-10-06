@@ -1,6 +1,8 @@
 // Tanggal & waktu WIB (Asia/Jakarta), hari kerja, kategori due. Fungsi murni (tanpa DOM) supaya bisa diuji.
 // Semantik sama dengan SQL: due_wib = tanggal WIB, hari_kerja(a,b) = Senin–Jumat a < d ≤ b di luar hari_libur.
 
+import type { KategoriDue } from "@/types/domain";
+
 export const ZONA = "Asia/Jakarta";
 
 const fmtTgl = new Intl.DateTimeFormat("id-ID", { timeZone: ZONA, weekday: "short", day: "numeric", month: "short" });
@@ -123,6 +125,41 @@ export function kategoriDue(t: BerDue, hariIni: string, libur?: ReadonlySet<stri
   if (t.due_wib === hariIni) return "hari_ini" as const;
   if (hariKerja(hariIni, t.due_wib, libur) <= 3) return "tiga_hk" as const;
   return "nanti" as const;
+}
+
+/** Tanggal (YYYY-MM-DD) n hari kerja setelah `dari` (Senin–Jumat, bukan hari libur); n harus ≥ 1. */
+export function tanggalHariKerjaKe(dari: string, n: number, libur?: ReadonlySet<string>): string {
+  let d = dari;
+  for (let sisa = n; sisa > 0; ) {
+    d = tambahHari(d, 1);
+    const w = hariDalamMinggu(d);
+    if (w !== 0 && w !== 6 && !libur?.has(d)) sisa--;
+  }
+  return d;
+}
+
+/**
+ * Tenggat (due_wib) agar kartu terbuka masuk kolom `kategori` di Papan Tugas Saya — konsisten dengan kategoriDue():
+ * `null` menghapus tenggat (tanpa_due), string = tanggal. `undefined` = kategori bukan tujuan yang sah ('telat':
+ * tidak masuk akal menjadwalkan kartu ke masa lampau), pemanggil harus menolak drop.
+ */
+export function tenggatUntukKategori(
+  kategori: KategoriDue,
+  hariIni: string,
+  libur?: ReadonlySet<string>,
+): string | null | undefined {
+  switch (kategori) {
+    case "tanpa_due":
+      return null;
+    case "hari_ini":
+      return hariIni;
+    case "tiga_hk":
+      return tanggalHariKerjaKe(hariIni, 1, libur); // hari kerja berikutnya → sisa 1 hk (≤ 3)
+    case "nanti":
+      return tanggalHariKerjaKe(hariIni, 4, libur); // > 3 hk
+    default:
+      return undefined; // 'telat'
+  }
 }
 
 export type InfoDue = { teks: string; kategori: ReturnType<typeof kategoriDue>; judul: string };
