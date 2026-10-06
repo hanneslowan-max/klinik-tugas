@@ -1050,6 +1050,48 @@ async function ujiAdminPurge() {
   cek("purge ulang → 4xx", x.status === 404 || x.status === 400, [x.status, x.json]);
 }
 
+// Perawatan lampiran: POST /x/rawat/lampiran (owner/bot, scope impor). Ditaruh sesudah purge supaya run nyata (hari=0,
+// menyasar SEMUA kartu app selesai) tidak mengganggu seksi lain yang membaca berkas. Seed tak punya lampiran app yang
+// memenuhi syarat (0), jadi efek hanya ke data uji — yang ikut dibersihkan di bersihkan().
+async function ujiRawatLampiran() {
+  bagian("POST /x/rawat/lampiran: hapus lampiran kartu selesai lama (owner/bot)");
+  const imp = apiEdge(cfg, st.tok.impor);
+
+  // dry-run: aman, tidak menghapus.
+  let x = await imp("POST", "/x/rawat/lampiran", { body: { dry: true } });
+  cek("dry-run (scope impor) → 200", x.status === 200, x.text);
+  sama("dry-run: bentuk respons (dry/hari/dihapus/berkas)",
+    [x.json?.dry === true, typeof x.json?.hari, typeof x.json?.dihapus, typeof x.json?.berkas],
+    [true, "number", "number", "number"]);
+
+  // scope: perlu impor.
+  x = await apiEdge(cfg, st.tok.baca)("POST", "/x/rawat/lampiran", { body: { dry: true } });
+  sama("scope baca → 403", x.status, 403);
+  x = await apiEdge(cfg, st.tok.tulis)("POST", "/x/rawat/lampiran", { body: { dry: true } });
+  sama("scope tulis → 403", x.status, 403);
+
+  // e2e: kartu app baru + lampiran app, tandai selesai, lalu rawat hari=0 → berkas fisik terhapus + lampiran lenyap.
+  const r0 = await tugas(cfg, st.tok.tulis, ["create", st.L.A, "--name", `uji-b1 rawat ${RUN}`]);
+  const Tr = r0.json?.id;
+  cek("buat kartu uji rawat", !!Tr, r0.stderr);
+  const nama = `uji-b1-rawat-${RUN}.png`, p = `t/${Tr}/${nama}`;
+  st.storage.add(p);
+  const up = await unggahSesi(st.jwt.budi, p, PNG, "image/png");
+  const lp = await rpcWeb(cfg, st.jwt.budi, "web_lampiran_catat",
+    { p_task: Tr, p_comment: null, p_path: p, p_title: nama, p_mime: "image/png", p_size: PNG.length });
+  cek("lampiran app untuk uji rawat tercatat", up.status === 200 && !!lp?.id, up.text);
+  await tugas(cfg, st.tok.tulis, ["update", Tr, "--status", "complete"]);
+  let o = await http("GET", `${cfg.url}/storage/v1/object/lampiran/${p}`, { headers: svcHeaders(cfg) });
+  cek("rawat e2e: berkas ada sebelum rawat", o.status === 200, o.status);
+  x = await imp("POST", "/x/rawat/lampiran", { body: { hari: 0 } });
+  cek("rawat nyata (hari=0) → 200, berkas_dihapus ≥ 1", x.status === 200 && (x.json?.berkas_dihapus ?? 0) >= 1, x.text);
+  o = await http("GET", `${cfg.url}/storage/v1/object/lampiran/${p}`, { headers: svcHeaders(cfg) });
+  cek("rawat e2e: berkas lenyap dari Storage", o.status >= 400, o.status);
+  const rt = await tugas(cfg, st.tok.baca, ["task", Tr]);
+  cek("rawat e2e: lampiran tak lagi di kartu (soft-delete)",
+    !(rt.json?.attachments || []).some((z) => z.id === lp?.id), rt.json?.attachments);
+}
+
 async function ujiBanding() {
   bagian("Banding perilaku: clickup.mjs asli vs tugas.mjs (mode tugas & mode clickup)");
   const { T1, T5 } = st.T;
@@ -1105,7 +1147,8 @@ async function utama() {
   try {
     await siapkan();
     for (const f of [ujiModeDanPesan, ujiWhoami, ujiCreate, ujiUpdate, ujiComment, ujiMove, ujiDelete, ujiBaca, ujiAgenda,
-      ujiTambahan, ujiToken, ujiImporLampiran, ujiLampiranApi, ujiHttp, ujiAdmin, ujiAdminPurge, ujiBanding, ujiRetry429]) {
+      ujiTambahan, ujiToken, ujiImporLampiran, ujiLampiranApi, ujiHttp, ujiAdmin, ujiAdminPurge, ujiRawatLampiran,
+      ujiBanding, ujiRetry429]) {
       try {
         await f();
       } catch (e) {

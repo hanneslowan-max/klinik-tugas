@@ -47,6 +47,7 @@ Bentuk galat `{err, ECODE}` dengan status HTTP:
 | GET | `/x/tenggat?tanggal=&folder=` · `/x/sensus?sumber=` | `x_tenggat` · `x_sensus` |
 | GET | `/x/count?list=&folder=&space=&sumber=` | `x_sensus` disaring; `total` dijumlah ulang, tanpa sha |
 | GET | `/x/export` (scope impor) | `x_export` |
+| POST | `/x/rawat/lampiran` (scope impor, owner/bot; body opsional `{hari?:int, dry?:bool}`) | Perawatan: `x_rawat_lampiran` men-soft-delete lampiran app pada kartu selesai > N hari (setelan `app_settings.rawat_lampiran` `{aktif,hari}`, default 7; hanya `sumber=app`, salinan ClickUp dibiarkan), lalu service role menghapus BERKAS-nya. `dry` → hanya hitung. Balas `{hari, dihapus, berkas_dihapus, berkas_sisa, berkas_gagal}` (atau `{dilewati:true}` bila setelan `aktif=false`). Dipanggil job terjadwal `rawat.yml` |
 | GET | `/x/file/{attachment_id}` | 302 ke signed URL (atau `clickup_url`) |
 | POST | `/x/impor/batch` `{jenis, rows, mode?, at_awal?}` | `impor_batch` |
 | POST | `/x/impor/hilang` `{jenis, ids_ada, mode?, lingkup?}` | `impor_tandai_hilang` |

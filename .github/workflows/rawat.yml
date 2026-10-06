@@ -1,0 +1,72 @@
+# Perawatan lampiran (impor/rawat.mjs): hapus BERKAS lampiran app pada kartu yang sudah selesai > N hari (setelan
+# app_settings.rawat_lampiran.hari, default 7) demi hemat ruang Storage. Hanya lampiran buatan app; salinan ClickUp
+# dibiarkan. Baris di-soft-delete (jejak di riwayat); berkas fisik dihapus service role.
+# Jadwal: 02:30 WIB (19:30 UTC), terpisah dari backup (03:15) & sinkron (05:45) dan di luar jendela routine 07:00–09:15.
+# HANYA jalan bila Variables repo RAWAT_AKTIF == '1'. Mematikan cepat cukup lewat setelan (rawat_lampiran.aktif=false)
+# tanpa mengubah workflow ini.
+# Secrets: TUGAS_API_URL (…/functions/v1/api/v2), TUGAS_IMPORT_TOKEN (token app scope 'impor', milik owner/bot).
+# Log hanya berisi angka (tanpa nama kartu / path).
+name: Rawat Lampiran
+
+on:
+  schedule:
+    - cron: "30 19 * * *" # 02:30 WIB
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Hanya laporkan jumlah kandidat, tanpa menghapus"
+        type: boolean
+        default: false
+      hari:
+        description: "Paksa ambang hari (kosong = pakai setelan, default 7)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rawat-lampiran
+  cancel-in-progress: false
+
+jobs:
+  rawat:
+    if: ${{ vars.RAWAT_AKTIF == '1' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TUGAS_API_URL: ${{ secrets.TUGAS_API_URL }}
+      TUGAS_IMPORT_TOKEN: ${{ secrets.TUGAS_IMPORT_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Cek secrets
+        run: |
+          set -euo pipefail
+          kurang=0
+          for v in TUGAS_API_URL TUGAS_IMPORT_TOKEN; do
+            if [ -z "${!v:-}" ]; then echo "::error::secret $v kosong"; kurang=1; fi
+          done
+          exit "$kurang"
+
+      - name: Rawat lampiran
+        env:
+          DRY: ${{ inputs.dry_run && '1' || '' }}
+          HARI: ${{ inputs.hari || '' }}
+        run: |
+          set -uo pipefail
+          args=()
+          if [ -n "$DRY" ]; then args+=(--dry); fi
+          if [ -n "$HARI" ]; then args+=(--hari "$HARI"); fi
+          node impor/rawat.mjs "${args[@]}"
+          kode=$?
+          case "$kode" in
+            0) echo "Perawatan lampiran sukses." ;;
+            2) echo "::warning::Sebagian berkas gagal dihapus (lihat ringkasan di atas)." ;;
+            *) echo "::error::Perawatan lampiran gagal (kode $kode)." ;;
+          esac
+          exit "$kode"

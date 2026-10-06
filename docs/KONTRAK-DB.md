@@ -202,6 +202,8 @@ List sama → no-op. List tak ada → 404.
 | `x_sensus(p_aktor bigint, p_sumber text default null)` | `{"dibuat","sumber","lists":[…],"total":{…}}`. Rincian di §4.2. |
 | `x_export(p_aktor bigint)` | Seluruh data untuk backup. **Hanya owner/bot** (atau `privasi_space` "abaikan"); selain itu `PT403 ACCESS_001` (review R2). Rincian di bawah tabel. |
 | `x_admin_akun(p_aktor bigint, p_member bigint, p_auth_user uuid, p_email text, p_harus_ganti boolean default true)` | **Tambahan** untuk Edge `/api/x/admin/akun` & `/reset`: menautkan `members.auth_user_id`, `email`, dan `harus_ganti_password`. Hasil `{"id","username","email","auth_user_id","harus_ganti_password"}`. Email/akun sudah dipakai anggota lain → `PT409 KONFLIK_001`. |
+| `x_lampiran_catat(p_aktor bigint, p_task text, p_comment text, p_path text, p_title text, p_mime text, p_size bigint)` | Untuk Edge `POST /v2/task/{id}/attachment` (scope `tulis`): catat baris lampiran setelah berkas ada di Storage. Logika bersama `inti_lampiran_catat` dengan `web_lampiran_catat` (§6); mode cermin & atribusi pengunggah via trigger; idempoten per `storage_path`. Hasil = lampiran web. |
+| `x_rawat_lampiran(p_aktor bigint, p_hari int default null, p_dry boolean default false)` | Untuk Edge `POST /x/rawat/lampiran` (scope `impor`, **owner/bot**). Soft-delete lampiran `sumber=app` pada kartu `sumber=app` yang `status_type in (done,closed)` dan `greatest(done_at,closed_at) < now() − N hari`. `N` = `p_hari`, atau `app_settings.rawat_lampiran.hari` (default 7); `aktif=false` → `{"dilewati":true,…}`. Kembalikan `{"hari","dihapus","dry","storage_paths":[…]}` (Edge yang menghapus berkas fisiknya). `p_dry` → hanya daftar. Trigger mencatat activity `lampiran_hapus`. Bukan owner/bot → `PT403 ACCESS_001`. Rincian di bawah tabel. |
 
 **`x_search`: pencocokan dan urutan**
 - Cocok dengan ID atau `clickup_id`, URL (`app.clickup.com/t/<id>`, `/t/<team>/<id>`, `<app>/t/<id>`), kode di awal nama (`Y7`, `FX-PM`, `[Claude]`), `name ILIKE`, markdown/teks, atau full-text.
@@ -224,6 +226,14 @@ List sama → no-op. List tak ada → 404.
 **`x_admin_akun`: syarat**
 - Hanya owner. Bot → 400. Anggota tak ada → 404.
 - Edge membuat atau mengubah user Auth lebih dulu (admin API), lalu memanggil fungsi ini dengan `p_aktor` = member owner pemilik JWT.
+
+**`x_rawat_lampiran`: perawatan lampiran (hemat Storage)**
+- Setelan `app_settings.rawat_lampiran` = `{"aktif": bool, "hari": int}` (default `{"aktif": true, "hari": 7}`). `aktif=false` → fungsi melewati tanpa menghapus.
+- Lingkup **sempit**: hanya `attachments.sumber='app'` pada `tasks.sumber='app'`. Salinan ClickUp (`sumber='clickup'`) tidak pernah disentuh (ClickUp tetap sumber kebenaran; lagipula akan terunduh ulang saat sinkron).
+- Syarat kedaluwarsa: kartu `status_type in ('done','closed')` dan `greatest(done_at, closed_at) < now() − N hari`.
+- Baris di-**soft delete** (`deleted_at`/`deleted_by`), jadi jejaknya tetap di riwayat (trigger `lampiran_sesudah` → activity `lampiran_hapus`). **Berkas fisik** dihapus Edge dengan service role memakai `storage_paths` yang dikembalikan (SQL tak bisa menghapus `storage.objects`; pembagian kerja sama dengan `web_purge`).
+- Logika inti di `inti_rawat_lampiran(p_hari, p_dry)` (pembantu internal). `p_dry=true` → daftar kandidat saja, tanpa menghapus baris.
+- Dipanggil job terjadwal `impor/rawat.mjs` (`.github/workflows/rawat.yml`, harian 02:30 WIB). Berkas lampiran app ikut backup mingguan (`cadangan.mjs lampiran`), jadi berkas yang dihapus umumnya masih bisa dipulihkan dari backup terbaru selama ambang `hari ≥ 7` (≥ satu siklus backup).
 
 ### 4.1 x_tenggat
 
@@ -498,9 +508,9 @@ Objek Storage **tidak** terhapus dari SQL karena trigger `storage.protect_object
 
 ## 7. Pembantu internal (tidak bisa dipanggil klien)
 
-`ms`, `ms_ke_ts`, `ts_dari`, `bool_dari`, `prioritas_dari`, `ids_dari`, `mulai_api`, `mulai_web`, `anggota_wajib`, `anggota_impor_wajib`, `set_space_anggota_impor`, `muat_space_anggota`, `list_diarsip`, `rujukan_urai`, `rujukan_wadah`, `penilai`, `akses_semua`, `list_terlihat`, `tugas_terlihat`, `menunggu_keputusan`, `kategori_due`, `wajib_owner_aktor`, `idem_ambil`, `idem_simpan`, `status_cari`, `status_petakan`, `status_id`, `app_url`, `team_id`, `j_member`, `j_prioritas`, `j_folder_list`, `j_list`, `j_list_statuses`, `j_lampiran`, `j_task`, `j_comment`, `komentar_parts`, `inti_buat_tugas`, `inti_assignee`, `inti_ubah_tugas`, `inti_pindah`, `inti_hapus`, `inti_komentar`, `cari_tugas`, `riwayat_tugas`, `j_baris`, `tenggat_hitung`, `norm_impor_tugas`, `norm_impor_komentar`, `sha256_hex`, `muat_*`, `set_mentions_impor`, `j_lampiran_web`, `j_komentar_web`, `body_web`.
+`ms`, `ms_ke_ts`, `ts_dari`, `bool_dari`, `prioritas_dari`, `ids_dari`, `mulai_api`, `mulai_web`, `anggota_wajib`, `anggota_impor_wajib`, `set_space_anggota_impor`, `muat_space_anggota`, `list_diarsip`, `rujukan_urai`, `rujukan_wadah`, `penilai`, `akses_semua`, `list_terlihat`, `tugas_terlihat`, `menunggu_keputusan`, `kategori_due`, `wajib_owner_aktor`, `idem_ambil`, `idem_simpan`, `status_cari`, `status_petakan`, `status_id`, `app_url`, `team_id`, `j_member`, `j_prioritas`, `j_folder_list`, `j_list`, `j_list_statuses`, `j_lampiran`, `j_task`, `j_comment`, `komentar_parts`, `inti_buat_tugas`, `inti_assignee`, `inti_ubah_tugas`, `inti_pindah`, `inti_hapus`, `inti_komentar`, `inti_lampiran_catat`, `inti_rawat_lampiran`, `cari_tugas`, `riwayat_tugas`, `j_baris`, `tenggat_hitung`, `norm_impor_tugas`, `norm_impor_komentar`, `sha256_hex`, `muat_*`, `set_mentions_impor`, `j_lampiran_web`, `j_komentar_web`, `body_web`.
 
-Konvensi: setiap fungsi berawalan `api_`, `x_`, `impor_`, atau `web_` adalah endpoint publik. Tes 09 memeriksa jumlahnya (29 service_role + 33 authenticated) dan haknya.
+Konvensi: setiap fungsi berawalan `api_`, `x_`, `impor_`, atau `web_` adalah endpoint publik. Tes 09 memeriksa jumlahnya (31 service_role + 33 authenticated) dan haknya.
 
 Pembantu privasi yang dipakai policy RLS/Storage dan bisa dipanggil `authenticated`/`service_role`: `lihat_semua()`, `space_terlihat(p_space)`, `list_tertutup()`, `tugas_tertutup()`. Semuanya menilai `penilai()` (internal): anggota sesi JWT bila ada (RLS, Storage, `web_*`), selain itu `aktor()` (`api_*`/`x_*`). Tidak ada parameter anggota, jadi klien tidak bisa menanyakan hak anggota lain.
 

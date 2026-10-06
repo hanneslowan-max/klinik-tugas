@@ -145,6 +145,7 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
 - **Komentar menaikkan `updated_at` (R4)**, kebalikan catatan "sementara" §3, supaya `agenda --hours` menangkap kartu yang hanya dapat komentar.
 - **Impor tidak pernah membuat owner (R1)**: anggota impor selalu `member`; baris owner/bot dilindungi dari impor.
 - `/x/export` butuh token scope `impor` dan hanya owner/bot. `POST /v2/task/{id}/attachment` kini aktif (scope `tulis`, `multipart/form-data`): service role unggah ke Storage lalu `x_lampiran_catat`; allowlist MIME + 25 MB; kartu ClickUp saat cermin ditolak trigger.
+- **Perawatan lampiran (hemat Storage)**: `POST /x/rawat/lampiran` + `x_rawat_lampiran` (scope `impor`, owner/bot) menghapus BERKAS lampiran app pada kartu selesai > N hari (setelan `app_settings.rawat_lampiran` `{aktif,hari}`, default 7; hanya `sumber=app`, salinan ClickUp dibiarkan). Baris di-soft-delete (jejak activity `lampiran_hapus`); berkas dihapus service role. Job terjadwal `rawat.yml` (harian 02:30 WIB, gerbang `RAWAT_AKTIF=1`), skrip `impor/rawat.mjs`.
 - Burst limit per isolate Edge (40 kapasitas, 20/detik), bukan global.
 
 ## Masalah terbuka

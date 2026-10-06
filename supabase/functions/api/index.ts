@@ -143,6 +143,22 @@ async function signedUrls(paths: string[]): Promise<Map<string, string>> {
   return hasil;
 }
 
+// Hapus objek Storage per daftar path (service role). `removeObjects`: DELETE /storage/v1/object/<bucket> {prefixes}.
+// Kembalikan path yang benar-benar terhapus + tanda gagal. Objek yang memang sudah tak ada tidak masuk `dihapus`.
+async function hapusObjek(paths: string[]): Promise<{ dihapus: string[]; gagal: boolean }> {
+  if (!paths.length) return { dihapus: [], gagal: false };
+  const r = await http(`${SUPABASE_URL}/storage/v1/object/${BUCKET}`, {
+    method: "DELETE",
+    headers: { ...kunciService(), "content-type": "application/json" },
+    body: JSON.stringify({ prefixes: paths }),
+  });
+  if (r.res.ok && Array.isArray(r.data)) {
+    return { dihapus: (r.data as Obj[]).map((o) => String(o.name ?? "")).filter(Boolean), gagal: false };
+  }
+  console.error(`hapus objek Storage gagal: HTTP ${r.res.status}`, r.text.slice(0, 300));
+  return { dihapus: [], gagal: true };
+}
+
 // ---------------------------------------------------------------- workspace & CORS (cache per isolate)
 let cacheSetel: { t: number; appUrl: string; teamId: string } | null = null;
 async function setelan() {
@@ -446,20 +462,7 @@ async function adminPurge(req: Request): Promise<unknown> {
   if (!res.ok) throw dariPostgrest(res.status, data as Obj, "web_purge");
   const hasil = (data ?? {}) as Obj;
   const paths = Array.isArray(hasil.storage_paths) ? (hasil.storage_paths as unknown[]).filter((p): p is string => typeof p === "string") : [];
-  let dihapus: string[] = [];
-  let storageGagal = false;
-  if (paths.length) {
-    const r = await http(`${SUPABASE_URL}/storage/v1/object/${BUCKET}`, {
-      method: "DELETE",
-      headers: { ...kunciService(), "content-type": "application/json" },
-      body: JSON.stringify({ prefixes: paths }),
-    });
-    if (r.res.ok && Array.isArray(r.data)) dihapus = (r.data as Obj[]).map((o) => String(o.name ?? "")).filter(Boolean);
-    else {
-      storageGagal = true;
-      console.error(`hapus storage purge gagal: HTTP ${r.res.status}`, r.text.slice(0, 300));
-    }
-  }
+  const { dihapus, gagal: storageGagal } = await hapusObjek(paths);
   // Path yang tak terhapus (objek memang tak ada / galat Storage) dilaporkan supaya bisa diulang.
   return { ...hasil, storage_dihapus: dihapus, storage_sisa: paths.filter((p) => !dihapus.includes(p)), storage_gagal: storageGagal };
 }
@@ -675,6 +678,25 @@ const RUTE: Rute[] = [
     },
   },
   { m: "GET", p: /^\/x\/export$/, perlu: "impor", h: (c) => rpc("x_export", { p_aktor: A(c) }, T(c)) },
+  {
+    // Perawatan lampiran (job terjadwal, owner/bot): hapus BERKAS lampiran app pada kartu selesai > N hari (setelan
+    // app_settings.rawat_lampiran.hari, default 7). Baris di-soft-delete (jejak di riwayat) oleh x_rawat_lampiran;
+    // berkas fisik dihapus di sini (service role). Body opsional {hari?:int, dry?:bool}. dry → hanya daftar, tanpa hapus.
+    m: "POST", p: /^\/x\/rawat\/lampiran$/, perlu: "impor",
+    h: async (c) => {
+      const b = (await c.body().catch(() => ({}))) as Obj;
+      const hariNum = Number(b.hari);
+      const hari = Number.isFinite(hariNum) ? Math.trunc(hariNum) : null;
+      const dry = b.dry === true;
+      const hasil = (await rpc("x_rawat_lampiran", { p_aktor: A(c), p_hari: hari, p_dry: dry }, T(c))) as Obj;
+      const paths = Array.isArray(hasil.storage_paths)
+        ? (hasil.storage_paths as unknown[]).filter((p): p is string => typeof p === "string") : [];
+      const { storage_paths: _sp, ...sisa } = hasil;
+      if (dry) return { ...sisa, berkas: paths.length };   // dry: laporkan jumlah, jangan sentuh berkas
+      const { dihapus, gagal } = await hapusObjek(paths);
+      return { ...sisa, berkas_dihapus: dihapus.length, berkas_sisa: paths.length - dihapus.length, berkas_gagal: gagal };
+    },
+  },
   {
     // Unduh lampiran: 302 ke signed URL (atau URL ClickUp untuk lampiran tautan_saja/gagal).
     m: "GET", p: /^\/x\/file\/([^/]+)$/, perlu: "baca",

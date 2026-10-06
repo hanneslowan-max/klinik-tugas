@@ -22,13 +22,13 @@ select uji.cek(not exists (
 select uji.sama((select count(*)::int from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname ~ '^web_'), 33,
   '33 fungsi web_* (kontrak §7)');
 select uji.sama((select count(*)::int from pg_proc p where p.pronamespace = 'public'::regnamespace
-                  and p.proname ~ '^(api|x|impor)_'), 30, '30 fungsi api_/x_/impor_ (kontrak §6 + x_admin_akun + x_lampiran_catat)');
+                  and p.proname ~ '^(api|x|impor)_'), 31, '31 fungsi api_/x_/impor_ (kontrak §6 + x_admin_akun + x_lampiran_catat + x_rawat_lampiran)');
 select uji.cek(not exists (
   select 1 from pg_proc p
    where p.pronamespace = 'public'::regnamespace
      and p.proname in ('mulai_api', 'mulai_web', 'j_task', 'j_comment', 'inti_buat_tugas', 'inti_ubah_tugas',
-                       'inti_komentar', 'inti_lampiran_catat', 'komentar_parts', 'muat_tasks', 'tenggat_hitung',
-                       'cari_tugas', 'idem_ambil')
+                       'inti_komentar', 'inti_lampiran_catat', 'inti_rawat_lampiran', 'komentar_parts', 'muat_tasks',
+                       'tenggat_hitung', 'cari_tugas', 'idem_ambil')
      and (has_function_privilege('service_role', p.oid, 'EXECUTE') or has_function_privilege('authenticated', p.oid, 'EXECUTE')
           or has_function_privilege('anon', p.oid, 'EXECUTE'))),
   'pembantu internal A2 tidak bisa dipanggil role API');
