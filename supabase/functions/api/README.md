@@ -40,13 +40,14 @@ Bentuk galat `{err, ECODE}` dengan status HTTP:
 | GET / PUT / DELETE | `/v2/task/{id}` (`?include_markdown_description=true`) | `api_task` (lampiran → signed URL 24 jam) / `api_update_task` / `api_delete_task` |
 | GET / POST | `/v2/task/{id}/comment` (`?start&start_id`) | `api_task_comments` (semua komentar; `start` menyaring yang lebih tua) / `api_create_comment` |
 | GET / POST | `/v2/comment/{id}/reply` | `api_comment_replies` / `api_create_reply` |
-| POST | `/v2/task/{id}/attachment` | 501 `APP_501` (ditunda Fase 1) |
+| POST | `/v2/task/{id}/attachment` (scope `tulis`, `multipart/form-data`: `file` wajib, `title`/`comment_id` opsional) | Unggah SATU berkas: service role menaruh ke Storage `t/<task>/<rand>-<nama>` lalu `x_lampiran_catat`. Allowlist MIME + 25 MB (bucket); kartu ClickUp saat mode cermin → ditolak trigger (`CERMIN_001`); tugas tak terlihat → 404. Balas objek lampiran + `url` (signed 24 jam). Kirim `Content-Type` berkas yang benar (tanpa itu jadi `application/octet-stream` → ditolak allowlist) |
 | PUT | `/v3/workspaces/{tid}/tasks/{id}/home_list/{list}` | `api_move_task` |
 | GET | `/x/task/{id}/activity` (alias `/x/activity/{id}`) | `x_activity` |
 | GET | `/x/resolve?ref=` · `/x/search?q=&space=&include_closed=` | `x_resolve` · `x_search` |
 | GET | `/x/tenggat?tanggal=&folder=` · `/x/sensus?sumber=` | `x_tenggat` · `x_sensus` |
 | GET | `/x/count?list=&folder=&space=&sumber=` | `x_sensus` disaring; `total` dijumlah ulang, tanpa sha |
 | GET | `/x/export` (scope impor) | `x_export` |
+| POST | `/x/rawat/lampiran` (scope impor, owner/bot; body opsional `{hari?:int, dry?:bool}`) | Perawatan: `x_rawat_lampiran` men-soft-delete lampiran app pada kartu selesai > N hari (setelan `app_settings.rawat_lampiran` `{aktif,hari}`, default 7; hanya `sumber=app`, salinan ClickUp dibiarkan), lalu service role menghapus BERKAS-nya. `dry` → hanya hitung. Balas `{hari, dihapus, berkas_dihapus, berkas_sisa, berkas_gagal}` (atau `{dilewati:true}` bila setelan `aktif=false`). Dipanggil job terjadwal `rawat.yml` |
 | GET | `/x/file/{attachment_id}` | 302 ke signed URL (atau `clickup_url`) |
 | POST | `/x/impor/batch` `{jenis, rows, mode?, at_awal?}` | `impor_batch` |
 | POST | `/x/impor/hilang` `{jenis, ids_ada, mode?, lingkup?}` | `impor_tandai_hilang` |

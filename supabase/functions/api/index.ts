@@ -143,6 +143,22 @@ async function signedUrls(paths: string[]): Promise<Map<string, string>> {
   return hasil;
 }
 
+// Hapus objek Storage per daftar path (service role). `removeObjects`: DELETE /storage/v1/object/<bucket> {prefixes}.
+// Kembalikan path yang benar-benar terhapus + tanda gagal. Objek yang memang sudah tak ada tidak masuk `dihapus`.
+async function hapusObjek(paths: string[]): Promise<{ dihapus: string[]; gagal: boolean }> {
+  if (!paths.length) return { dihapus: [], gagal: false };
+  const r = await http(`${SUPABASE_URL}/storage/v1/object/${BUCKET}`, {
+    method: "DELETE",
+    headers: { ...kunciService(), "content-type": "application/json" },
+    body: JSON.stringify({ prefixes: paths }),
+  });
+  if (r.res.ok && Array.isArray(r.data)) {
+    return { dihapus: (r.data as Obj[]).map((o) => String(o.name ?? "")).filter(Boolean), gagal: false };
+  }
+  console.error(`hapus objek Storage gagal: HTTP ${r.res.status}`, r.text.slice(0, 300));
+  return { dihapus: [], gagal: true };
+}
+
 // ---------------------------------------------------------------- workspace & CORS (cache per isolate)
 let cacheSetel: { t: number; appUrl: string; teamId: string } | null = null;
 async function setelan() {
@@ -265,6 +281,14 @@ async function lampiranTerisi(task: Obj): Promise<Obj> {
     return sisa;
   });
   return task;
+}
+
+// Satu lampiran (hasil x_lampiran_catat) → bentuk respons: tambah signed URL 24 jam, buang storage_path & clickup_url.
+async function lampiranSatu(a: Obj): Promise<Obj> {
+  const { storage_path, clickup_url, ...sisa } = a;
+  const sp = typeof storage_path === "string" ? storage_path : "";
+  sisa.url = (sp && (await signedUrls([sp])).get(sp)) || (typeof clickup_url === "string" && clickup_url) || null;
+  return sisa;
 }
 
 // Paginasi ClickUp `start`(ms) + `start_id`: API ini mengembalikan SEMUA komentar di halaman pertama;
@@ -438,20 +462,7 @@ async function adminPurge(req: Request): Promise<unknown> {
   if (!res.ok) throw dariPostgrest(res.status, data as Obj, "web_purge");
   const hasil = (data ?? {}) as Obj;
   const paths = Array.isArray(hasil.storage_paths) ? (hasil.storage_paths as unknown[]).filter((p): p is string => typeof p === "string") : [];
-  let dihapus: string[] = [];
-  let storageGagal = false;
-  if (paths.length) {
-    const r = await http(`${SUPABASE_URL}/storage/v1/object/${BUCKET}`, {
-      method: "DELETE",
-      headers: { ...kunciService(), "content-type": "application/json" },
-      body: JSON.stringify({ prefixes: paths }),
-    });
-    if (r.res.ok && Array.isArray(r.data)) dihapus = (r.data as Obj[]).map((o) => String(o.name ?? "")).filter(Boolean);
-    else {
-      storageGagal = true;
-      console.error(`hapus storage purge gagal: HTTP ${r.res.status}`, r.text.slice(0, 300));
-    }
-  }
+  const { dihapus, gagal: storageGagal } = await hapusObjek(paths);
   // Path yang tak terhapus (objek memang tak ada / galat Storage) dilaporkan supaya bisa diulang.
   return { ...hasil, storage_dihapus: dihapus, storage_sisa: paths.filter((p) => !dihapus.includes(p)), storage_gagal: storageGagal };
 }
@@ -559,9 +570,64 @@ const RUTE: Rute[] = [
       rpc("api_create_reply", { p_aktor: A(c), p_comment: d(g[0]), p_body: await c.body(), p_idem: idem(c.req) }, T(c)),
   },
   {
+    // Unggah lampiran dalam SATU panggilan: multipart/form-data, field `file` (opsional `title`, `comment_id`).
+    // Edge (service role) menaruh berkas ke Storage lalu x_lampiran_catat mencatat barisnya. Allowlist MIME + 25 MB
+    // ditegakkan bucket; mode cermin (kartu ClickUp tak bisa dilampiri) & atribusi pengunggah oleh trigger. Objek
+    // yatim dibersihkan bila pencatatan gagal.
     m: "POST", p: /^\/v2\/task\/([^/]+)\/attachment$/, perlu: "tulis",
-    h: () => {
-      throw new GalatApi(501, "Unggah lampiran lewat API belum tersedia (Fase 1): pakai aplikasi web", "APP_501");
+    h: async (c, g) => {
+      const task = d(g[0]);
+      if (!/^multipart\/form-data/i.test(c.req.headers.get("content-type") ?? "")) {
+        throw new GalatApi(400, "Kirim berkas sebagai multipart/form-data dengan field 'file'", "INPUT_001");
+      }
+      let form: FormData;
+      try {
+        form = await c.req.formData();
+      } catch {
+        throw new GalatApi(400, "Isi multipart/form-data tidak valid", "INPUT_001");
+      }
+      const f = form.get("file") ?? form.get("attachment");
+      if (!(f instanceof File)) throw new GalatApi(400, "Field 'file' wajib berisi sebuah berkas", "INPUT_001");
+      if (f.size === 0) throw new GalatApi(400, "Berkas kosong", "INPUT_001");
+      if (f.size > 26214400) throw new GalatApi(413, "Berkas melebihi 25 MB", "INPUT_001");
+      const title = (form.get("title") as string | null)?.toString().trim() || "";
+      const comment = (form.get("comment_id") as string | null)?.toString().trim() || "";
+      // deno-lint-ignore no-control-regex -- tolak karakter kontrol di nama objek
+      const nama = ((f.name || title || "lampiran").replace(/[\/\\]/g, "_").replace(/[\x00-\x1f]/g, "").trim() || "lampiran").slice(0, 200);
+      const mime = f.type || "application/octet-stream";
+      const path = `t/${task}/${crypto.randomUUID().slice(0, 8)}-${nama}`;
+
+      // 1) unggah ke Storage (service role). Bucket menolak tipe di luar allowlist & berkas > 25 MB.
+      const up = await http(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${encPath(path)}`, {
+        method: "POST",
+        headers: { ...kunciService(), "content-type": mime, "x-upsert": "false" },
+        body: new Uint8Array(await f.arrayBuffer()),
+        timeoutMs: 300_000,
+      });
+      if (!up.res.ok) {
+        const pesan = String((up.data as Obj)?.message ?? (up.data as Obj)?.error ?? up.text ?? "").slice(0, 200);
+        if (/mime|not allowed|invalid.?mime|content.?type/i.test(pesan)) {
+          throw new GalatApi(400, `Tipe berkas tidak diizinkan: ${mime}`, "INPUT_001");
+        }
+        if (up.res.status === 413 || /exceed|too large|maximum size/i.test(pesan)) {
+          throw new GalatApi(413, "Berkas melebihi 25 MB", "INPUT_001");
+        }
+        if (up.res.status === 409) throw new GalatApi(409, "Berkas dengan nama itu sudah ada", "KONFLIK_001");
+        console.error(`unggah lampiran gagal: HTTP ${up.res.status} ${pesan}`);
+        throw new GalatApi(502, "Storage gagal menerima berkas", "APP_502");
+      }
+
+      // 2) catat baris (cek tugas terlihat/editable + trigger cermin). Bersihkan objek bila gagal.
+      try {
+        const hasil = await rpc("x_lampiran_catat", {
+          p_aktor: A(c), p_task: task, p_comment: comment || null, p_path: path,
+          p_title: title || null, p_mime: mime, p_size: f.size,
+        }, T(c));
+        return await lampiranSatu(hasil as Obj);
+      } catch (e) {
+        await http(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${encPath(path)}`, { method: "DELETE", headers: kunciService() }).catch(() => {});
+        throw e;
+      }
     },
   },
   // ---- v3: pindah home list
@@ -612,6 +678,25 @@ const RUTE: Rute[] = [
     },
   },
   { m: "GET", p: /^\/x\/export$/, perlu: "impor", h: (c) => rpc("x_export", { p_aktor: A(c) }, T(c)) },
+  {
+    // Perawatan lampiran (job terjadwal, owner/bot): hapus BERKAS lampiran app pada kartu selesai > N hari (setelan
+    // app_settings.rawat_lampiran.hari, default 7). Baris di-soft-delete (jejak di riwayat) oleh x_rawat_lampiran;
+    // berkas fisik dihapus di sini (service role). Body opsional {hari?:int, dry?:bool}. dry → hanya daftar, tanpa hapus.
+    m: "POST", p: /^\/x\/rawat\/lampiran$/, perlu: "impor",
+    h: async (c) => {
+      const b = (await c.body().catch(() => ({}))) as Obj;
+      const hariNum = Number(b.hari);
+      const hari = Number.isFinite(hariNum) ? Math.trunc(hariNum) : null;
+      const dry = b.dry === true;
+      const hasil = (await rpc("x_rawat_lampiran", { p_aktor: A(c), p_hari: hari, p_dry: dry }, T(c))) as Obj;
+      const paths = Array.isArray(hasil.storage_paths)
+        ? (hasil.storage_paths as unknown[]).filter((p): p is string => typeof p === "string") : [];
+      const { storage_paths: _sp, ...sisa } = hasil;
+      if (dry) return { ...sisa, berkas: paths.length };   // dry: laporkan jumlah, jangan sentuh berkas
+      const { dihapus, gagal } = await hapusObjek(paths);
+      return { ...sisa, berkas_dihapus: dihapus.length, berkas_sisa: paths.length - dihapus.length, berkas_gagal: gagal };
+    },
+  },
   {
     // Unduh lampiran: 302 ke signed URL (atau URL ClickUp untuk lampiran tautan_saja/gagal).
     m: "GET", p: /^\/x\/file\/([^/]+)$/, perlu: "baca",
