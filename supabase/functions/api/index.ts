@@ -678,6 +678,21 @@ const RUTE: Rute[] = [
     },
   },
   { m: "GET", p: /^\/x\/export$/, perlu: "impor", h: (c) => rpc("x_export", { p_aktor: A(c) }, T(c)) },
+  // ---- Pipeline (READ-ONLY untuk routine/agent; scope baca). Tulis hanya lewat web (rep) & admin.
+  {
+    m: "GET", p: /^\/x\/pipeline\/leads$/, perlu: "baca",
+    h: (c) => rpc("x_pipeline_daftar", { p_aktor: A(c), p: {
+      tab: c.q.get("tab") ?? undefined, pemilik: c.q.get("pemilik") ?? undefined, q: c.q.get("q") ?? undefined } }, T(c)),
+  },
+  {
+    m: "GET", p: /^\/x\/pipeline\/lead\/([^/]+)$/, perlu: "baca",
+    h: (c, g) => rpc("x_pipeline_lead", { p_aktor: A(c), p_id: d(g[0]) }, T(c)),
+  },
+  {
+    m: "GET", p: /^\/x\/pipeline\/ringkas$/, perlu: "baca",
+    h: (c) => rpc("x_pipeline_ringkas", { p_aktor: A(c), p: {
+      dasar: c.q.get("dasar") ?? undefined, bulan: c.q.get("bulan") ?? undefined } }, T(c)),
+  },
   {
     // Perawatan lampiran (job terjadwal, owner/bot): hapus BERKAS lampiran app pada kartu selesai > N hari (setelan
     // app_settings.rawat_lampiran.hari, default 7). Baris di-soft-delete (jejak di riwayat) oleh x_rawat_lampiran;
