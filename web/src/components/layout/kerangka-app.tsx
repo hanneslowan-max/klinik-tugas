@@ -13,6 +13,7 @@ import { AvatarAnggota } from "@/components/umum/avatar-anggota";
 import { Chip } from "@/components/umum/chip";
 import { Lembar } from "@/components/umum/lembar";
 import { useKeluar } from "@/features/auth/keluar";
+import { usePipelineSaya } from "@/features/pipeline/queries";
 import { useProfil } from "@/features/profil/penyedia-profil";
 import { PenyimakRealtime } from "@/features/realtime/penyimak-realtime";
 import { LABEL_PERAN } from "@/lib/konstanta";
@@ -52,7 +53,7 @@ function TautanSidebar({ item, path, angka }: { item: ItemNav; path: string; ang
   );
 }
 
-function Sidebar({ path }: { path: string }) {
+function Sidebar({ path, navUtama }: { path: string; navUtama: ItemNav[] }) {
   const { owner, profil } = useProfil();
   const keluar = useKeluar();
   return (
@@ -66,7 +67,7 @@ function Sidebar({ path }: { path: string }) {
         </div>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
-        {NAV_UTAMA.map((item) => (
+        {navUtama.map((item) => (
           <TautanSidebar key={item.href} item={item} path={path} />
         ))}
         <div className="my-3 border-t" />
@@ -96,7 +97,7 @@ function Sidebar({ path }: { path: string }) {
   );
 }
 
-function NavBawah({ path }: { path: string }) {
+function NavBawah({ path, navUtama }: { path: string; navUtama: ItemNav[] }) {
   const { owner, profil } = useProfil();
   const keluar = useKeluar();
   const [menu, setMenu] = useState(false);
@@ -108,7 +109,7 @@ function NavBawah({ path }: { path: string }) {
         aria-label="Navigasi utama"
         data-uji="nav-bawah"
       >
-        {NAV_UTAMA.map((item) => {
+        {navUtama.map((item) => {
           const aktif = item.cocok(path);
           return (
             <Link key={item.href} href={item.href} aria-current={aktif ? "page" : undefined} className={cn(kelasItem, aktif && "text-primary")}>
@@ -172,6 +173,9 @@ function NavBawah({ path }: { path: string }) {
 export function KerangkaApp({ children }: { children: ReactNode }) {
   const path = usePathname();
   usePelacakRiwayat();
+  // Gerbang menu Pipeline (§6): sembunyikan dari anggota tanpa akses modul. Halaman tetap digerbangi GerbangPipeline + RLS server.
+  const aksesPipeline = usePipelineSaya();
+  const navUtama = NAV_UTAMA.filter((i) => !i.pipelineSaja || !!aksesPipeline.data?.peran);
   return (
     <div className="flex min-h-dvh">
       <a href="#isi" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded focus:bg-background focus:p-2">

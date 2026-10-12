@@ -340,6 +340,139 @@ export type HasilPurge = { purged: string[]; storage_paths: string[] };
 /** Hasil Edge /x/admin/purge: web_purge + objek Storage yang terhapus/tertinggal. */
 export type HasilPurgeEdge = HasilPurge & { storage_dihapus?: string[]; storage_sisa?: string[] };
 
+// ==================================================================== Pipeline (sales)
+// Bentuk JSON dari fungsi web_pipeline_* (supabase/migrations/20261011120100/120200/120300).
+export type PeranPipeline = "admin" | "rep" | "baca";
+export type TahapLead = "BARU" | "PENAWARAN" | "ORDER" | "BATAL" | "DIALIHKAN";
+export type SumberLead =
+  | "Google Ads" | "Meta Ads" | "Website organik" | "WA langsung"
+  | "Telepon" | "Referral" | "Repeat order" | "Lainnya";
+export type ProdukLead =
+  | "Roda" | "Pallet Mesh" | "Airport Trolley" | "Shopping Cart"
+  | "Lemari Arsip" | "Material Handling" | "Locker" | "Lainnya";
+export type SatuanItem = "unit" | "set" | "pcs";
+export type JenisAktivitas = "Telepon" | "WA" | "Email" | "Visit" | "Kirim penawaran" | "Catatan" | "Catatan impor";
+export type AlasanBatal =
+  | "Harga" | "Stok/waktu kirim" | "Spesifikasi tidak cocok" | "Tidak ada respon"
+  | "Beli di tempat lain" | "Proyek batal/ditunda" | "Lainnya";
+export type JenisPelanggan = "perusahaan" | "perorangan";
+
+/** Hasil web_pipeline_saya: gerbang menu & layar (§6). */
+export type PipelineSaya = { peran: PeranPipeline | null; boleh_ringkas: boolean };
+
+export type ItemLead = {
+  id: number;
+  produk: ProdukLead;
+  qty: number;
+  satuan: SatuanItem;
+  spesifikasi: string | null;
+  periksa?: boolean;
+};
+
+export type ItemLeadRingkas = { produk: ProdukLead; qty: number; satuan: SatuanItem };
+
+export type AktivitasLead = {
+  id: number;
+  waktu: string;
+  oleh: IdAnggota | null;
+  jenis: JenisAktivitas;
+  hasil: string | null;
+  rencana_berikutnya: string | null;
+};
+
+export type RiwayatTahapLead = { dari: TahapLead | null; ke: TahapLead; waktu: string };
+
+/** Nama & telepon null bila disamarkan (peran 'baca' / Yosie, §6). */
+export type KontakLead = { id: string; nama: string | null; telepon: string | null; jabatan: string | null };
+export type PelangganLead = { id: string; nama: string; jenis: JenisPelanggan; kota: string | null };
+
+/** Baris ringkas daftar lead = public.j_pipeline_lead_ringkas. */
+export type LeadRingkas = {
+  id: string;
+  kode: string;
+  tahap: TahapLead;
+  sumber: SumberLead;
+  pelanggan: string;
+  kota: string | null;
+  pemilik: IdAnggota | null;
+  pemilik_nama: string | null;
+  tanggal_masuk: string;
+  diam_hari: number;
+  nilai_transaksi: number | null;
+  no_sp: string | null;
+  periksa: boolean;
+  produk: ItemLeadRingkas[];
+};
+
+/** Detail lead penuh = public.j_pipeline_lead. */
+export type LeadDetail = {
+  id: string;
+  kode: string;
+  tanggal_masuk: string;
+  tahap: TahapLead;
+  sumber: SumberLead;
+  pemilik: IdAnggota | null;
+  pemilik_nama: string | null;
+  dialihkan_ke: string | null;
+  kebutuhan: string | null;
+  catatan: string | null;
+  catatan_impor: string | null;
+  nilai_penawaran: number | null;
+  tanggal_penawaran: string | null;
+  no_sp: string | null;
+  tanggal_sp: string | null;
+  nilai_transaksi: number | null;
+  alasan_batal: AlasanBatal | null;
+  alasan_batal_lain: string | null;
+  periksa: boolean;
+  periksa_sebab: string | null;
+  ref_sheet: string | null;
+  diam_sejak: string | null;
+  diam_hari: number;
+  dibuat_pada: string;
+  pelanggan: PelangganLead;
+  kontak: KontakLead | null;
+  items: ItemLead[];
+  aktivitas: AktivitasLead[];
+  riwayat_tahap: RiwayatTahapLead[];
+};
+
+export type DaftarLead = { total: number; items: LeadRingkas[] };
+
+/** Hasil web_pipeline_pelanggan_cari (dedup saat input lead baru). */
+export type PelangganCari = {
+  id: string;
+  nama: string;
+  kota: string | null;
+  jenis: JenisPelanggan;
+  kontak: { id: string; nama: string | null; telepon: string | null }[];
+};
+
+/** win-rate kecil = public.pipeline_wr. */
+export type WinRate = { order: number; batal: number; matang: number; rate: number | null };
+
+export type RingkasBulanRep = { pemilik: IdAnggota | null; username: string | null; order: number; omzet: number };
+
+export type RingkasBulan = {
+  bulan: string;
+  leads: number;
+  pelanggan_baru: number;
+  penawaran: number;
+  order: number;
+  batal: number;
+  dialihkan: number;
+  omzet_total: number;
+  per_rep: RingkasBulanRep[];
+};
+
+/** Hasil web_pipeline_ringkas (§4). */
+export type RingkasPipeline = {
+  dasar: "sp" | "lead";
+  bulan: RingkasBulan[];
+  win_rate: { semua: WinRate; pm: WinRate; pm_kecil_lt20: WinRate; pm_besar_ge20: WinRate };
+  siklus_hari_rata2: number | null;
+};
+
 /** Peta nama fungsi web_* → bentuk hasilnya. */
 export type HasilRpc = {
   web_saya: Profil;
@@ -375,4 +508,13 @@ export type HasilRpc = {
   web_admin_token_cabut: unknown;
   web_admin_tokens: TokenApi[];
   web_admin_sinkron: DataSinkron;
+  web_pipeline_saya: PipelineSaya;
+  web_pipeline_daftar: DaftarLead;
+  web_pipeline_lead: LeadDetail;
+  web_pipeline_lead_buat: LeadDetail;
+  web_pipeline_fu_catat: LeadDetail;
+  web_pipeline_tahap: LeadDetail;
+  web_pipeline_lead_ubah: LeadDetail;
+  web_pipeline_pelanggan_cari: PelangganCari[];
+  web_pipeline_ringkas: RingkasPipeline;
 };

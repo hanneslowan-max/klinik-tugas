@@ -1,0 +1,16 @@
+Tgl,Company,Location,PIC Name,Phone No,Status,Sales Rep,Item,Remark,Respon,No Surat Pesanan,Nilai Transaksi,Follow Up,Respon setelah FU
+2025-10-13,PT Sinar Uji,Jakarta,Andi,0812-1111-2222,Customer Baru,Riksa,Roda,butuh roda 4 inch,minta penawaran,,,,
+2025-10-14,PT Palet Uji,Surabaya,Bima,0813-2222-3333,Kirim Penawaran,Michael,Pallet Mesh,pallet 10 unit,sedang dihitung,,,Follow up 1x,belum ada respon
+2025-10-15,PT Kereta Uji,Bekasi,Candra,0812-3333-4444,"Customer Baru, Kirim Penawaran, Order",Riksa,Shopping Cart,troli belanja,deal,12/RSG/X/2025,Rp 5.000.000,Follow up 2x,oke lanjut
+2025-10-16,PT Roda Uji,Tangerang,Dewi,0812-4444-5555,Order,Michael,Roda,roda nylon,jadi beli,N/10/2025,Rp 3.000.000,,
+2025-09-20,PT Kembar Satu,Depok,Eka,0812-5555-6666,Order,Riksa,Roda,roda besi,jadi,88/RSG/IX/2025,Rp 1.000.000,,
+2025-09-21,PT Kembar Dua,Bogor,Fajar,0812-6666-7777,Order,Michael,Roda,roda besi,jadi,88/RSG/IX/2025,Rp 2.000.000,,
+2025-10-18,PT Batal Uji,Jakarta,Gita,0812-7777-8888,Batal,Riksa,Roda,tanya harga,,,,,
+2025-10-19,PT Alih Uji,Semarang,Hadi,0812-8888-9999,Follow up Sales lain,Surabaya,Roda,minta cabang terdekat,,,,,
+2025-10-20,PT Sebut Pallet,Jakarta,Indra,0812-9999-0000,Customer Baru,Michael,Roda,mau pallet mesh juga nanti,nanti dikabari,,,,
+NOVEMBER,,,,,,,,,,,,,
+2025-11-05,-,Bandung,Budi,0813-3333-4444,Customer Baru,,Cabinet,lemari arsip kecil,,,,,
+2025-11-06,CV Uji Dua,Yogyakarta,Joko,0813-4444-5555,Visit,Felix,Gerobak Dorong,gerobak custom,survei dulu,,,,
+2025-11-07,,,Citra,0815-5555-6666,Customer Baru,,Roda,roda troli,,,,,
+2025-12-01,"PT Maju's ""Alat""",Jakarta,Kiki,0812-1212-1212,Customer Baru,Riksa,Roda,roda standar,,,,,
+2099-01-01,PT Masa Depan,Jakarta,Lina,0812-3434-3434,Customer Baru,,Roda,salah ketik tahun,,,,,

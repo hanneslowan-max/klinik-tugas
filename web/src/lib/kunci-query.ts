@@ -14,4 +14,12 @@ export const kunci = {
   adminTokens: ["admin", "tokens"] as const,
   adminSinkron: ["admin", "sinkron"] as const,
   adminLibur: ["admin", "libur"] as const,
+  // Pipeline (sales)
+  pipelineSaya: ["pipeline", "saya"] as const,
+  pipelineDaftar: (tab: string, pemilik: number | null, q: string) =>
+    ["pipeline", "daftar", tab, pemilik ?? "semua", q] as const,
+  pipelineLead: (id: string) => ["pipeline", "lead", id] as const,
+  pipelineRingkas: (bulan: string, dasar: string) => ["pipeline", "ringkas", bulan, dasar] as const,
+  /** akar invalidasi untuk semua data lead/daftar/ringkasan sesudah mutasi */
+  semuaPipeline: ["pipeline"] as const,
 };
