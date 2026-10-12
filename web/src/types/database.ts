@@ -1358,6 +1358,20 @@ export type Database = {
       web_notif: { Args: { p_limit?: number }; Returns: Json };
       web_notif_baca: { Args: { p_ids?: number[] }; Returns: Json };
       web_pindah: { Args: { p_list: string; p_task: string }; Returns: Json };
+      web_pipeline_akses_daftar: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      web_pipeline_akses_simpan: { Args: { p: Json }; Returns: Json };
+      web_pipeline_daftar: { Args: { p: Json }; Returns: Json };
+      web_pipeline_fu_catat: { Args: { p: Json }; Returns: Json };
+      web_pipeline_lead: { Args: { p_id: string }; Returns: Json };
+      web_pipeline_lead_buat: { Args: { p: Json }; Returns: Json };
+      web_pipeline_lead_ubah: { Args: { p: Json }; Returns: Json };
+      web_pipeline_pelanggan_cari: { Args: { p_q: string }; Returns: Json };
+      web_pipeline_ringkas: { Args: { p: Json }; Returns: Json };
+      web_pipeline_saya: { Args: Record<PropertyKey, never>; Returns: Json };
+      web_pipeline_tahap: { Args: { p: Json }; Returns: Json };
       web_pulihkan: { Args: { p_task: string }; Returns: Json };
       web_purge: { Args: { p_task: string }; Returns: Json };
       web_saya: { Args: Record<PropertyKey, never>; Returns: Json };

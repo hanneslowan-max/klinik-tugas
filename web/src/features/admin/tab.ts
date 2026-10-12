@@ -6,6 +6,7 @@ export const TAB_ADMIN = [
   { kunci: "struktur", label: "Struktur" },
   { kunci: "libur", label: "Hari libur" },
   { kunci: "token", label: "Token API" },
+  { kunci: "pipeline", label: "Akses Pipeline" },
   { kunci: "mode", label: "Mode" },
   { kunci: "sinkron", label: "Sinkron" },
 ] as const;

@@ -38,7 +38,8 @@ export function Lembar({ buka, ubahBuka, judul, deskripsi, kaki, lebar, children
             {deskripsi ? <DialogDescription>{deskripsi}</DialogDescription> : <DialogDescription className="sr-only">{judul}</DialogDescription>}
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
-          {kaki ? <DialogFooter className="border-t px-5 py-3">{kaki}</DialogFooter> : null}
+          {/* m-0 membatalkan -mx-4/-mb-4 bawaan DialogFooter (dirancang utk konten p-4); di sini konten p-0 jadi footer harus flush, bukan mencuat keluar kartu. */}
+          {kaki ? <DialogFooter className="m-0 border-t px-5 py-3">{kaki}</DialogFooter> : null}
         </DialogContent>
       </Dialog>
     );

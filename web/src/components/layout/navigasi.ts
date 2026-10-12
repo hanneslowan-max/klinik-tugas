@@ -1,12 +1,21 @@
-import { Bell, CheckSquare, FolderTree, Search, Settings, Trash2, type LucideIcon } from "lucide-react";
+import { Bell, CheckSquare, FolderTree, Search, Settings, Target, Trash2, type LucideIcon } from "lucide-react";
 
-export type ItemNav = { href: string; label: string; Ikon: LucideIcon; ownerSaja?: boolean; cocok: (path: string) => boolean };
+export type ItemNav = {
+  href: string;
+  label: string;
+  Ikon: LucideIcon;
+  ownerSaja?: boolean;
+  /** hanya untuk pengguna berakses modul Pipeline (peran != null, §6) — gerbang dibaca dari web_pipeline_saya */
+  pipelineSaja?: boolean;
+  cocok: (path: string) => boolean;
+};
 
 /** Navigasi utama (urutan sama di sidebar desktop & nav bawah HP). */
 export const NAV_UTAMA: ItemNav[] = [
   { href: "/saya", label: "Tugas Saya", Ikon: CheckSquare, cocok: (p) => p === "/" || p.startsWith("/saya") },
   { href: "/jelajah", label: "Jelajah", Ikon: FolderTree, cocok: (p) => p.startsWith("/jelajah") || p.startsWith("/l/") },
   { href: "/cari", label: "Cari", Ikon: Search, cocok: (p) => p.startsWith("/cari") },
+  { href: "/pipeline", label: "Pipeline", Ikon: Target, pipelineSaja: true, cocok: (p) => p.startsWith("/pipeline") },
 ];
 
 export const NAV_LAIN: ItemNav[] = [

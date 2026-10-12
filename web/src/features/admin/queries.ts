@@ -10,7 +10,7 @@ import { bungkusGalat, rpc } from "@/lib/api/rpc";
 import { kunci } from "@/lib/kunci-query";
 import { klienBrowser } from "@/lib/supabase/client";
 import type { Json } from "@/types/database";
-import type { Anggota, Peran, TipeStatus, TokenApi } from "@/types/domain";
+import type { Anggota, Peran, PeranPipeline, TipeStatus, TokenApi } from "@/types/domain";
 
 /** Tandai basi & tunggu kunci yang sedang tampil selesai dimuat ulang (mutateAsync selesai sesudah data segar). */
 function segarkan(qc: QueryClient, ...daftar: QueryKey[]) {
@@ -162,5 +162,33 @@ export function useGantiMode() {
     mutationFn: (mode: "cermin" | "utama") => rpc(klienBrowser(), "web_admin_mode", { p_mode: mode }),
     // mode mengubah hak ubah di semua layar (kartu ClickUp terkunci/terbuka) → segarkan semuanya
     onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+// ------------------------------------------------------------------ akses modul Pipeline (owner)
+
+/** Daftar akses Pipeline saat ini + kandidat anggota (web_pipeline_akses_daftar, owner-only). */
+export function usePipelineAksesAdmin() {
+  return useQuery({
+    queryKey: kunci.pipelineAkses,
+    queryFn: () => rpc(klienBrowser(), "web_pipeline_akses_daftar"),
+    staleTime: 0,
+  });
+}
+
+/** Simpan/ubah akses (hapus: true untuk mencabut). kode_sp dipakai membangun No SP (rep). */
+export type DataAksesPipeline = {
+  member_id: number;
+  peran?: PeranPipeline;
+  kode_sp?: string | null;
+  hapus?: boolean;
+};
+
+export function useSimpanAksesPipeline() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (p: DataAksesPipeline) => rpc(klienBrowser(), "web_pipeline_akses_simpan", { p: p as Json }),
+    // akses berubah → segarkan daftar akses + gerbang/menu Pipeline semua layar
+    onSuccess: () => segarkan(qc, kunci.pipelineAkses, kunci.semuaPipeline),
   });
 }
