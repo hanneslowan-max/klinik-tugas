@@ -77,6 +77,10 @@ bagian("Unit: parser CSV (quote, pemisah, multi-baris)");
   cek("uraiTabel: newline dalam kutip utuh", b[1][2] === "tiga\nbaris", JSON.stringify(b[1][2]));
   const tsv = uraiTabel("x\ty\n1\t2\n", "\t");
   cek("uraiTabel TSV", tsv[1][0] === "1" && tsv[1][1] === "2");
+  // baris kosong interior tidak boleh menggeser ref_sheet (header "a"=tgl, "b"=company)
+  const recD = bacaRecord("a,b\n2025-01-01,X\n\n2025-01-03,Z\n", "blank.csv", bacaArgumen(["blank.csv"]));
+  const zRec = recD.find((r) => r.tgl === "2025-01-03");
+  cek("baris kosong interior tetap sejajar nomor baris sheet (ref_sheet)", !!zRec && zRec._baris === 4, zRec && zRec._baris);
 }
 
 // ---------------------------------------------------------------- integrasi: olah fixture
@@ -89,6 +93,7 @@ const lap = hitungLaporan(h, records);
 
 cek("records = 15 baris data (header dibuang)", records.length === 15, records.length);
 cek("ref_sheet berurut mulai r2", records[0]._baris === 2 && records[14]._baris === 16, { a: records[0]._baris, z: records[14]._baris });
+cek("header kolom A kosong → tgl via posisi; 'Company Name' → company (regresi dry-run)", records[0].tgl === "2025-10-13" && records[0].company === "PT Sinar Uji", { tgl: records[0].tgl, co: records[0].company });
 cek("tidak terimpor = 1 (NOVEMBER pemisah)", lap.tidak_terimpor === 1 && lap.pemisah_bulan === 1, { t: lap.tidak_terimpor, p: lap.pemisah_bulan });
 cek("terimpor = 14", lap.terimpor === 14, lap.terimpor);
 
@@ -112,7 +117,7 @@ cek("r3: PM qty default ditandai", /Pallet Mesh/.test(perByRef.r3 || ""), perByR
 cek("r4: ORDER tanggal SP dari tanggal lead", /tanggal SP diisi dari tanggal lead/.test(perByRef.r4 || ""), perByRef.r4);
 cek("r5: No SP gagal pola", /tidak sesuai pola/.test(perByRef.r5 || ""), perByRef.r5);
 cek("r6 & r7: No SP dobel", /dobel/.test(perByRef.r6 || "") && /dobel/.test(perByRef.r7 || ""), { r6: perByRef.r6, r7: perByRef.r7 });
-cek("r8: BATAL tanpa alasan", /BATAL tapi alasan/.test(perByRef.r8 || ""), perByRef.r8);
+cek("r8: BATAL selalu periksa (alasan_batal tak diimpor, walau kolom J terisi)", /BATAL/.test(perByRef.r8 || ""), perByRef.r8);
 cek("r10: teks sebut pallet, produk bukan PM", /menyebut "pallet"/.test(perByRef.r10 || ""), perByRef.r10);
 cek("r13: produk tak dikenal", /tak dikenal/.test(perByRef.r13 || ""), perByRef.r13);
 cek("r14: nama perusahaan kosong", /nama perusahaan kosong/.test(perByRef.r14 || ""), perByRef.r14);

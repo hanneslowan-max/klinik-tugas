@@ -157,11 +157,16 @@ begin
     end if;
   end if;
 
-  -- pemilik: rep → dirinya; owner boleh set eksplisit atau biarkan kosong
-  v_pemilik := nullif(p->>'pemilik', '')::bigint;
-  if v_pemilik is null and v_peran = 'rep' then v_pemilik := public.aktor(); end if;
-  if v_pemilik is not null and not exists (select 1 from public.members m where m.id = v_pemilik) then
-    perform public.lempar('PT400', 'Pemilik tidak dikenal', 'INPUT_001');
+  -- pemilik: rep SELALU dirinya (abaikan payload, cegah palsukan kepemilikan); admin/owner boleh set eksplisit atau kosong (K1/§6)
+  if v_peran = 'rep' then
+    v_pemilik := public.aktor();
+  else
+    v_pemilik := nullif(p->>'pemilik', '')::bigint;
+  end if;
+  if v_pemilik is not null and not exists (
+    select 1 from public.members m where m.id = v_pemilik and m.aktif and m.role in ('owner', 'member')
+  ) then
+    perform public.lempar('PT400', 'Pemilik tidak dikenal / tidak aktif', 'INPUT_001');
   end if;
 
   insert into public.lead (pelanggan_id, kontak_id, sumber, pemilik, tanggal_masuk, kebutuhan, catatan, ref_sheet)

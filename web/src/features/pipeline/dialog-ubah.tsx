@@ -17,7 +17,19 @@ import { useLeadUbah, type BodyLeadUbah, type ItemMasuk } from "@/features/pipel
 import { pesanGalat } from "@/lib/api/galat";
 import type { LeadDetail, ProdukLead, SatuanItem, SumberLead } from "@/types/domain";
 
-type DetailItem = { qty: string; satuan: SatuanItem };
+type DetailItem = { qty: string; satuan: SatuanItem; spesifikasi: string };
+
+// Bandingkan item lead sekarang vs hasil edit; `items` hanya dikirim saat benar-benar berubah. Server mengganti
+// SEMUA lead_item bila `items` ada (hapus-lalu-isi) — tanpa guard ini, simpan biasa (mis. ubah catatan) menghapus
+// spesifikasi item & flag periksa impor §7.
+function itemsBerubah(asal: LeadDetail["items"], baru: ItemMasuk[]): boolean {
+  if (asal.length !== baru.length) return true;
+  const kunciItem = (produk: string, qty: number, satuan: string | null | undefined, spes: string | null | undefined) =>
+    `${produk}|${qty}|${satuan ?? "unit"}|${spes ?? ""}`;
+  const a = asal.map((i) => kunciItem(i.produk, i.qty, i.satuan, i.spesifikasi)).sort();
+  const b = baru.map((i) => kunciItem(i.produk, i.qty, i.satuan, i.spesifikasi)).sort();
+  return a.some((x, idx) => x !== b[idx]);
+}
 
 export function DialogUbah({ buka, ubahBuka, lead }: { buka: boolean; ubahBuka: (b: boolean) => void; lead: LeadDetail }) {
   return (
@@ -34,7 +46,7 @@ function IsiUbah({ lead, onSelesai }: { lead: LeadDetail; onSelesai: () => void 
   const [catatan, setCatatan] = useState(lead.catatan ?? "");
   const [produk, setProduk] = useState<ProdukLead[]>(lead.items.map((i) => i.produk));
   const [detail, setDetail] = useState<Record<string, DetailItem>>(
-    Object.fromEntries(lead.items.map((i) => [i.produk, { qty: String(i.qty), satuan: i.satuan }])),
+    Object.fromEntries(lead.items.map((i) => [i.produk, { qty: String(i.qty), satuan: i.satuan, spesifikasi: i.spesifikasi ?? "" }])),
   );
   const [galat, setGalat] = useState<string | null>(null);
 
@@ -42,7 +54,7 @@ function IsiUbah({ lead, onSelesai }: { lead: LeadDetail; onSelesai: () => void 
     setProduk(baru);
     setDetail((d) => {
       const next = { ...d };
-      for (const p of baru) if (!next[p]) next[p] = { qty: "", satuan: "unit" };
+      for (const p of baru) if (!next[p]) next[p] = { qty: "", satuan: "unit", spesifikasi: "" };
       return next;
     });
   }
@@ -54,14 +66,20 @@ function IsiUbah({ lead, onSelesai }: { lead: LeadDetail; onSelesai: () => void 
       const n = Number(detail[p]?.qty);
       if (!detail[p]?.qty || !Number.isFinite(n) || n <= 0) return setGalat(`Isi qty (> 0) untuk ${p}.`);
     }
-    const items: ItemMasuk[] = produk.map((p) => ({ produk: p, qty: Number(detail[p].qty), satuan: detail[p].satuan }));
+    const items: ItemMasuk[] = produk.map((p) => ({
+      produk: p,
+      qty: Number(detail[p].qty),
+      satuan: detail[p].satuan,
+      spesifikasi: detail[p].spesifikasi.trim() || null,
+    }));
     const body: BodyLeadUbah = {
       lead_id: lead.id,
       sumber,
       kebutuhan: kebutuhan.trim() || null,
       catatan: catatan.trim() || null,
-      items,
     };
+    // Kirim `items` hanya bila berubah — kalau tidak, server akan hapus-lalu-isi lead_item & membuang spesifikasi + flag periksa §7.
+    if (itemsBerubah(lead.items, items)) body.items = items;
     try {
       await ubah.mutateAsync(body);
       toast.success("Lead diperbarui");
@@ -88,14 +106,14 @@ function IsiUbah({ lead, onSelesai }: { lead: LeadDetail; onSelesai: () => void 
                 <Input
                   inputMode="numeric"
                   value={detail[p]?.qty ?? ""}
-                  onChange={(e) => setDetail((d) => ({ ...d, [p]: { ...(d[p] ?? { satuan: "unit" }), qty: e.target.value } }))}
+                  onChange={(e) => setDetail((d) => ({ ...d, [p]: { satuan: "unit", spesifikasi: "", ...(d[p] ?? {}), qty: e.target.value } }))}
                   placeholder="Qty"
                   aria-label={`Qty ${p}`}
                   className="w-20"
                 />
                 <Select
                   value={detail[p]?.satuan ?? "unit"}
-                  onValueChange={(v) => setDetail((d) => ({ ...d, [p]: { ...(d[p] ?? { qty: "" }), satuan: v as SatuanItem } }))}
+                  onValueChange={(v) => setDetail((d) => ({ ...d, [p]: { qty: "", spesifikasi: "", ...(d[p] ?? {}), satuan: v as SatuanItem } }))}
                 >
                   <SelectTrigger className="w-24" aria-label={`Satuan ${p}`}>
                     <SelectValue />

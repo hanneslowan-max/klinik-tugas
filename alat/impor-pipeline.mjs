@@ -46,7 +46,7 @@ export const SENTINEL_PERORANGAN = new Set(["-", "?", "perorangan", "pribadi", "
 export const KOLOM = ["tgl", "company", "location", "pic", "phone", "status", "rep", "item", "remark", "respon", "no_sp", "nilai", "fu", "respon_fu"];
 export const ALIAS = {
   tgl: ["tgl", "tanggal", "date", "a"],
-  company: ["company", "perusahaan", "nama perusahaan", "nama", "b"],
+  company: ["company", "company name", "perusahaan", "nama perusahaan", "nama", "b"],
   location: ["location", "kota", "lokasi", "c"],
   pic: ["pic name", "pic", "nama pic", "kontak", "contact", "d"],
   phone: ["phone no", "phone", "telepon", "telp", "hp", "no hp", "no telp", "e"],
@@ -141,7 +141,9 @@ export function bacaRecord(teks, nama, opsi) {
     return data.map((obj, idx) => petakanObjek(obj, idx, opsi));
   }
   const pemisah = deteksiPemisah(nama, opsi.pemisah);
-  const baris = uraiTabel(teks, pemisah).filter((b) => !(b.length === 1 && b[0] === ""));
+  // JANGAN saring baris kosong: _baris harus tetap sejajar nomor baris sheet asli (ref_sheet dipakai lacak-balik & routine).
+  // Baris kosong lolos sebagai tanggal kosong → dilewati di olah(), tapi penghitung baris tak bergeser.
+  const baris = uraiTabel(teks, pemisah);
   if (!baris.length) return [];
   let peta, mulai, kolomNama = null;
   if (opsi.pos) {
@@ -150,6 +152,8 @@ export function bacaRecord(teks, nama, opsi) {
   } else {
     kolomNama = baris[0].map((h) => String(h).trim().toLowerCase());
     peta = KOLOM.map((f) => cariKolom(kolomNama, f));
+    // Sheet asli: header kolom A (tanggal) KOSONG → tak terpetakan lewat alias. Jatuhkan ke posisi kolom pertama.
+    if (peta[0] < 0) peta[0] = 0;
     mulai = 1;
   }
   const refIdx = opsi.refKolom && kolomNama ? kolomNama.indexOf(opsi.refKolom.toLowerCase()) : -1;
@@ -352,7 +356,7 @@ export function olah(records, opsi, hariIni = new Date().toISOString().slice(0, 
       lead.tanggal_sp = tgl.date;
       sebab.push("ada No SP tapi tahap bukan ORDER");
     }
-    if (lead.tahap === "BATAL" && !bersih(rec.respon)) sebab.push("tahap BATAL tapi alasan batal tidak ada di sheet");
+    if (lead.tahap === "BATAL") sebab.push("tahap BATAL — isi alasan_batal (tidak diimpor dari sheet)" + (bersih(rec.respon) ? ` (petunjuk kolom J: "${bersih(rec.respon)}")` : ""));
     if (lead.tahap === "DIALIHKAN" && !lead.dialihkan_ke) sebab.push("tahap DIALIHKAN tapi tujuan (kolom G) kosong");
     if (tgl.date > hariIni) sebab.push(`tanggal masuk di masa depan: ${tgl.date} (cek salah ketik tahun)`);
 

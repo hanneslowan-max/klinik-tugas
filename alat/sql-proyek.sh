@@ -101,7 +101,8 @@ case "${1:-}" in
   --akun) [ $# -eq 3 ] || { echo "pakai: --akun <member_id> <email>" >&2; exit 2; }; akun "$2" "$3" ;;
   ""|-h|--help) sed -n '2,23p' "$0"; exit 2 ;;
   *)
-    [ -f "$1" ] || { echo "Berkas tidak ada: $1" >&2; exit 2; }
+    # terima berkas biasa, FIFO, atau process substitution <(...) (/dev/fd/NN, dibaca sekali oleh `kirim`)
+    [ -f "$1" ] || [ -p "$1" ] || [ -r "$1" ] || { echo "Berkas/aliran tidak ada: $1" >&2; exit 2; }
     kode=$(kirim "$1" "$TMP/r.json")
     if [ -n "${2:-}" ]; then
       (umask 077; cp "$TMP/r.json" "$2")

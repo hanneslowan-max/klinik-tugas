@@ -43,7 +43,10 @@ parsial `lead_no_sp_uniq`, trigger pengisi kode/riwayat/diam/cari).
 | N Respon setelah FU | `respon_fu` | idem (isi: hitungan FU + teks N). |
 
 **Pemetaan kolom:** default lewat **baris header** (alias longgar — huruf besar/kecil & spasi diabaikan; mis.
-"Sales Rep"/"Sales"/"Rep"/"G"). Tanpa header gunakan `--pos` (kolom berurut A..N). JSON: array objek berkunci nama
+"Sales Rep"/"Sales"/"Rep"/"G", dan "Company Name" → `company`). **Catatan sheet asli:** header sel A1 (tanggal)
+sering **kosong** di ekspor — otomatis dijatuhkan ke posisi kolom pertama (A). **Selalu cek angka stdout** (`total_baris_sheet`
+vs `terimpor`): kalau `terimpor` mendekati 0 atau semua tanggal/pemilik kosong, berarti pemetaan header gagal →
+jalankan ulang dengan `--pos` (kolom berurut A..N, tanpa membaca baris header). JSON: array objek berkunci nama
 kolom/alias. `ref_sheet` diambil dari kolom `--ref-kolom` bila ada; jika tidak, dihitung dari posisi (lihat
 `--mulai-baris`, default 2 karena baris 1 = header). Baris pemisah/kosong tetap menambah penghitung agar `ref_sheet`
 sejajar nomor baris sheet asli.
