@@ -82,10 +82,13 @@ begin
       select coalesce(jsonb_agg(jsonb_build_object(
           'produk', pr.produk, 'leads', pr.leads, 'order', pr.ord, 'omzet', pr.omzet) order by pr.leads desc), '[]'::jsonb)
       from (
-        select i.produk, count(distinct l.id) leads,
-          count(distinct l.id) filter (where l.tahap = 'ORDER') ord,
-          coalesce(sum(l.nilai_transaksi) filter (where l.tahap = 'ORDER'), 0) omzet
-        from public.lead_item i join public.lead l on l.id = i.lead_id group by i.produk) pr),
+        -- dedup (produk, lead) dulu: satu lead bisa punya >1 lead_item produk sama → cegah omzet dihitung ganda.
+        select d.produk, count(*) leads,
+          count(*) filter (where d.tahap = 'ORDER') ord,
+          coalesce(sum(d.nilai_transaksi) filter (where d.tahap = 'ORDER'), 0) omzet
+        from (select distinct i.produk, l.id, l.tahap, l.nilai_transaksi
+              from public.lead_item i join public.lead l on l.id = i.lead_id) d
+        group by d.produk) pr),
     'per_alasan_batal', (
       select coalesce(jsonb_agg(jsonb_build_object('alasan', a.alasan, 'jumlah', a.n) order by a.n desc), '[]'::jsonb)
       from (
