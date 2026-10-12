@@ -76,6 +76,7 @@ create table public.lead (
   periksa_sebab   text,
   ref_sheet       text,                                        -- impor: no. baris sheet (mis. r1983)
   diam_sejak      timestamptz,                                 -- turunan: aktivitas terakhir (trigger)
+  fu_berikutnya   date,                                        -- turunan: rencana FU terbaru (trigger) → tab "Follow up hari ini"
   dibuat_oleh     bigint references public.members (id),
   dibuat_pada     timestamptz not null default now(),
   diperbarui_pada timestamptz not null default now(),
@@ -91,6 +92,7 @@ create index lead_tanggal_masuk_idx on public.lead (tanggal_masuk);
 create index lead_tanggal_sp_idx on public.lead (tanggal_sp) where tanggal_sp is not null;
 create index lead_pelanggan_idx on public.lead (pelanggan_id);
 create index lead_diam_idx on public.lead (diam_sejak);
+create index lead_fu_idx on public.lead (fu_berikutnya) where fu_berikutnya is not null;
 create index lead_periksa_idx on public.lead (periksa) where periksa;
 create index lead_cari_idx on public.lead using gin (cari);
 
@@ -176,7 +178,8 @@ create or replace function public.pipeline_aktivitas_sesudah()
 returns trigger language plpgsql security definer set search_path = '' as $$
 begin
   update public.lead
-     set diam_sejak = greatest(coalesce(diam_sejak, new.waktu), new.waktu)
+     set diam_sejak = greatest(coalesce(diam_sejak, new.waktu), new.waktu),
+         fu_berikutnya = new.rencana_berikutnya   -- rencana FU terbaru menang (null = tak ada rencana)
    where id = new.lead_id;
   return null;
 end; $$;

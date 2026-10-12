@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { KotakPesan } from "@/components/umum/kotak-pesan";
-import { KakiLembar, Lembar } from "@/components/umum/lembar";
+import { Lembar } from "@/components/umum/lembar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,14 +23,10 @@ import type { PelangganCari, ProdukLead, SatuanItem, SumberLead } from "@/types/
 type DetailItem = { qty: string; satuan: SatuanItem };
 
 export function DialogLeadBaru({ buka, ubahBuka }: { buka: boolean; ubahBuka: (b: boolean) => void }) {
-  return (
-    <Lembar buka={buka} ubahBuka={ubahBuka} judul="Lead baru" data-uji="dialog-lead-baru">
-      {buka ? <FormLeadBaru onSelesai={() => ubahBuka(false)} /> : null}
-    </Lembar>
-  );
+  return <FormLeadBaru buka={buka} ubahBuka={ubahBuka} />;
 }
 
-function FormLeadBaru({ onSelesai }: { onSelesai: () => void }) {
+function FormLeadBaru({ buka, ubahBuka }: { buka: boolean; ubahBuka: (b: boolean) => void }) {
   const buat = useLeadBaru();
 
   const [nama, setNama] = useState("");
@@ -47,6 +43,17 @@ function FormLeadBaru({ onSelesai }: { onSelesai: () => void }) {
   const [peringatanTelp, setPeringatanTelp] = useState<PelangganCari[]>([]);
   const [galat, setGalat] = useState<string | null>(null);
   const [galatField, setGalatField] = useState<Record<string, boolean>>({});
+
+  // Tutup + reset isian lewat callback (bukan efek, agar lolos react-hooks/set-state-in-effect); komponen tetap
+  // ter-mount utk kaki & animasi, jadi buka berikutnya tetap bersih.
+  const tutup = (b: boolean) => {
+    if (!b) {
+      setNama(""); setPelangganId(null); setPic(""); setKota(""); setTelepon("");
+      setProduk([]); setDetail({}); setKebutuhan(""); setSumber(null);
+      setSaran([]); setPeringatanTelp([]); setGalat(null); setGalatField({});
+    }
+    ubahBuka(b);
+  };
 
   // dedup perusahaan: cari saat mengetik nama (bukan setelah pilih pelanggan lama). Hasil hanya ditampilkan bila
   // syarat masih terpenuhi (lihat render), jadi tak perlu setState sinkron di dalam efek.
@@ -140,14 +147,30 @@ function FormLeadBaru({ onSelesai }: { onSelesai: () => void }) {
     try {
       const lead = await buat.mutateAsync(body);
       toast.success(`Lead ${lead.kode} dibuat`);
-      onSelesai();
+      tutup(false);
     } catch (e) {
       setGalat(pesanGalat(e));
     }
   };
 
   return (
-    <div className="space-y-4">
+    <Lembar
+      buka={buka}
+      ubahBuka={tutup}
+      judul="Lead baru"
+      data-uji="dialog-lead-baru"
+      kaki={
+        <>
+          <Button type="button" variant="outline" onClick={() => tutup(false)}>
+            Batal
+          </Button>
+          <Button type="button" onClick={kirim} disabled={buat.isPending} data-uji="kirim-lead-baru">
+            {buat.isPending ? "Menyimpan…" : "Simpan lead"}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
       {/* Perusahaan + dedup */}
       <div className="space-y-1.5">
         <Label htmlFor="lb-nama">Perusahaan</Label>
@@ -284,15 +307,7 @@ function FormLeadBaru({ onSelesai }: { onSelesai: () => void }) {
       </KotakPesan>
 
       {galat ? <KotakPesan nada="galat">{galat}</KotakPesan> : null}
-
-      <KakiLembar>
-        <Button type="button" variant="outline" onClick={onSelesai}>
-          Batal
-        </Button>
-        <Button type="button" onClick={kirim} disabled={buat.isPending} data-uji="kirim-lead-baru">
-          {buat.isPending ? "Menyimpan…" : "Simpan lead"}
-        </Button>
-      </KakiLembar>
-    </div>
+      </div>
+    </Lembar>
   );
 }

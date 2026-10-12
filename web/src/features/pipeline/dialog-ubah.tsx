@@ -106,14 +106,14 @@ function IsiUbah({ lead, onSelesai }: { lead: LeadDetail; onSelesai: () => void 
                 <Input
                   inputMode="numeric"
                   value={detail[p]?.qty ?? ""}
-                  onChange={(e) => setDetail((d) => ({ ...d, [p]: { satuan: "unit", spesifikasi: "", ...(d[p] ?? {}), qty: e.target.value } }))}
+                  onChange={(e) => setDetail((d) => ({ ...d, [p]: { ...(d[p] ?? { qty: "", satuan: "unit", spesifikasi: "" }), qty: e.target.value } }))}
                   placeholder="Qty"
                   aria-label={`Qty ${p}`}
                   className="w-20"
                 />
                 <Select
                   value={detail[p]?.satuan ?? "unit"}
-                  onValueChange={(v) => setDetail((d) => ({ ...d, [p]: { qty: "", spesifikasi: "", ...(d[p] ?? {}), satuan: v as SatuanItem } }))}
+                  onValueChange={(v) => setDetail((d) => ({ ...d, [p]: { ...(d[p] ?? { qty: "", satuan: "unit", spesifikasi: "" }), satuan: v as SatuanItem } }))}
                 >
                   <SelectTrigger className="w-24" aria-label={`Satuan ${p}`}>
                     <SelectValue />

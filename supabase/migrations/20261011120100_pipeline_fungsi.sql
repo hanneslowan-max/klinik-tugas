@@ -40,7 +40,7 @@ create or replace function public.j_pipeline_lead(p_id text, p_mask boolean)
 returns jsonb language sql stable security definer set search_path = '' as $$
   select jsonb_build_object(
     'id', l.id, 'kode', l.kode, 'tanggal_masuk', l.tanggal_masuk, 'tahap', l.tahap, 'sumber', l.sumber,
-    'pemilik', l.pemilik, 'pemilik_nama', mp.username, 'dialihkan_ke', l.dialihkan_ke,
+    'pemilik', l.pemilik, 'pemilik_nama', mp.username, 'pemilik_kode_sp', pa.kode_sp, 'dialihkan_ke', l.dialihkan_ke,
     'kebutuhan', l.kebutuhan, 'catatan', l.catatan, 'catatan_impor', l.catatan_impor,
     'nilai_penawaran', l.nilai_penawaran, 'tanggal_penawaran', l.tanggal_penawaran,
     'no_sp', l.no_sp, 'tanggal_sp', l.tanggal_sp, 'nilai_transaksi', l.nilai_transaksi,
@@ -48,6 +48,7 @@ returns jsonb language sql stable security definer set search_path = '' as $$
     'periksa', l.periksa, 'periksa_sebab', l.periksa_sebab, 'ref_sheet', l.ref_sheet,
     'diam_sejak', public.iso_utc(l.diam_sejak),
     'diam_hari', greatest(0, public.hari_ini_wib() - l.diam_sejak::date),
+    'fu_berikutnya', l.fu_berikutnya,
     'dibuat_pada', public.iso_utc(l.dibuat_pada),
     'pelanggan', jsonb_build_object('id', pg.id, 'nama', pg.nama, 'jenis', pg.jenis, 'kota', pg.kota),
     'kontak', case when l.kontak_id is null then null else jsonb_build_object(
@@ -70,6 +71,7 @@ returns jsonb language sql stable security definer set search_path = '' as $$
     join public.pelanggan pg on pg.id = l.pelanggan_id
     left join public.kontak k on k.id = l.kontak_id
     left join public.members mp on mp.id = l.pemilik
+    left join public.pipeline_akses pa on pa.member_id = l.pemilik
   where l.id = p_id
 $$;
 
@@ -80,6 +82,7 @@ returns jsonb language sql stable security definer set search_path = '' as $$
     'id', l.id, 'kode', l.kode, 'tahap', l.tahap, 'sumber', l.sumber,
     'pelanggan', pg.nama, 'kota', pg.kota, 'pemilik', l.pemilik, 'pemilik_nama', mp.username,
     'tanggal_masuk', l.tanggal_masuk, 'diam_hari', greatest(0, public.hari_ini_wib() - l.diam_sejak::date),
+    'fu_berikutnya', l.fu_berikutnya,
     'nilai_transaksi', l.nilai_transaksi, 'no_sp', l.no_sp, 'periksa', l.periksa,
     'produk', (select coalesce(jsonb_agg(jsonb_build_object('produk', i.produk, 'qty', i.qty, 'satuan', i.satuan) order by i.id), '[]'::jsonb)
       from public.lead_item i where i.lead_id = l.id))
@@ -341,6 +344,7 @@ begin
     join public.pelanggan pg on pg.id = l.pelanggan_id
   where (v_pemilik is null or l.pemilik = v_pemilik)
     and (v_tab <> 'diam'      or (l.tahap in ('BARU', 'PENAWARAN') and l.diam_sejak < now() - interval '7 days'))
+    and (v_tab <> 'fu'        or (l.tahap in ('BARU', 'PENAWARAN') and l.fu_berikutnya is not null and l.fu_berikutnya <= public.hari_ini_wib()))
     and (v_tab <> 'pm'        or (l.tahap in ('BARU', 'PENAWARAN') and exists (select 1 from public.lead_item i where i.lead_id = l.id and i.produk = 'Pallet Mesh')))
     and (v_tab <> 'penawaran' or l.tahap = 'PENAWARAN')
     and (v_tab <> 'order'     or l.tahap = 'ORDER')

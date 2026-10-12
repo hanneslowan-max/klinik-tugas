@@ -13,9 +13,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ALASAN_BATAL, pratinjauNoSp } from "@/features/pipeline/konstanta";
+import { usePipelineSaya } from "@/features/pipeline/queries";
 import { useTahap, type BodyTahap } from "@/features/pipeline/mutasi";
 import { useProfil } from "@/features/profil/penyedia-profil";
 import { pesanGalat } from "@/lib/api/galat";
+import { fmtTanggal } from "@/lib/tanggal";
 import type { LeadDetail } from "@/types/domain";
 
 export type AksiTahap = "penawaran" | "order" | "batal" | "alihkan";
@@ -48,6 +50,8 @@ export function DialogTahap({
 function IsiTahap({ lead, aksi, onSelesai }: { lead: LeadDetail; aksi: AksiTahap; onSelesai: () => void }) {
   const simpan = useTahap();
   const { hariIni } = useProfil(); // tanggal WIB dari server (hindari Date.now di render)
+  const saya = usePipelineSaya();
+  const kodeSp = lead.pemilik_kode_sp ?? saya.data?.kode_sp ?? null; // kode SP pemilik lead, atau aktor saat klaim
   const [galat, setGalat] = useState<string | null>(null);
 
   // penawaran
@@ -115,15 +119,18 @@ function IsiTahap({ lead, aksi, onSelesai }: { lead: LeadDetail; aksi: AksiTahap
             <Label htmlFor="th-nomor">Nomor urut SP</Label>
             <Input id="th-nomor" inputMode="numeric" value={nomor} onChange={(e) => setNomor(e.target.value)} placeholder="mis. 214" />
             <div className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
-              No SP jadi: <span className="font-mono text-foreground">{pratinjauNoSp(nomor, tanggalSp)}</span>
+              No SP jadi: <span className="font-mono text-foreground">{pratinjauNoSp(nomor, tanggalSp, kodeSp)}</span>
               <br />
-              Kode RSG/MCE diisi sistem dari pemilik lead; bulan &amp; tahun dari tanggal SP.
+              {kodeSp
+                ? "Kode diisi otomatis dari pemilik lead; bulan & tahun dari tanggal SP."
+                : "Kode SP pemilik belum diatur — minta admin set kode SP sebelum simpan order."}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="th-tsp">Tanggal SP</Label>
               <Input id="th-tsp" type="date" max={hariIni} value={tanggalSp} onChange={(e) => setTanggalSp(e.target.value)} />
+              {tanggalSp ? <p className="text-xs text-muted-foreground">{fmtTanggal(tanggalSp, hariIni)}</p> : null}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="th-nilai">Nilai transaksi (Rp)</Label>

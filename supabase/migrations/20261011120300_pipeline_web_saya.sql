@@ -13,7 +13,9 @@ begin
   v_peran := public.pipeline_peran_aktor();
   return jsonb_build_object(
     'peran', v_peran,
-    'boleh_ringkas', coalesce(v_peran in ('admin', 'baca'), false));
+    'boleh_ringkas', coalesce(v_peran in ('admin', 'baca'), false),
+    -- kode SP milik aktor sendiri (buat pratinjau No SP saat rep klaim lead tanpa pemilik). null bila belum diatur.
+    'kode_sp', (select kode_sp from public.pipeline_akses where member_id = public.penilai()));
 end; $$;
 
 revoke all on function public.web_pipeline_saya() from public, anon, authenticated, service_role;

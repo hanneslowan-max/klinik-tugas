@@ -39,6 +39,7 @@ export const TAHAP: Record<TahapLead, { label: string; nada: NadaChip }> = {
 /** Tab daftar "Lead saya" (§5). Kunci = nilai `tab` yang diterima web_pipeline_daftar. */
 export const TAB_DAFTAR = [
   { kunci: "semua", label: "Semua" },
+  { kunci: "fu", label: "Follow up hari ini" },
   { kunci: "diam", label: "Diam >7 hari" },
   { kunci: "pm", label: "Pallet Mesh" },
   { kunci: "penawaran", label: "Penawaran" },
@@ -63,10 +64,10 @@ export function ringkasProduk(items: { produk: string; qty: number; satuan: stri
 }
 
 /**
- * Pratinjau No SP untuk form Order. Kode rep (RSG/MCE) diisi sistem dari pemilik lead, jadi di sini ditampilkan
- * sebagai placeholder. Bulan (romawi) & tahun dihitung dari tanggal SP. Server tetap memvalidasi pola & keunikan.
+ * Pratinjau No SP untuk form Order. `kode` = kode SP pemilik lead (atau aktor saat klaim); bila belum diatur,
+ * tampilkan penanda jelas. Bulan (romawi) & tahun dihitung dari tanggal SP. Server tetap memvalidasi pola & keunikan.
  */
-export function pratinjauNoSp(nomor: string, tanggalSp: string): string {
+export function pratinjauNoSp(nomor: string, tanggalSp: string, kode: string | null): string {
   const n = (nomor || "").replace(/\D/g, "");
   let bulan = "—";
   let tahun = "—";
@@ -75,5 +76,5 @@ export function pratinjauNoSp(nomor: string, tanggalSp: string): string {
     bulan = ROMAWI[bln - 1] ?? "—";
     tahun = tanggalSp.slice(0, 4);
   }
-  return `${n || "—"}/⟨RSG·MCE⟩/${bulan}/${tahun}`;
+  return `${n || "—"}/${kode || "⟨kode SP belum diatur⟩"}/${bulan}/${tahun}`;
 }

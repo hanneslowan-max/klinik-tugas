@@ -181,13 +181,13 @@ export function KerangkaApp({ children }: { children: ReactNode }) {
       <a href="#isi" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded focus:bg-background focus:p-2">
         Lompat ke isi
       </a>
-      <Sidebar path={path} />
+      <Sidebar path={path} navUtama={navUtama} />
       <div className="flex min-w-0 flex-1 flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">
         <main id="isi" className="flex min-w-0 flex-1 flex-col" tabIndex={-1}>
           {children}
         </main>
       </div>
-      <NavBawah path={path} />
+      <NavBawah path={path} navUtama={navUtama} />
       <PenyimakRealtime />
     </div>
   );

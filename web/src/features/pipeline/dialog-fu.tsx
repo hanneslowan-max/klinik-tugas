@@ -13,11 +13,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { GrupChip } from "@/features/pipeline/chip-pilih";
 import { JENIS_FU } from "@/features/pipeline/konstanta";
 import { useFuCatat } from "@/features/pipeline/mutasi";
+import { useProfil } from "@/features/profil/penyedia-profil";
 import { pesanGalat } from "@/lib/api/galat";
+import { fmtTanggal } from "@/lib/tanggal";
 import type { JenisAktivitas } from "@/types/domain";
 
 export function DialogFu({ buka, ubahBuka, leadId }: { buka: boolean; ubahBuka: (b: boolean) => void; leadId: string }) {
   const simpan = useFuCatat();
+  const { hariIni } = useProfil();
   const [jenis, setJenis] = useState<JenisAktivitas>("Telepon");
   const [hasil, setHasil] = useState("");
   const [rencana, setRencana] = useState("");
@@ -55,6 +58,7 @@ export function DialogFu({ buka, ubahBuka, leadId }: { buka: boolean; ubahBuka: 
             Rencana berikutnya <span className="font-normal text-muted-foreground">(opsional)</span>
           </Label>
           <Input id="fu-next" type="date" value={rencana} onChange={(e) => setRencana(e.target.value)} />
+          {rencana ? <p className="text-xs text-muted-foreground">{fmtTanggal(rencana, hariIni)}</p> : null}
         </div>
         {galat ? <KotakPesan nada="galat">{galat}</KotakPesan> : null}
         <KakiLembar>

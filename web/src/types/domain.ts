@@ -357,8 +357,8 @@ export type AlasanBatal =
   | "Beli di tempat lain" | "Proyek batal/ditunda" | "Lainnya";
 export type JenisPelanggan = "perusahaan" | "perorangan";
 
-/** Hasil web_pipeline_saya: gerbang menu & layar (§6). */
-export type PipelineSaya = { peran: PeranPipeline | null; boleh_ringkas: boolean };
+/** Hasil web_pipeline_saya: gerbang menu & layar (§6). kode_sp = kode SP aktor sendiri (pratinjau No SP). */
+export type PipelineSaya = { peran: PeranPipeline | null; boleh_ringkas: boolean; kode_sp: string | null };
 
 export type ItemLead = {
   id: number;
@@ -398,6 +398,7 @@ export type LeadRingkas = {
   pemilik_nama: string | null;
   tanggal_masuk: string;
   diam_hari: number;
+  fu_berikutnya: string | null;
   nilai_transaksi: number | null;
   no_sp: string | null;
   periksa: boolean;
@@ -413,6 +414,7 @@ export type LeadDetail = {
   sumber: SumberLead;
   pemilik: IdAnggota | null;
   pemilik_nama: string | null;
+  pemilik_kode_sp: string | null;
   dialihkan_ke: string | null;
   kebutuhan: string | null;
   catatan: string | null;

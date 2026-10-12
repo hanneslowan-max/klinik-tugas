@@ -19,12 +19,21 @@ import { ringkasProduk, rupiah, TAB_DAFTAR } from "@/features/pipeline/konstanta
 import { PilTahap } from "@/features/pipeline/pil-tahap";
 import { usePipelineDaftar } from "@/features/pipeline/queries";
 import { useProfil } from "@/features/profil/penyedia-profil";
+import { fmtTanggal, selisihHari } from "@/lib/tanggal";
 import { cn } from "@/lib/utils";
 import type { LeadRingkas } from "@/types/domain";
 
-function BarisLead({ lead }: { lead: LeadRingkas }) {
+/** Status rencana follow-up relatif hari ini (tab "Follow up hari ini"). */
+function infoFu(fu: string, hariIni: string): { teks: string; mendesak: boolean } {
+  if (fu < hariIni) return { teks: `FU telat ${selisihHari(fu, hariIni)} hr`, mendesak: true };
+  if (fu === hariIni) return { teks: "FU hari ini", mendesak: true };
+  return { teks: `FU ${fmtTanggal(fu, hariIni)}`, mendesak: false };
+}
+
+function BarisLead({ lead, hariIni }: { lead: LeadRingkas; hariIni: string }) {
   const buka = lead.tahap === "BARU" || lead.tahap === "PENAWARAN";
   const panas = buka && lead.diam_hari > 7;
+  const fu = buka && lead.fu_berikutnya ? infoFu(lead.fu_berikutnya, hariIni) : null;
   return (
     <Link
       href={`/pipeline/${encodeURIComponent(lead.id)}`}
@@ -36,12 +45,10 @@ function BarisLead({ lead }: { lead: LeadRingkas }) {
           <span className="truncate font-semibold">{lead.pelanggan}</span>
           {lead.periksa ? <Chip nada="hari-ini">periksa</Chip> : null}
         </div>
-        <div className="truncate text-sm text-muted-foreground">
-          {ringkasProduk(lead.produk)}
-          {lead.kota ? ` · ${lead.kota}` : ""}
-        </div>
-        <div className="text-xs text-muted-foreground">
+        <div className="truncate text-sm text-muted-foreground">{ringkasProduk(lead.produk)}</div>
+        <div className="truncate text-xs text-muted-foreground">
           {lead.kode}
+          {lead.kota ? ` · ${lead.kota}` : ""}
           {lead.pemilik_nama ? ` · ${lead.pemilik_nama}` : " · tanpa pemilik"}
         </div>
       </div>
@@ -50,9 +57,16 @@ function BarisLead({ lead }: { lead: LeadRingkas }) {
         {lead.tahap === "ORDER" ? (
           <span className="text-xs font-medium tabular-nums">{rupiah(lead.nilai_transaksi)}</span>
         ) : buka ? (
-          <span className={cn("text-xs tabular-nums", panas ? "font-semibold text-telat" : "text-muted-foreground")}>
-            diam {lead.diam_hari} hr
-          </span>
+          <>
+            {fu ? (
+              <span className={cn("text-xs whitespace-nowrap", fu.mendesak ? "font-semibold text-telat" : "text-muted-foreground")}>
+                {fu.teks}
+              </span>
+            ) : null}
+            <span className={cn("text-xs tabular-nums", panas ? "font-semibold text-telat" : "text-muted-foreground")}>
+              diam {lead.diam_hari} hr
+            </span>
+          </>
         ) : null}
       </div>
     </Link>
@@ -60,7 +74,7 @@ function BarisLead({ lead }: { lead: LeadRingkas }) {
 }
 
 function IsiDaftar({ akses }: { akses: AksesPipeline }) {
-  const { member } = useProfil();
+  const { member, hariIni } = useProfil();
   const idSaya = Number(member.id);
   const router = useRouter();
   const sp = useSearchParams();
@@ -177,7 +191,7 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
           <p className="text-xs text-muted-foreground">{daftar.data.total} lead</p>
           <div className="space-y-2">
             {daftar.data.items.map((l) => (
-              <BarisLead key={l.id} lead={l} />
+              <BarisLead key={l.id} lead={l} hariIni={hariIni} />
             ))}
           </div>
         </>
