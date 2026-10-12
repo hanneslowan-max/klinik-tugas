@@ -56,6 +56,17 @@ sejajar nomor baris sheet asli.
 Ambil tahap **paling akhir** menurut prioritas: mengandung "Order" → **ORDER**; "Batal" → **BATAL**; "Follow up Sales
 lain" (3 variasi ejaan) → **DIALIHKAN**; "Kirim Penawaran"/"Visit" → **PENAWARAN**; selain itu → **BARU**.
 
+**Tambahan 12 Okt (cek hasil Langkah 2):** baris dengan No SP **dan** Nilai terisi tapi status sheet belum "Order"
+(dan bukan Batal) dijadikan **ORDER** + PERIKSA ("dijadikan ORDER (aturan §3)"). Tanpa ini omzetnya hilang dari ringkasan
+(5 baris, Rp5.753.519 pada data 12 Okt).
+
+### Waktu & "diam"
+
+Sheet tidak menyimpan tanggal follow-up. `lead.diam_sejak` lead impor = **tanggal lead pukul 12:00 WIB**, kecuali
+lead itu sudah punya aktivitas nyata di Anvil (FU yang dicatat rep sesudah impor) → aktivitas terakhir itu yang dipakai.
+Aktivitas "Catatan impor" juga diberi waktu tanggal lead 12:00 WIB. Jam 12:00 dipakai supaya `::date` tidak bergeser
+sehari karena zona waktu server (UTC). Sebelum aturan ini semua lead impor tercatat "diam 0 hari" dan tab Diam kosong.
+
 ### Data yang tidak ada di sheet (diisi default, dicatat)
 
 - **`sumber`** (wajib NOT NULL, sheet tak punya) → `--sumber-default` (default **Lainnya**).

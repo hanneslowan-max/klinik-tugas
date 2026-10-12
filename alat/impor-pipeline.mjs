@@ -579,7 +579,11 @@ function blokLead(lead) {
   L.push(`  delete from public.lead_item where lead_id = v_lead;`);
   L.push(`  insert into public.lead_item (lead_id, produk, qty, satuan, spesifikasi, periksa, periksa_sebab) values (v_lead, ${qstr(it.produk)}, ${qnum(it.qty)}, ${qstr(it.satuan)}, ${qstr(it.spesifikasi)}, ${qbool(it.periksa)}, ${qstr(it.periksa ? it.sebab.join("; ") : null)});`);
   L.push(`  delete from public.lead_aktivitas where lead_id = v_lead and jenis = 'Catatan impor';`);
-  if (lead.catatan_impor_akt) L.push(`  insert into public.lead_aktivitas (lead_id, jenis, hasil) values (v_lead, 'Catatan impor', ${qstr(lead.catatan_impor_akt)});`);
+  // waktu catatan impor = tanggal lead pukul 12:00 WIB (bukan saat impor; tengah hari supaya ::date tidak bergeser zona), supaya riwayat & "diam N hari" tidak tampak baru hari ini
+  if (lead.catatan_impor_akt) L.push(`  insert into public.lead_aktivitas (lead_id, jenis, hasil, waktu) values (v_lead, 'Catatan impor', ${qstr(lead.catatan_impor_akt)}, ((${qdate(lead.tanggal_masuk)}) + time '12:00') at time zone 'Asia/Jakarta');`);
+  // diam_sejak: sheet tidak menyimpan tanggal FU → pakai tanggal lead, kecuali sudah ada aktivitas nyata di Anvil
+  // (FU yang dicatat rep sesudah impor). Tanpa ini semua lead impor tercatat "diam 0 hari" (cek 12 Okt).
+  L.push(`  update public.lead set diam_sejak = greatest(((${qdate(lead.tanggal_masuk)}) + time '12:00') at time zone 'Asia/Jakarta', coalesce((select max(a.waktu) from public.lead_aktivitas a where a.lead_id = v_lead and a.jenis <> 'Catatan impor'), '-infinity'::timestamptz)) where id = v_lead;`);
   L.push(`end`);
   return L.join("\n");
 }

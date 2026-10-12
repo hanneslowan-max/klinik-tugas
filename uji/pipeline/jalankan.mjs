@@ -43,6 +43,16 @@ bagian("Aturan: SP + Nilai tapi status bukan Order → ORDER");
   cek("SP + nilai tapi BATAL → tetap BATAL", c.tahap === "BATAL", c.tahap);
 }
 
+bagian("Aturan: diam_sejak lead impor = tanggal lead");
+{
+  const op = bacaArgumen([FIXTURE]);
+  const h = olah(bacaRecord(fs.readFileSync(FIXTURE, "utf8"), FIXTURE, op), op, HARI_INI);
+  const sql = buatSQL(h, op, FIXTURE);
+  cek("SQL menyetel diam_sejak dari tanggal lead", sql.includes("update public.lead set diam_sejak = greatest((('2025-10-13'::date) + time '12:00') at time zone 'Asia/Jakarta'"), "tidak ada update diam_sejak");
+  cek("aktivitas FU nyata (bukan Catatan impor) tetap menang", sql.includes("a.jenis <> 'Catatan impor'"), "");
+  cek("waktu Catatan impor = tanggal lead", /'Catatan impor', .*'Asia\/Jakarta'\)/.test(sql), "");
+}
+
 // ---------------------------------------------------------------- unit: pembersih & klasifikasi
 bagian("Unit: pembersih nilai & klasifikasi");
 cek("telpNorm 0812.. → 62..", telpNorm("0812-1111-2222") === "6281211112222", telpNorm("0812-1111-2222"));
