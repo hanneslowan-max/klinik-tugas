@@ -482,6 +482,22 @@ export type RingkasPipeline = {
   per_alasan_batal: RingkasPerAlasan[];
 };
 
+// -------------------------------------------------------------------- akses modul (admin owner)
+/** Satu baris akses Pipeline (web_pipeline_akses_daftar / _simpan). */
+export type AksesPipelineRow = {
+  member_id: IdAnggota;
+  username: string;
+  nama: string | null;
+  role: Peran;
+  aktif: boolean;
+  peran: PeranPipeline;
+  kode_sp: string | null;
+};
+/** Kandidat anggota yang bisa diberi akses (anggota aktif role 'member'). */
+export type AnggotaPilihAkses = { id: IdAnggota; username: string; nama: string | null; role: Peran };
+/** Hasil web_pipeline_akses_daftar: daftar akses saat ini + kandidat anggota. */
+export type DaftarAksesPipeline = { akses: AksesPipelineRow[]; anggota: AnggotaPilihAkses[] };
+
 /** Peta nama fungsi web_* → bentuk hasilnya. */
 export type HasilRpc = {
   web_saya: Profil;
@@ -526,4 +542,7 @@ export type HasilRpc = {
   web_pipeline_lead_ubah: LeadDetail;
   web_pipeline_pelanggan_cari: PelangganCari[];
   web_pipeline_ringkas: RingkasPipeline;
+  web_pipeline_akses_daftar: DaftarAksesPipeline;
+  // simpan mengembalikan daftar akses terkini (tanpa nama/role/aktif); layar menyegar lewat _daftar.
+  web_pipeline_akses_simpan: Pick<AksesPipelineRow, "member_id" | "username" | "peran" | "kode_sp">[];
 };

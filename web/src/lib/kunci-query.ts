@@ -20,6 +20,8 @@ export const kunci = {
     ["pipeline", "daftar", tab, pemilik ?? "semua", q] as const,
   pipelineLead: (id: string) => ["pipeline", "lead", id] as const,
   pipelineRingkas: (bulan: string, dasar: string) => ["pipeline", "ringkas", bulan, dasar] as const,
+  /** daftar akses modul Pipeline (layar admin owner) */
+  pipelineAkses: ["pipeline", "akses"] as const,
   /** akar invalidasi untuk semua data lead/daftar/ringkasan sesudah mutasi */
   semuaPipeline: ["pipeline"] as const,
 };

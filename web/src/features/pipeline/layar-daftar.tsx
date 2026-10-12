@@ -2,7 +2,7 @@
 
 // Layar "Lead saya" (§5): tab Semua / Diam >7 hari / Pallet Mesh / Penawaran, pencarian, tombol Lead baru.
 // Rep default melihat leadnya sendiri; admin/baca default semua lead. Filter pemilik & tab disimpan di URL.
-import { BarChart3, Plus, Search } from "lucide-react";
+import { BarChart3, Plus, Search, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -74,7 +74,7 @@ function BarisLead({ lead, hariIni }: { lead: LeadRingkas; hariIni: string }) {
 }
 
 function IsiDaftar({ akses }: { akses: AksesPipeline }) {
-  const { member, hariIni } = useProfil();
+  const { member, hariIni, owner } = useProfil();
   const idSaya = Number(member.id);
   const router = useRouter();
   const sp = useSearchParams();
@@ -132,6 +132,14 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
           </div>
         ) : null}
         <div className="ml-auto flex items-center gap-2">
+          {owner ? (
+            <Button asChild variant="outline">
+              <Link href="/admin/pipeline" data-uji="tautan-akses-pipeline">
+                <ShieldCheck aria-hidden />
+                Kelola akses
+              </Link>
+            </Button>
+          ) : null}
           {akses.boleh_ringkas ? (
             <Button asChild variant="outline">
               <Link href="/pipeline/ringkasan" data-uji="tautan-ringkasan">
