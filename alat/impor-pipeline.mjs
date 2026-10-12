@@ -345,6 +345,13 @@ export function olah(records, opsi, hariIni = new Date().toISOString().slice(0, 
       else { lead.nilai_transaksi = nilai.nilai; if (nilai.mengandungHuruf) sebab.push(`Nilai transaksi memuat huruf: "${bersih(rec.nilai)}"`); }
     }
 
+    // ---- SP + nilai terisi tapi status sheet belum "Order" → ORDER (aturan §3: SP terisi → ORDER). Tanpa ini omzet
+    // baris itu hilang dari ringkasan (cek 12 Okt: 5 baris, Rp5.753.519). Tetap PERIKSA supaya bisa ditinjau.
+    if (lead.tahap !== "ORDER" && lead.tahap !== "BATAL" && lead.no_sp && lead.nilai_transaksi > 0) {
+      sebab.push(`ada No SP + Nilai tapi status sheet bukan Order ("${bersih(rec.status)}") → dijadikan ORDER (aturan §3)`);
+      lead.tahap = "ORDER";
+    }
+
     // ---- aturan tahap ORDER vs kelengkapan (§7 no.2) — tidak dipaksa, hanya ditandai
     if (lead.tahap === "ORDER") {
       lead.tanggal_sp = tgl.date;                                  // tanggal SP belum diketahui → diisi tanggal lead

@@ -475,7 +475,11 @@ export type RingkasPerAlasan = { alasan: string; jumlah: number };
 export type RingkasPipeline = {
   dasar: "sp" | "lead";
   bulan: RingkasBulan[];
-  win_rate: { semua: WinRate; pm: WinRate; pm_kecil_lt20: WinRate; pm_besar_ge20: WinRate };
+  /** Kohort lead umur >= umur_matang_hari (metode routine Analisa Pipeline); menang = ORDER, "batal" = sisanya. */
+  win_rate: {
+    semua: WinRate; pm: WinRate; pm_kecil_lt20: WinRate; pm_besar_ge20: WinRate;
+    pm_qty_belum_diisi?: number; umur_matang_hari?: number; definisi?: string;
+  };
   siklus_hari_rata2: number | null;
   per_sumber: RingkasPerSumber[];
   per_produk: RingkasPerProduk[];

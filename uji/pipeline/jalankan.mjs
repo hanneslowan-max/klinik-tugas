@@ -25,6 +25,24 @@ function bagian(n) { console.log(`\n== ${n}`); }
 
 const opsiDasar = () => bacaArgumen([FIXTURE]);
 
+// ---------------------------------------------------------------- aturan SP + nilai → ORDER (cek 12 Okt)
+bagian("Aturan: SP + Nilai tapi status bukan Order → ORDER");
+{
+  const teks = [
+    ",Company Name,Location,PIC Name,Phone No,Status,Sales Rep,Item,Remark,Respon,No Surat Pesanan,Nilai Transaksi,Follow Up,Respon setelah FU",
+    "2026-08-03,PT Sp Nilai,Jakarta,Ani,0812-1010-2020,Customer Baru,Riksa,Roda,roda,ok,8/RSG/VIII/2026,Rp 400.000,,",
+    "2026-08-04,PT Sp Saja,Jakarta,Beni,0812-1010-3030,Customer Baru,Riksa,Roda,roda,ok,9/RSG/VIII/2026,,,",
+    "2026-08-05,PT Sp Batal,Jakarta,Cici,0812-1010-4040,\"Customer Baru, Batal\",Riksa,Roda,roda,ok,10/RSG/VIII/2026,Rp 500.000,,",
+  ].join("\n");
+  const op = bacaArgumen(["x.csv"]);
+  const h = olah(bacaRecord(teks, "x.csv", op), op, HARI_INI);
+  const [a, b, c] = h.leads;
+  cek("SP + nilai + status Customer Baru → ORDER", a.tahap === "ORDER", a.tahap);
+  cek("SP + nilai → tetap PERIKSA dengan sebab", a.periksa && (a.periksa_sebab || "").includes("dijadikan ORDER"), a.periksa_sebab);
+  cek("SP tanpa nilai → tidak dipaksa ORDER", b.tahap !== "ORDER", b.tahap);
+  cek("SP + nilai tapi BATAL → tetap BATAL", c.tahap === "BATAL", c.tahap);
+}
+
 // ---------------------------------------------------------------- unit: pembersih & klasifikasi
 bagian("Unit: pembersih nilai & klasifikasi");
 cek("telpNorm 0812.. → 62..", telpNorm("0812-1111-2222") === "6281211112222", telpNorm("0812-1111-2222"));
