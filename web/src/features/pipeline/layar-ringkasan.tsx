@@ -148,13 +148,20 @@ function IsiRingkas() {
       ) : (
         <>
           <section className="space-y-2">
-            <h2 className="text-sm font-semibold">Win rate (lead matang = order + batal)</h2>
+            <h2 className="text-sm font-semibold">
+              Win rate (lead umur ≥ {q.data.win_rate.umur_matang_hari ?? 90} hari, menang = Order)
+            </h2>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <Tile label="Semua" nilai={persenWr(q.data.win_rate.semua)} sub={`${q.data.win_rate.semua.order}/${q.data.win_rate.semua.matang}`} />
               <Tile label="Pallet Mesh" nilai={persenWr(q.data.win_rate.pm)} sub={`${q.data.win_rate.pm.order}/${q.data.win_rate.pm.matang}`} />
               <Tile label="PM < 20u" nilai={persenWr(q.data.win_rate.pm_kecil_lt20)} sub={`${q.data.win_rate.pm_kecil_lt20.order}/${q.data.win_rate.pm_kecil_lt20.matang}`} />
               <Tile label="PM ≥ 20u" nilai={persenWr(q.data.win_rate.pm_besar_ge20)} sub={`${q.data.win_rate.pm_besar_ge20.order}/${q.data.win_rate.pm_besar_ge20.matang}`} />
             </div>
+            {q.data.win_rate.pm_qty_belum_diisi ? (
+              <p className="text-xs text-muted-foreground">
+                {q.data.win_rate.pm_qty_belum_diisi} lead Pallet Mesh lama belum punya qty (data impor), tidak ikut PM &lt; 20u / ≥ 20u.
+              </p>
+            ) : null}
             <Tile
               label="Siklus rata-rata (masuk → SP)"
               nilai={q.data.siklus_hari_rata2 != null ? `${q.data.siklus_hari_rata2} hari` : "—"}
