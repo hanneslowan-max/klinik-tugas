@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ALASAN_BATAL, pratinjauNoSp } from "@/features/pipeline/konstanta";
+import { ALASAN_BATAL, pratinjauNoSp, rupiah } from "@/features/pipeline/konstanta";
 import { usePipelineSaya } from "@/features/pipeline/queries";
 import { useTahap, type BodyTahap } from "@/features/pipeline/mutasi";
 import { useProfil } from "@/features/profil/penyedia-profil";
@@ -109,6 +109,7 @@ function IsiTahap({ lead, aksi, onSelesai }: { lead: LeadDetail; aksi: AksiTahap
             Nilai penawaran (Rp) <span className="font-normal text-muted-foreground">(opsional)</span>
           </Label>
           <Input id="th-np" inputMode="numeric" value={nilaiPenawaran} onChange={(e) => setNilaiPenawaran(e.target.value)} />
+          {nilaiPenawaran.replace(/\D/g, "") ? <p className="text-xs font-medium tabular-nums">{rupiah(Number(nilaiPenawaran.replace(/\D/g, "")))}</p> : null}
           <p className="text-xs text-muted-foreground">Tahap pindah ke PENAWARAN. Tanggal penawaran dicatat otomatis.</p>
         </div>
       ) : null}
@@ -135,6 +136,7 @@ function IsiTahap({ lead, aksi, onSelesai }: { lead: LeadDetail; aksi: AksiTahap
             <div className="space-y-1.5">
               <Label htmlFor="th-nilai">Nilai transaksi (Rp)</Label>
               <Input id="th-nilai" inputMode="numeric" value={nilai} onChange={(e) => setNilai(e.target.value)} />
+              {nilai.replace(/\D/g, "") ? <p className="text-xs font-medium tabular-nums">{rupiah(Number(nilai.replace(/\D/g, "")))}</p> : null}
             </div>
           </div>
         </>
