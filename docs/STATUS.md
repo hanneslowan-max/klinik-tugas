@@ -164,6 +164,14 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
 13. Font input 16px berlaku di semua ukuran layar (bukan hanya layar sentuh), supaya iPad ikut aman; kontrol di desktop sedikit lebih besar dari sebelumnya.
 14. **Git**: commit `c8b3d6b` "WIP: putaran perbaikan (sedang berjalan)" (09:28 UTC, patch migrasi setengah jadi dari run yang terputus, sesi yang sama) sudah ada di branch `claude/rhj-task-management-app-cc50bk` dan origin. Semua hasil putaran poles DB + web + dokumen ini belum di-commit (33 berkas diubah + 3 baru). Commit/push menunggu keputusan Hannes; commit berikutnya di atas `c8b3d6b` sudah memuat versi final migrasi, jadi WIP itu tidak perlu di-revert.
 
+## Modul Pipeline (12 Okt 2026)
+
+- **Live:** PR #8 (11–12 Okt) — tabel `pelanggan`/`kontak`/`lead`/`lead_item`/`lead_aktivitas`/`lead_riwayat_tahap`/`pipeline_akses` + RLS, layar Lead saya / Detail / Ringkasan / Admin Akses, API `/x/pipeline/*`, CLI `pipeline list|get|summary|fu-set`. Spesifikasi: rhj-brain `deliverables/pipeline-anvil/RANCANGAN-MODUL-PIPELINE.md`.
+- **Perbaikan hasil cek (PR #9):** migrasi `20261012120000_pipeline_ringkas_v2` (win rate kohort umur ≥ 90 hari; omzet per rep via kode SP bila pemilik kosong; siklus tanpa tanggal SP tebakan) **sudah diterapkan ke produksi 12 Okt**; alat impor: SP + nilai → ORDER, `diam_sejak` lead impor = tanggal lead 12:00 WIB.
+- **Data:** 2.008 lead dari sheet s/d 12 Okt diimpor; per bulan Okt 2025–Okt 2026 lead & omzet (dasar tanggal lead) = sheet, selisih 0. 600 lead bertanda PERIKSA (data sheet tak lengkap).
+- **Akses:** Riksa (rep, RSG), Michael Eppy (rep, MCE), Yosie (baca; telepon & PIC disembunyikan). Owner implisit admin.
+- **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md`.
+
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)
 Prasyarat dari Hannes: project Supabase baru `rhj-tugas` (akun/org baru, Sydney `ap-southeast-2` per keputusan 30/9, Free); env cloud `SUPABASE_ACCESS_TOKEN` (PAT akun baru) + `SUPABASE_PROJECT_REF`; `CLICKUP_API_TOKEN` (sudah ada); sesi baru supaya env terbaca. Semua langkah ke ClickUp **GET saja**. Tidak memakai MCP Supabase (itu ERP).
 
