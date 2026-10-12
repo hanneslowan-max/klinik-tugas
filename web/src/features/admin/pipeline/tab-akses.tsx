@@ -26,11 +26,11 @@ import { cn } from "@/lib/utils";
 import type { AksesPipelineRow, AnggotaPilihAkses, PeranPipeline } from "@/types/domain";
 
 const PERAN: { nilai: PeranPipeline; label: string; ket: string }[] = [
-  { nilai: "rep", label: "Rep", ket: "Kelola lead sendiri (Riksa/Michael)" },
+  { nilai: "rep", label: "Rep", ket: "Kelola lead sendiri (tim sales)" },
   { nilai: "admin", label: "Admin", ket: "Lihat semua lead + Ringkasan, kelola semua" },
   { nilai: "baca", label: "Baca", ket: "Lihat lead + Ringkasan saja (tanpa ubah)" },
 ];
-const LABEL_PERAN: Record<PeranPipeline, string> = { admin: "admin", rep: "rep", baca: "baca" };
+const LABEL_PERAN: Record<PeranPipeline, string> = { admin: "Admin", rep: "Rep", baca: "Baca" };
 
 const skema = z
   .object({
@@ -63,11 +63,14 @@ export function TabAksesPipeline() {
       {q.data.akses.length === 0 ? (
         <Kosong>Belum ada anggota yang diberi akses Pipeline.</Kosong>
       ) : (
-        <DaftarAdmin data-uji="daftar-akses-pipeline">
-          {q.data.akses.map((a) => (
-            <BarisAkses key={a.member_id} akses={a} />
-          ))}
-        </DaftarAdmin>
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold">Anggota dengan akses ({q.data.akses.length})</h2>
+          <DaftarAdmin data-uji="daftar-akses-pipeline">
+            {q.data.akses.map((a) => (
+              <BarisAkses key={a.member_id} akses={a} />
+            ))}
+          </DaftarAdmin>
+        </div>
       )}
     </section>
   );
@@ -225,7 +228,7 @@ function BarisAkses({ akses: a }: { akses: AksesPipelineRow }) {
       <div className="min-w-0 flex-1">
         <strong className={cn("block truncate text-sm font-semibold", !a.aktif && "text-muted-foreground")}>
           {a.username}
-          {a.nama ? ` · ${a.nama}` : ""}
+          {a.nama && a.nama.toLowerCase() !== a.username.toLowerCase() ? ` · ${a.nama}` : ""}
         </strong>
         <SubBaris>
           <Chip nada={a.peran === "admin" ? "hari-ini" : undefined}>{LABEL_PERAN[a.peran]}</Chip>
