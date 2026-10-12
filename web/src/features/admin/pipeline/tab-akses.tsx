@@ -90,7 +90,8 @@ function FormAkses({ anggota, akses }: { anggota: AnggotaPilihAkses[]; akses: Ak
         kode_sp: v.peran === "baca" ? null : (v.kode_sp?.trim().toUpperCase() || null),
       });
       const nama = anggota.find((m) => String(m.id) === v.member)?.username ?? "anggota";
-      toast.success(`Akses ${LABEL_PERAN[v.peran]} diberikan ke ${nama}`);
+      const sudahAda = aksesPer.has(Number(v.member));
+      toast.success(sudahAda ? `Akses ${nama} diperbarui → ${LABEL_PERAN[v.peran]}` : `Akses ${LABEL_PERAN[v.peran]} diberikan ke ${nama}`);
       form.reset({ member: "", peran: "rep", kode_sp: "" });
     } catch (e) {
       toast.error(pesanGalat(e));
@@ -113,7 +114,15 @@ function FormAkses({ anggota, akses }: { anggota: AnggotaPilihAkses[]; akses: Ak
             control={form.control}
             name="member"
             render={({ field }) => (
-              <Select value={field.value} onValueChange={field.onChange} name="akses-anggota">
+              <Select
+                value={field.value}
+                // muat peran & kode SP anggota yang sudah punya akses → menekan Simpan tak diam-diam menurunkan peran
+                onValueChange={(val) => {
+                  const ada = aksesPer.get(Number(val));
+                  form.reset({ member: val, peran: ada?.peran ?? "rep", kode_sp: ada?.kode_sp ?? "" });
+                }}
+                name="akses-anggota"
+              >
                 <SelectTrigger id="akses-anggota" className="w-full">
                   <SelectValue placeholder="— pilih anggota —" />
                 </SelectTrigger>
@@ -198,7 +207,7 @@ function BarisAkses({ akses: a }: { akses: AksesPipelineRow }) {
   const klikCabut = async () => {
     const ok = await konfirmasi({
       judul: "Cabut akses",
-      pesan: `Cabut akses Pipeline untuk "${a.username}"? Menu Pipeline langsung hilang untuk anggota ini.`,
+      pesan: `Cabut akses Pipeline untuk "${a.username}"? Anggota ini tak bisa lagi membuka modul Pipeline.`,
       ya: "Cabut",
       bahaya: true,
     });
@@ -220,7 +229,7 @@ function BarisAkses({ akses: a }: { akses: AksesPipelineRow }) {
         </strong>
         <SubBaris>
           <Chip nada={a.peran === "admin" ? "hari-ini" : undefined}>{LABEL_PERAN[a.peran]}</Chip>
-          {a.kode_sp ? <Chip>SP {a.kode_sp}</Chip> : null}
+          {a.peran !== "baca" && a.kode_sp ? <Chip>SP {a.kode_sp}</Chip> : null}
           {!a.aktif ? <Chip nada="telat">nonaktif</Chip> : null}
         </SubBaris>
       </div>

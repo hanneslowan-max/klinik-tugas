@@ -308,8 +308,12 @@ begin
     if nullif(p->>'peran', '') not in ('admin', 'rep', 'baca') then perform public.lempar('PT400', 'Peran tidak sah', 'INPUT_001'); end if;
     insert into public.pipeline_akses (member_id, peran, kode_sp, ditambah_oleh)
       values (v_mid, p->>'peran', nullif(p->>'kode_sp', ''), public.aktor())
+      -- rep: pertahankan kode SP lama bila tak dikirim (lindungi dari terhapus tak sengaja). admin/baca: ambil apa
+      -- adanya, jadi ganti peran rep→baca/admin ikut mengosongkan kode SP (tak nyangkut & tak menyesatkan).
       on conflict (member_id) do update set peran = excluded.peran,
-        kode_sp = coalesce(excluded.kode_sp, public.pipeline_akses.kode_sp);
+        kode_sp = case when excluded.peran = 'rep'
+                    then coalesce(excluded.kode_sp, public.pipeline_akses.kode_sp)
+                    else excluded.kode_sp end;
   end if;
   return (select coalesce(jsonb_agg(jsonb_build_object('member_id', pa.member_id, 'username', m.username,
             'peran', pa.peran, 'kode_sp', pa.kode_sp) order by pa.member_id), '[]'::jsonb)
