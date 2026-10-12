@@ -67,7 +67,30 @@ begin
       from matang),
     'siklus_hari_rata2', (
       select round(avg(l.tanggal_sp - l.tanggal_masuk)::numeric, 1)
-      from public.lead l where l.tahap = 'ORDER' and l.tanggal_sp is not null and l.tanggal_sp >= l.tanggal_masuk)
+      from public.lead l where l.tahap = 'ORDER' and l.tanggal_sp is not null and l.tanggal_sp >= l.tanggal_masuk),
+    -- Breakdown KESELURUHAN (semua bulan; §4/mockup). Omzet/order memakai lead tahap ORDER apa adanya.
+    'per_sumber', (
+      select coalesce(jsonb_agg(jsonb_build_object(
+          'sumber', s.sumber, 'leads', s.leads, 'order', s.ord, 'omzet', s.omzet) order by s.leads desc), '[]'::jsonb)
+      from (
+        select l.sumber, count(*) leads,
+          count(*) filter (where l.tahap = 'ORDER') ord,
+          coalesce(sum(l.nilai_transaksi) filter (where l.tahap = 'ORDER'), 0) omzet
+        from public.lead l group by l.sumber) s),
+    -- per produk: lead multi-produk terhitung di TIAP produknya (count distinct lead), jadi jumlah bisa > total lead.
+    'per_produk', (
+      select coalesce(jsonb_agg(jsonb_build_object(
+          'produk', pr.produk, 'leads', pr.leads, 'order', pr.ord, 'omzet', pr.omzet) order by pr.leads desc), '[]'::jsonb)
+      from (
+        select i.produk, count(distinct l.id) leads,
+          count(distinct l.id) filter (where l.tahap = 'ORDER') ord,
+          coalesce(sum(l.nilai_transaksi) filter (where l.tahap = 'ORDER'), 0) omzet
+        from public.lead_item i join public.lead l on l.id = i.lead_id group by i.produk) pr),
+    'per_alasan_batal', (
+      select coalesce(jsonb_agg(jsonb_build_object('alasan', a.alasan, 'jumlah', a.n) order by a.n desc), '[]'::jsonb)
+      from (
+        select coalesce(nullif(l.alasan_batal, ''), '(tak diisi)') alasan, count(*) n
+        from public.lead l where l.tahap = 'BATAL' group by coalesce(nullif(l.alasan_batal, ''), '(tak diisi)')) a)
   );
 end; $$;
 

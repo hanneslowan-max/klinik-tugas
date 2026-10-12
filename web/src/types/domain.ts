@@ -467,12 +467,19 @@ export type RingkasBulan = {
   per_rep: RingkasBulanRep[];
 };
 
-/** Hasil web_pipeline_ringkas (§4). */
+export type RingkasPerSumber = { sumber: SumberLead; leads: number; order: number; omzet: number };
+export type RingkasPerProduk = { produk: ProdukLead; leads: number; order: number; omzet: number };
+export type RingkasPerAlasan = { alasan: string; jumlah: number };
+
+/** Hasil web_pipeline_ringkas (§4). Breakdown per_* = keseluruhan (semua bulan). */
 export type RingkasPipeline = {
   dasar: "sp" | "lead";
   bulan: RingkasBulan[];
   win_rate: { semua: WinRate; pm: WinRate; pm_kecil_lt20: WinRate; pm_besar_ge20: WinRate };
   siklus_hari_rata2: number | null;
+  per_sumber: RingkasPerSumber[];
+  per_produk: RingkasPerProduk[];
+  per_alasan_batal: RingkasPerAlasan[];
 };
 
 /** Peta nama fungsi web_* → bentuk hasilnya. */

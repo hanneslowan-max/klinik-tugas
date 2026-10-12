@@ -75,6 +75,43 @@ function BlokBulan({ b }: { b: RingkasBulan }) {
   );
 }
 
+function Tabel({ judul, kolom, baris, catatan }: { judul: string; kolom: string[]; baris: (string | number)[][]; catatan?: string }) {
+  return (
+    <section className="space-y-2">
+      <h2 className="text-sm font-semibold">{judul}</h2>
+      {baris.length === 0 ? (
+        <Kosong>Belum ada data.</Kosong>
+      ) : (
+        <div className="overflow-hidden rounded-xl border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50 text-xs text-muted-foreground">
+                {kolom.map((k, i) => (
+                  <th key={k} className={cn("px-3 py-2 font-medium", i === 0 ? "text-left" : "text-right")}>
+                    {k}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {baris.map((r, ri) => (
+                <tr key={ri} className="border-b last:border-0">
+                  {r.map((c, ci) => (
+                    <td key={ci} className={cn("px-3 py-2 tabular-nums", ci === 0 ? "text-left font-medium" : "text-right")}>
+                      {c}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {catatan ? <p className="text-xs text-muted-foreground">{catatan}</p> : null}
+    </section>
+  );
+}
+
 function IsiRingkas() {
   const [dasar, setDasar] = useState<"sp" | "lead">("sp");
   const q = usePipelineRingkas({ bulan: "", dasar });
@@ -136,6 +173,23 @@ function IsiRingkas() {
               </div>
             )}
           </section>
+
+          <Tabel
+            judul="Per sumber"
+            kolom={["Sumber", "Lead", "Order", "Omzet"]}
+            baris={q.data.per_sumber.map((s) => [s.sumber, s.leads, s.order, rupiah(s.omzet)])}
+          />
+          <Tabel
+            judul="Per produk"
+            kolom={["Produk", "Lead", "Order", "Omzet"]}
+            baris={q.data.per_produk.map((p) => [p.produk, p.leads, p.order, rupiah(p.omzet)])}
+            catatan="Lead multi-produk dihitung di tiap produknya (jumlah bisa > total lead)."
+          />
+          <Tabel
+            judul="Alasan batal"
+            kolom={["Alasan", "Jumlah"]}
+            baris={q.data.per_alasan_batal.map((a) => [a.alasan, a.jumlah])}
+          />
         </>
       )}
     </div>

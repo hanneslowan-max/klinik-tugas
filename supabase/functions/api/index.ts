@@ -678,7 +678,12 @@ const RUTE: Rute[] = [
     },
   },
   { m: "GET", p: /^\/x\/export$/, perlu: "impor", h: (c) => rpc("x_export", { p_aktor: A(c) }, T(c)) },
-  // ---- Pipeline (READ-ONLY untuk routine/agent; scope baca). Tulis hanya lewat web (rep) & admin.
+  // ---- Pipeline. Baca (scope baca) untuk routine/agent. Satu-satunya tulis: fu (set rencana FU; scope tulis),
+  // dipakai routine Arahan Pipeline untuk menandai lead yang harus di-follow-up (tab "Follow up hari ini").
+  {
+    m: "POST", p: /^\/x\/pipeline\/fu$/, perlu: "tulis",
+    h: async (c) => rpc("x_pipeline_fu_set", { p_aktor: A(c), p: await c.body() }, T(c)),
+  },
   {
     m: "GET", p: /^\/x\/pipeline\/leads$/, perlu: "baca",
     h: (c) => rpc("x_pipeline_daftar", { p_aktor: A(c), p: {

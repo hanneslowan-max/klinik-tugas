@@ -18,6 +18,7 @@
 //   node tools/tugas.mjs pipeline list [--tab diam|pm|penawaran|order|batal|periksa] [--pemilik id] [--q ...]   lead pipeline (READ-ONLY)
 //   node tools/tugas.mjs pipeline get <lead_id>                        detail lead
 //   node tools/tugas.mjs pipeline summary [--dasar sp|lead] [--bulan YYYY-MM]   ringkasan §4 (omzet, win-rate, siklus)
+//   node tools/tugas.mjs pipeline fu-set --leads "ld1,ld2=YYYY-MM-DD"   tandai lead utk follow-up (tab "Follow up hari ini"); scope tulis
 //   audit-free tidak berlaku di mode tugas.
 //   node tools/<tugas|clickup>.mjs backend                             (KEDUA mode) backend aktif + asal pilihan mode
 //
@@ -226,7 +227,18 @@ const EKSTRA = {
     if (sub === "summary") {
       return api("GET", `${BASE_X}/pipeline/ringkas?${qs({ dasar: wajibNilai("pipeline", "dasar"), bulan: wajibNilai("pipeline", "bulan") })}`);
     }
-    throw new Error("pipeline: subperintah harus list | get <lead_id> | summary");
+    if (sub === "fu-set") {
+      // Tandai lead utk follow-up (muncul di tab "Follow up hari ini"). Dipakai routine Arahan Pipeline. Scope token: tulis.
+      const spec = wajibNilai("pipeline", "leads");
+      if (!spec) throw new Error('pipeline fu-set: --leads "id[,id=YYYY-MM-DD]..." wajib (tanpa tanggal = hari ini)');
+      const items = spec.split(",").map((x) => x.trim()).filter(Boolean).map((x) => {
+        const [id, tgl] = x.split("=");
+        return { lead_id: id.trim(), tanggal: (tgl || "").trim() || undefined };
+      });
+      if (!items.length) throw new Error("pipeline fu-set: --leads kosong");
+      return api("POST", `${BASE_X}/pipeline/fu`, { items });
+    }
+    throw new Error("pipeline: subperintah harus list | get <lead_id> | summary | fu-set");
   },
 };
 
