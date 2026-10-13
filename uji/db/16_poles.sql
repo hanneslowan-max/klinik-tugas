@@ -37,8 +37,9 @@ select uji.sama(
   (select array_agg(x order by x collate "C") from unnest(array[
     'aktor', 'beban', 'boleh_unggah_lampiran', 'hari_ini_wib', 'hari_kerja', 'id_baru', 'is_member', 'is_owner', 'iso_utc',
     'lampiran_task_dari_path', 'lihat_semua', 'list_tertutup', 'member_saya', 'mode_app', 'space_terlihat',
-    'status_list_valid', 'sumber_aktif', 'tugas_tertutup', 'wib_date']) x),
-  'di luar api_/x_/impor_/web_ hanya 19 pembantu A1 (RLS/Storage) yang bisa dipanggil role API');
+    'status_list_valid', 'sumber_aktif', 'tugas_tertutup', 'wib_date',
+    'boleh_pipeline', 'boleh_pipeline_penuh']) x),   -- dipakai policy RLS Pipeline (authenticated saja)
+  'di luar api_/x_/impor_/web_ hanya 19 pembantu A1 (RLS/Storage) + 2 pembantu RLS Pipeline yang bisa dipanggil role API');
 
 -- ================================================================ P1 (PR-1) tags/checklists/custom_fields kartu impor
 select uji.jadi_service();

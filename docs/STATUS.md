@@ -180,11 +180,17 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   (`bash alat/sql-proyek.sh --migrasi`) SEBELUM merge**: Hostinger langsung men-deploy `main`, dan tanpa migrasi
   tampilan Papan galat (Daftar tetap jalan, hanya tanpa chip). Tes: `uji/db/19_pipeline_kategori.sql` (50 cek),
   `web/tests/e2e/pipeline-papan.spec.ts`.
-- **Tes DB lama yang merah sejak PR #8** (bukan dari revisi #1): `01_skema_hak` (service_role masih punya hak tulis
-  langsung ke 7 tabel Pipeline, dari hak bawaan Supabase), `09_api_baca` (`web_pipeline_*` lama bisa dipanggil
-  service_role; jumlah `web_*` yang diharapkan masih 33), `16_poles` (pembantu `boleh_pipeline*`, `pipeline_akses_saya`,
-  `pipeline_wr` bisa dipanggil role API). CI tidak menjalankan `uji/db`, jadi tidak terlihat di PR. Tabel & fungsi
-  kategori baru sudah fail-closed.
+- **Hak Pipeline dirapikan (13 Okt, migrasi `20261013121000_pipeline_hak_ketat`).** Sejak PR #8 tes DB 01/09/16 merah
+  (CI tidak menjalankan `uji/db`, jadi tak terlihat di PR): hak bawaan Supabase memberi service_role hak tulis langsung ke
+  7 tabel + 4 sequence Pipeline, `web_pipeline_*` bisa dipanggil service_role, dan pembantu `pipeline_wr` /
+  `pipeline_akses_saya` bisa dipanggil role API. Sekarang fail-closed: tabel SELECT saja, sequence tertutup,
+  `web_pipeline_*` → authenticated, `x_pipeline_*` → service_role, `boleh_pipeline*` → authenticated (dipakai policy RLS),
+  pembantu lain internal. Tidak ada pemanggil yang bergantung pada hak yang dicabut (web/Edge/CLI hanya lewat fungsi; impor
+  berjalan sebagai postgres). Tes: 01 (+cek sequence service_role), 09 (jumlah `web_*` 47, `api_/x_/impor_` 35), 16
+  (allowlist + 2 pembantu RLS Pipeline), baru `21_pipeline_hak.sql` (18 cek: hak + semua jalur aplikasi tetap jalan).
+  **Terapkan ke produksi bersama migrasi kategori, SEBELUM merge.** Semua `uji/db` hijau. Catatan: `11_x` merah bila dijalankan
+  sesudah e2e `papan-saya.spec.ts` di DB yang sama (kartu uji yang di-soft-delete menambah hitungan list "Latihan Uji");
+  jalankan `uji/db` sebelum e2e atau sesudah `supabase db reset`.
 - **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md`.
 
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)

@@ -35,6 +35,15 @@ select uji.cek(not exists (
           or has_sequence_privilege('authenticated', c.oid, 'USAGE,SELECT,UPDATE'))),
   'anon/authenticated tidak punya hak sequence');
 
+-- hak default Supabase tetap memberi service_role semua hak ke sequence BARU → tiap migrasi wajib mencabutnya
+-- (temuan 13 Okt: 4 sequence Pipeline terbuka; 20261013121000_pipeline_hak_ketat)
+select uji.cek(not exists (
+  select 1 from pg_class c
+   where c.relnamespace = 'public'::regnamespace and c.relkind = 'S'
+     -- CASE: planner bebas mengurutkan syarat; has_sequence_privilege galat bila dievaluasi pada bukan-sequence
+     and case when c.relkind = 'S' then has_sequence_privilege('service_role', c.oid, 'USAGE,SELECT,UPDATE') else false end),
+  'service_role tidak punya hak sequence (tulis hanya lewat fungsi)');
+
 select uji.cek(not exists (
   select 1 from pg_proc p
    where p.pronamespace = 'public'::regnamespace and has_function_privilege('anon', p.oid, 'EXECUTE')),
