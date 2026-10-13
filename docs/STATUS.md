@@ -205,6 +205,14 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   **Terapkan ke produksi bersama migrasi kategori, SEBELUM merge.** Semua `uji/db` hijau. Catatan: `11_x` merah bila dijalankan
   sesudah e2e `papan-saya.spec.ts` di DB yang sama (kartu uji yang di-soft-delete menambah hitungan list "Latihan Uji");
   jalankan `uji/db` sebelum e2e atau sesudah `supabase db reset`.
+- **Performa daftar Pipeline (13 Okt, revisi "loading terasa lambat", migrasi `20261014090000_pipeline_daftar_cepat`).**
+  `inti_pipeline_daftar` kini membangun semua baris dalam satu kueri set-based (`j_pipeline_lead_ringkas_banyak`), bukan
+  `j_pipeline_lead_ringkas` per lead: lokal 2.053 lead 324–378 → 103–138 ms per muat/refetch. Kontrak JSON TIDAK berubah
+  (keluaran lama vs baru identik), jadi bisa dipasang ke produksi sebelum/sesudah deploy web (manual oleh Hannes).
+  **Perawatan: field ringkas lead kini ada di DUA tempat** — `j_pipeline_lead_ringkas` (per lead) dan
+  `j_pipeline_lead_ringkas_banyak` (daftar); menambah/mengubah field = ubah KEDUANYA. Tes `uji/db/23_pipeline_daftar_cepat.sql`
+  (23 cek: bentuk sama untuk setiap lead, keluaran identik admin/rep/baca × tab/cari/pemilik pada ±2.000 lead, hak fungsi).
+  Sisi web (render bertahap 50 baris, kotak cari terpisah) tidak bergantung pada migrasi ini.
 - **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md`.
 
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)
