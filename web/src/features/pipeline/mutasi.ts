@@ -8,7 +8,7 @@ import { rpc } from "@/lib/api/rpc";
 import { kunci } from "@/lib/kunci-query";
 import { klienBrowser } from "@/lib/supabase/client";
 import type { Json } from "@/types/database";
-import type { PelangganCari, ProdukLead, SatuanItem, SumberLead } from "@/types/domain";
+import type { PapanKategori, PelangganCari, ProdukLead, SatuanItem, SumberLead } from "@/types/domain";
 
 function segarkanPipeline(qc: QueryClient, id?: string) {
   return Promise.all([
@@ -96,4 +96,51 @@ export function useLeadUbah() {
 /** Pencarian pelanggan (dedup saat input lead baru). Dipanggil imperatif (debounce di komponen). */
 export function cariPelanggan(q: string): Promise<PelangganCari[]> {
   return rpc(klienBrowser(), "web_pipeline_pelanggan_cari", { p_q: q });
+}
+
+// -------------------------------------------------------------------- kategori papan pribadi
+export type BodyKategoriSimpan =
+  | { aksi: "buat"; nama: string }
+  | { aksi: "ganti_nama"; id: string; nama: string }
+  | { aksi: "hapus"; id: string }
+  | { aksi: "urut"; ids: string[] };
+
+/** Tambah / ganti nama / hapus / urutkan kategori sendiri. Server mengembalikan keadaan papan terkini → jadi cache. */
+export function useKategoriSimpan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: BodyKategoriSimpan) =>
+      rpc(klienBrowser(), "web_pipeline_kategori_simpan", { p: body as unknown as Json }),
+    onSuccess: (papan) => qc.setQueryData(kunci.pipelineKategori, papan),
+  });
+}
+
+const KUNCI_PINDAH = ["pipeline-kategori-pindah"] as const;
+
+/**
+ * Pindahkan lead ke kategori (null = "Tanpa kategori"). Optimistis: posisi di cache langsung diubah supaya kartu
+ * tidak "melompat balik" selama menyimpan. Data server dimuat ulang hanya saat pindah TERAKHIR yang sedang berjalan
+ * selesai (berhasil atau gagal) — jadi seret cepat beruntun tidak saling menimpa, dan gagal = kembali ke data server.
+ */
+export function useKategoriPindah() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: KUNCI_PINDAH,
+    mutationFn: (body: { lead_id: string; kategori_id: string | null }) =>
+      rpc(klienBrowser(), "web_pipeline_kategori_pindah", { p: body as unknown as Json }),
+    onMutate: async (body) => {
+      await qc.cancelQueries({ queryKey: kunci.pipelineKategori });
+      qc.setQueryData<PapanKategori>(kunci.pipelineKategori, (lama) => {
+        if (!lama) return lama;
+        const posisi = { ...lama.posisi };
+        if (body.kategori_id) posisi[body.lead_id] = body.kategori_id;
+        else delete posisi[body.lead_id];
+        return { ...lama, posisi };
+      });
+    },
+    onSettled: () =>
+      qc.isMutating({ mutationKey: KUNCI_PINDAH }) === 1
+        ? qc.invalidateQueries({ queryKey: kunci.pipelineKategori })
+        : undefined,
+  });
 }

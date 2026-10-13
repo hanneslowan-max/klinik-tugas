@@ -1365,6 +1365,9 @@ export type Database = {
       web_pipeline_akses_simpan: { Args: { p: Json }; Returns: Json };
       web_pipeline_daftar: { Args: { p: Json }; Returns: Json };
       web_pipeline_fu_catat: { Args: { p: Json }; Returns: Json };
+      web_pipeline_kategori: { Args: Record<PropertyKey, never>; Returns: Json };
+      web_pipeline_kategori_pindah: { Args: { p: Json }; Returns: Json };
+      web_pipeline_kategori_simpan: { Args: { p: Json }; Returns: Json };
       web_pipeline_lead: { Args: { p_id: string }; Returns: Json };
       web_pipeline_lead_buat: { Args: { p: Json }; Returns: Json };
       web_pipeline_lead_ubah: { Args: { p: Json }; Returns: Json };

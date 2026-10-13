@@ -170,6 +170,21 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
 - **Perbaikan hasil cek (PR #9):** migrasi `20261012120000_pipeline_ringkas_v2` (win rate kohort umur ≥ 90 hari; omzet per rep via kode SP bila pemilik kosong; siklus tanpa tanggal SP tebakan) **sudah diterapkan ke produksi 12 Okt**; alat impor: SP + nilai → ORDER, `diam_sejak` lead impor = tanggal lead 12:00 WIB.
 - **Data:** 2.008 lead dari sheet s/d 12 Okt diimpor; per bulan Okt 2025–Okt 2026 lead & omzet (dasar tanggal lead) = sheet, selisih 0. 600 lead bertanda PERIKSA (data sheet tak lengkap).
 - **Akses:** Riksa (rep, RSG), Michael Eppy (rep, MCE), Yosie (baca; telepon & PIC disembunyikan). Owner implisit admin.
+- **Revisi #1 (13 Okt, branch `claude/trusting-bell-zz7ocs`): Papan kategori pribadi.** Layar Pipeline punya tombol
+  Daftar | Papan (`?v=papan`). Papan = kolom "Tanpa kategori" + kategori buatan pengguna SENDIRI (tambah, ganti nama,
+  geser kiri/kanan, hapus lewat menu ⋯; maks 30); lead diseret antar kolom seperti Papan Tugas Saya. Pribadi per
+  pengguna (keputusan Hannes): orang lain tidak melihat kategori/penempatan, dan tahap/pemilik/ringkasan lead TIDAK
+  berubah. Papan memuat semua lead sesuai saringan (keputusan Hannes), 30 kartu per kolom + "Tampilkan lagi". Tampilan
+  Daftar menampilkan chip nama kategori. Migrasi `20261013120000_pipeline_kategori` (tabel `pipeline_kategori` +
+  `pipeline_kategori_lead`, fungsi `web_pipeline_kategori` / `_simpan` / `_pindah`). **Terapkan migrasi ke produksi
+  (`bash alat/sql-proyek.sh --migrasi`) SEBELUM merge**: Hostinger langsung men-deploy `main`, dan tanpa migrasi
+  tampilan Papan galat (Daftar tetap jalan, hanya tanpa chip). Tes: `uji/db/19_pipeline_kategori.sql` (50 cek),
+  `web/tests/e2e/pipeline-papan.spec.ts`.
+- **Tes DB lama yang merah sejak PR #8** (bukan dari revisi #1): `01_skema_hak` (service_role masih punya hak tulis
+  langsung ke 7 tabel Pipeline, dari hak bawaan Supabase), `09_api_baca` (`web_pipeline_*` lama bisa dipanggil
+  service_role; jumlah `web_*` yang diharapkan masih 33), `16_poles` (pembantu `boleh_pipeline*`, `pipeline_akses_saya`,
+  `pipeline_wr` bisa dipanggil role API). CI tidak menjalankan `uji/db`, jadi tidak terlihat di PR. Tabel & fungsi
+  kategori baru sudah fail-closed.
 - **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md`.
 
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)

@@ -3,6 +3,7 @@
 import type { VariantProps } from "class-variance-authority";
 
 import type { chipVariants } from "@/components/umum/chip";
+import { fmtTanggal, selisihHari } from "@/lib/tanggal";
 import type { AlasanBatal, JenisAktivitas, ProdukLead, SatuanItem, SumberLead, TahapLead } from "@/types/domain";
 
 export const PRODUK: ProdukLead[] = [
@@ -77,4 +78,11 @@ export function pratinjauNoSp(nomor: string, tanggalSp: string, kode: string | n
     tahun = tanggalSp.slice(0, 4);
   }
   return `${n || "—"}/${kode || "⟨kode SP belum diatur⟩"}/${bulan}/${tahun}`;
+}
+
+/** Status rencana follow-up relatif hari ini (tab "Follow up hari ini", daftar & papan). */
+export function infoFu(fu: string, hariIni: string): { teks: string; mendesak: boolean } {
+  if (fu < hariIni) return { teks: `FU telat ${selisihHari(fu, hariIni)} hr`, mendesak: true };
+  if (fu === hariIni) return { teks: "FU hari ini", mendesak: true };
+  return { teks: `FU ${fmtTanggal(fu, hariIni)}`, mendesak: false };
 }

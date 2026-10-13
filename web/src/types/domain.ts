@@ -502,6 +502,12 @@ export type AnggotaPilihAkses = { id: IdAnggota; username: string; nama: string 
 /** Hasil web_pipeline_akses_daftar: daftar akses saat ini + kandidat anggota. */
 export type DaftarAksesPipeline = { akses: AksesPipelineRow[]; anggota: AnggotaPilihAkses[] };
 
+// -------------------------------------------------------------------- kategori papan pribadi
+/** Satu kolom papan Pipeline buatan pengguna sendiri (pribadi, tidak terlihat pengguna lain). */
+export type KategoriPipeline = { id: string; nama: string; urutan: number };
+/** Hasil web_pipeline_kategori / _simpan: kategori urut + penempatan {lead_id: kategori_id}. Lead tanpa entri = "Tanpa kategori". */
+export type PapanKategori = { kategori: KategoriPipeline[]; posisi: Record<string, string> };
+
 /** Peta nama fungsi web_* → bentuk hasilnya. */
 export type HasilRpc = {
   web_saya: Profil;
@@ -549,4 +555,7 @@ export type HasilRpc = {
   web_pipeline_akses_daftar: DaftarAksesPipeline;
   // simpan mengembalikan daftar akses terkini (tanpa nama/role/aktif); layar menyegar lewat _daftar.
   web_pipeline_akses_simpan: Pick<AksesPipelineRow, "member_id" | "username" | "peran" | "kode_sp">[];
+  web_pipeline_kategori: PapanKategori;
+  web_pipeline_kategori_simpan: PapanKategori;
+  web_pipeline_kategori_pindah: { lead_id: string; kategori_id: string | null };
 };

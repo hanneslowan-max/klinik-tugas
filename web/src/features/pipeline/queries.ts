@@ -45,3 +45,11 @@ export function usePipelineRingkas(arg: { bulan: string; dasar: "sp" | "lead" })
     placeholderData: (lama) => lama,
   });
 }
+
+/** Papan pribadi: kategori buatan pengguna ini + penempatan lead {lead_id: kategori_id}. */
+export function usePipelineKategori() {
+  return useQuery({
+    queryKey: kunci.pipelineKategori,
+    queryFn: () => rpc(klienBrowser(), "web_pipeline_kategori"),
+  });
+}

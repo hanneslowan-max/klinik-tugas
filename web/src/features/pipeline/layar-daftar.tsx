@@ -2,7 +2,8 @@
 
 // Layar "Lead saya" (§5): tab Semua / Diam >7 hari / Pallet Mesh / Penawaran, pencarian, tombol Lead baru.
 // Rep default melihat leadnya sendiri; admin/baca default semua lead. Filter pemilik & tab disimpan di URL.
-import { BarChart3, Plus, Search, ShieldCheck } from "lucide-react";
+// Dua tampilan (?v=papan): Daftar, atau Papan = kolom kategori PRIBADI pengguna, lead diseret antar kolom (papan-lead).
+import { BarChart3, List, Plus, Search, ShieldCheck, SquareKanban } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -15,22 +16,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DialogLeadBaru } from "@/features/pipeline/dialog-lead-baru";
 import { GerbangPipeline, type AksesPipeline } from "@/features/pipeline/gerbang";
-import { ringkasProduk, rupiah, TAB_DAFTAR } from "@/features/pipeline/konstanta";
+import { infoFu, ringkasProduk, rupiah, TAB_DAFTAR } from "@/features/pipeline/konstanta";
+import { PapanLead } from "@/features/pipeline/papan-lead";
 import { PilTahap } from "@/features/pipeline/pil-tahap";
-import { usePipelineDaftar } from "@/features/pipeline/queries";
+import { usePipelineDaftar, usePipelineKategori } from "@/features/pipeline/queries";
 import { useProfil } from "@/features/profil/penyedia-profil";
-import { fmtTanggal, selisihHari } from "@/lib/tanggal";
 import { cn } from "@/lib/utils";
 import type { LeadRingkas } from "@/types/domain";
 
-/** Status rencana follow-up relatif hari ini (tab "Follow up hari ini"). */
-function infoFu(fu: string, hariIni: string): { teks: string; mendesak: boolean } {
-  if (fu < hariIni) return { teks: `FU telat ${selisihHari(fu, hariIni)} hr`, mendesak: true };
-  if (fu === hariIni) return { teks: "FU hari ini", mendesak: true };
-  return { teks: `FU ${fmtTanggal(fu, hariIni)}`, mendesak: false };
-}
+const TAMPILAN = [
+  { papan: false, label: "Daftar", Ikon: List, uji: "tab-daftar-lead" },
+  { papan: true, label: "Papan", Ikon: SquareKanban, uji: "tab-papan-lead" },
+] as const;
 
-function BarisLead({ lead, hariIni }: { lead: LeadRingkas; hariIni: string }) {
+function BarisLead({ lead, hariIni, kategori }: { lead: LeadRingkas; hariIni: string; kategori?: string }) {
   const buka = lead.tahap === "BARU" || lead.tahap === "PENAWARAN";
   const panas = buka && lead.diam_hari > 7;
   const fu = buka && lead.fu_berikutnya ? infoFu(lead.fu_berikutnya, hariIni) : null;
@@ -44,6 +43,11 @@ function BarisLead({ lead, hariIni }: { lead: LeadRingkas; hariIni: string }) {
         <div className="flex items-center gap-2">
           <span className="truncate font-semibold">{lead.pelanggan}</span>
           {lead.periksa ? <Chip nada="hari-ini">periksa</Chip> : null}
+          {kategori ? (
+            <Chip nada="garis" className="min-w-0 shrink truncate" data-uji="chip-kategori">
+              {kategori}
+            </Chip>
+          ) : null}
         </div>
         <div className="truncate text-sm text-muted-foreground">{ringkasProduk(lead.produk)}</div>
         <div className="truncate text-xs text-muted-foreground">
@@ -80,6 +84,7 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
   const sp = useSearchParams();
 
   const tab = TAB_DAFTAR.find((t) => t.kunci === sp.get("tab"))?.kunci ?? "semua";
+  const papan = sp.get("v") === "papan";
   // pemilik: ?m=<id> | "semua". Rep default ke dirinya; admin/baca default semua.
   const mParam = sp.get("m");
   const pemilik: number | null =
@@ -94,15 +99,18 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
 
   const [bukaBaru, setBukaBaru] = useState(false);
 
-  const setParam = (kunci: string, nilai: string | null) => {
+  const hrefParam = (kunci: string, nilai: string | null) => {
     const p = new URLSearchParams(sp.toString());
     if (nilai) p.set(kunci, nilai);
     else p.delete(kunci);
     const s = p.toString();
-    router.replace(s ? `/pipeline?${s}` : "/pipeline");
+    return s ? `/pipeline?${s}` : "/pipeline";
   };
+  const setParam = (kunci: string, nilai: string | null) => router.replace(hrefParam(kunci, nilai));
 
   const daftar = usePipelineDaftar({ tab, pemilik, q });
+  const kategori = usePipelineKategori();
+  const namaKategori = new Map(kategori.data?.kategori.map((k) => [k.id, k.nama]));
 
   return (
     <div className="space-y-3">
@@ -131,6 +139,27 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
             })}
           </div>
         ) : null}
+        <div role="tablist" aria-label="Tampilan" className="inline-flex shrink-0 rounded-lg bg-muted p-[3px]">
+          {TAMPILAN.map(({ papan: b, label, Ikon, uji }) => (
+            <Link
+              key={label}
+              role="tab"
+              aria-selected={papan === b}
+              tabIndex={papan === b ? 0 : -1}
+              href={hrefParam("v", b ? "papan" : null)}
+              replace
+              data-uji={uji}
+              className={cn(
+                "inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors outline-none",
+                "focus-visible:ring-3 focus-visible:ring-ring/50",
+                papan === b ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Ikon className="size-4" aria-hidden />
+              {label}
+            </Link>
+          ))}
+        </div>
         <div className="ml-auto flex items-center gap-2">
           {owner ? (
             <Button asChild variant="outline">
@@ -188,7 +217,24 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
         />
       </div>
 
-      {daftar.isError ? (
+      {papan ? (
+        daftar.isError || kategori.isError ? (
+          <GalatMuat
+            galat={daftar.error ?? kategori.error}
+            ulang={() => void Promise.all([daftar.refetch(), kategori.refetch()])}
+          />
+        ) : daftar.isPending || kategori.isPending ? (
+          <MemuatDaftar />
+        ) : (
+          <>
+            <p className="text-xs text-muted-foreground">
+              {daftar.data.total} lead · Kategori di papan ini pribadi, hanya terlihat oleh Anda. Menyeret lead tidak mengubah
+              tahapnya.
+            </p>
+            <PapanLead leads={daftar.data.items} papan={kategori.data} />
+          </>
+        )
+      ) : daftar.isError ? (
         <GalatMuat galat={daftar.error} ulang={() => void daftar.refetch()} />
       ) : daftar.isPending ? (
         <MemuatDaftar />
@@ -199,7 +245,7 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
           <p className="text-xs text-muted-foreground">{daftar.data.total} lead</p>
           <div className="space-y-2">
             {daftar.data.items.map((l) => (
-              <BarisLead key={l.id} lead={l} hariIni={hariIni} />
+              <BarisLead key={l.id} lead={l} hariIni={hariIni} kategori={namaKategori.get(kategori.data?.posisi[l.id] ?? "")} />
             ))}
           </div>
         </>
@@ -211,10 +257,11 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
 }
 
 export function LayarDaftar() {
+  const papan = useSearchParams().get("v") === "papan";
   return (
     <>
       <KepalaHalaman judul="Pipeline" />
-      <IsiHalaman className="space-y-4">
+      <IsiHalaman lebar={papan} className="space-y-4">
         <GerbangPipeline>{(akses) => <IsiDaftar akses={akses} />}</GerbangPipeline>
       </IsiHalaman>
     </>
