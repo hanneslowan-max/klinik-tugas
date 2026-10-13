@@ -1,4 +1,6 @@
 // Kunci TanStack Query terpusat, supaya invalidasi sesudah mutasi konsisten di semua layar.
+import type { DariNotif } from "@/types/domain";
+
 export const kunci = {
   anggota: ["anggota"] as const,
   struktur: ["struktur"] as const,
@@ -9,7 +11,10 @@ export const kunci = {
   detail: (id: string) => ["detail", id] as const,
   semuaCari: ["cari"] as const,
   cari: (q: string, space: string) => ["cari", q, space] as const,
+  /** akar invalidasi semua tab notifikasi (realtime, sesudah tandai dibaca) */
   notif: ["notif"] as const,
+  /** satu tab notifikasi "Dari tim" / "Dari agent" (datanya sendiri, limit sendiri) */
+  notifDari: (dari: DariNotif) => ["notif", dari] as const,
   sampah: ["sampah"] as const,
   adminTokens: ["admin", "tokens"] as const,
   adminSinkron: ["admin", "sinkron"] as const,

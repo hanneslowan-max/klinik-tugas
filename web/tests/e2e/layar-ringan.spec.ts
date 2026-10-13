@@ -60,6 +60,7 @@ test.describe("Notifikasi", () => {
       const lonceng = page.getByTestId("lonceng").first();
       await expect(lonceng).toHaveAttribute("aria-label", /2 belum dibaca/);
       await page.goto("/notif");
+      await expect(page.getByTestId("tab-notif-tim")).toHaveAttribute("aria-selected", "true"); // tab bawaan: Dari tim
       const pertama = page.locator("[data-notif]").first();
       await expect(pertama).toContainText("baru");
       await pertama.locator("a").click();

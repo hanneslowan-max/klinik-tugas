@@ -187,6 +187,34 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   kategori baru sudah fail-closed.
 - **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md`.
 
+## Notifikasi "Dari tim" / "Dari agent" (revisi #2, 13 Okt 2026, branch `rev2-notif`)
+
+- **Permintaan Hannes:** pisahkan notifikasi dari claude agent dan dari user. Layar `/notif` punya 2 tab: **Dari tim**
+  (bawaan) dan **Dari agent** (`/notif?dari=agent`). Tiap tab menampilkan angka belum dibaca dan memuat datanya sendiri
+  (100 terbaru per tab), jadi tab tim tidak terdesak oleh notifikasi agent. "Tandai semua dibaca" pindah ke bawah tab
+  dan hanya berlaku untuk tab aktif (judul "Notifikasi" di HP kini tidak lagi terdesak tombol). Lonceng dan badge menu
+  tetap TOTAL semua tab (tidak berubah).
+- **Aturan agent** (satu pintu SQL `notif_dari_agent`): aktor ber-role `bot` ("claude (agent)") ATAU tindakan pemicunya
+  lewat token API (`notifications.sumber = 'api'`: Edge `/api`, CLI, routine, importer) walau tokennya milik anggota
+  manusia. Kasus kedua diberi chip "lewat API". Selain itu masuk tab tim.
+- **Migrasi `20261013160000_notif_pisah_agent` (aditif):** kolom `notifications.sumber` + trigger pengisi + isi mundur dari
+  `activity`; `web_notif(p_limit, p_dari)` dan `web_notif_baca(p_ids, p_dari)`. Parameter baru opsional, JSON hanya
+  bertambah, jadi web lama, `web-lama/` dan uji lama tetap jalan. **Terapkan ke produksi (`bash alat/sql-proyek.sh
+  --migrasi`) SEBELUM merge**: web baru di atas DB lama membuat `/notif` galat (PGRST202); web lama di atas DB baru aman.
+  Sesudah terap, pastikan tepat satu `web_notif(integer,text)` dan satu `web_notif_baca(bigint[],text)`:
+  `select oid::regprocedure from pg_proc where proname in ('web_notif', 'web_notif_baca');`
+- **Konfirmasi data produksi** (baca-saja, SQL editor). Menurut catatan bootstrap (tabel sesi deploy & langkah 8), semua
+  token dibuat untuk bot. Bila ada token aktif milik anggota manusia yang dipakai orangnya sendiri, notifikasinya ikut
+  tab agent; aturan bisa diubah di `notif_dari_agent` tanpa migrasi data.
+  ```sql
+  select m.username, m.role, k.nama, k.scope, k.revoked_at is null as aktif, k.last_used_at
+    from api_tokens k join members m on m.id = k.member_id order by m.role, k.created_at;
+  select a.sumber, m.role, count(*) from activity a left join members m on m.id = a.actor_id
+   where a.sumber in ('ui', 'api') group by 1, 2 order by 1, 2;
+  ```
+- **Tes:** `uji/db/20_notif_pisah.sql` (47 cek), `web/src/features/notif/dari.test.ts`, e2e
+  `web/tests/e2e/notif-pisah.spec.ts` (HP + desktop; penerima uji Dodi supaya tidak mengganggu tes owner/Citra).
+
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)
 Prasyarat dari Hannes: project Supabase baru `rhj-tugas` (akun/org baru, Sydney `ap-southeast-2` per keputusan 30/9, Free); env cloud `SUPABASE_ACCESS_TOKEN` (PAT akun baru) + `SUPABASE_PROJECT_REF`; `CLICKUP_API_TOKEN` (sudah ada); sesi baru supaya env terbaca. Semua langkah ke ClickUp **GET saja**. Tidak memakai MCP Supabase (itu ERP).
 
