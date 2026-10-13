@@ -1,8 +1,10 @@
 "use client";
 
-// Jelajah: Space → Folder → List (web_struktur) dengan hitungan terbuka/telat. Arsip disembunyikan (bisa dibuka).
+// Jelajah: Space → Folder → List (web_struktur) dengan hitungan terbuka/telat. Arsip disembunyikan (bisa dibuka;
+// ?arsip=1 dibaca di klien dan diganti lewat history.replaceState, tanpa permintaan ke server).
 import { ChevronDown, ChevronRight, Folder, Lock } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 import { IsiHalaman } from "@/components/layout/isi-halaman";
 import { IsiTautan } from "@/components/layout/petunjuk-tautan";
@@ -12,6 +14,7 @@ import { GalatMuat, Kosong, MemuatDaftar } from "@/components/umum/keadaan";
 import { Button } from "@/components/ui/button";
 import { useProfil } from "@/features/profil/penyedia-profil";
 import { useStruktur } from "@/features/struktur/queries";
+import { gantiUrl } from "@/lib/url-dangkal";
 import type { ListStruktur } from "@/types/domain";
 
 function TautanList({ list: l }: { list: ListStruktur }) {
@@ -40,7 +43,9 @@ function TautanList({ list: l }: { list: ListStruktur }) {
   );
 }
 
-export function LayarJelajah({ arsip }: { arsip: boolean }) {
+export function LayarJelajah() {
+  const arsip = useSearchParams().get("arsip") === "1";
+  const hrefArsip = arsip ? "/jelajah" : "/jelajah?arsip=1";
   const q = useStruktur();
   const tampak = <T extends { archived: boolean }>(x: T) => arsip || !x.archived;
 
@@ -50,7 +55,14 @@ export function LayarJelajah({ arsip }: { arsip: boolean }) {
         judul="Jelajah"
         aksi={
           <Button variant="ghost" size="sm" asChild aria-pressed={arsip}>
-            <Link href={arsip ? "/jelajah" : "/jelajah?arsip=1"} replace>
+            <Link
+              href={hrefArsip}
+              prefetch={false}
+              onNavigate={(e) => {
+                e.preventDefault();
+                gantiUrl(hrefArsip);
+              }}
+            >
               {arsip ? "Sembunyikan arsip" : "Tampilkan arsip"}
             </Link>
           </Button>

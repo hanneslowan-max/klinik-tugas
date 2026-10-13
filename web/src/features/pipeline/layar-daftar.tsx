@@ -1,13 +1,14 @@
 "use client";
 
 // Layar "Lead saya" (§5): tab Semua / Diam >7 hari / Pallet Mesh / Penawaran, pencarian, tombol Lead baru.
-// Rep default melihat leadnya sendiri; admin/baca default semua lead. Filter pemilik & tab disimpan di URL.
+// Rep default melihat leadnya sendiri; admin/baca default semua lead. Filter pemilik & tab disimpan di URL; semua
+// perubahan URL di layar ini lewat history.replaceState (gantiUrl) — data dari TanStack, tanpa permintaan ke server.
 // Dua tampilan (?v=papan): Daftar, atau Papan = kolom kategori PRIBADI pengguna, lead diseret antar kolom (papan-lead).
 // Tab Order (revisi #3–#7): rekap & tabel order per bulan SP (daftar-order). Saringan status + tanggal (?st, dari, sampai)
 // disaring di klien di atas hasil cari server (saringan-lead).
 import { BarChart3, List, Plus, Search, ShieldCheck, SquareKanban } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { IsiHalaman } from "@/components/layout/isi-halaman";
@@ -27,6 +28,7 @@ import { PilTahap } from "@/features/pipeline/pil-tahap";
 import { usePipelineDaftar, usePipelineKategori } from "@/features/pipeline/queries";
 import { opsiStatus, SaringanLead, tanggalSah } from "@/features/pipeline/saringan-lead";
 import { useProfil } from "@/features/profil/penyedia-profil";
+import { gantiUrl } from "@/lib/url-dangkal";
 import { cn } from "@/lib/utils";
 import type { LeadRingkas } from "@/types/domain";
 
@@ -88,7 +90,6 @@ function BarisLead({ lead, hariIni, kategori }: { lead: LeadRingkas; hariIni: st
 function IsiDaftar({ akses }: { akses: AksesPipeline }) {
   const { member, hariIni, owner } = useProfil();
   const idSaya = Number(member.id);
-  const router = useRouter();
   const sp = useSearchParams();
 
   const tab = TAB_DAFTAR.find((t) => t.kunci === sp.get("tab"))?.kunci ?? "semua";
@@ -125,12 +126,12 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
     return s ? `/pipeline?${s}` : "/pipeline";
   };
   const hrefParam = (kunci: string, nilai: string | null) => hrefParams({ [kunci]: nilai });
-  const setParam = (kunci: string, nilai: string | null) => router.replace(hrefParam(kunci, nilai));
-  const setSaringan = (f: NilaiSaringan) => router.replace(hrefParams({ st: f.status, dari: f.dari, sampai: f.sampai }));
+  const setParam = (kunci: string, nilai: string | null) => gantiUrl(hrefParam(kunci, nilai));
+  const setSaringan = (f: NilaiSaringan) => gantiUrl(hrefParams({ st: f.status, dari: f.dari, sampai: f.sampai }));
   // status selalu dibuang saat ganti tab (pilihannya beda per tab); tanggal berarti lain di tab Order (tanggal SP) →
   // dibuang saat pindah masuk/keluar tab Order
   const pindahTab = (kunci: string) =>
-    router.replace(
+    gantiUrl(
       hrefParams({
         tab: kunci === "semua" ? null : kunci,
         st: null,
@@ -186,7 +187,11 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
               aria-selected={papan === b}
               tabIndex={papan === b ? 0 : -1}
               href={hrefParam("v", b ? "papan" : null)}
-              replace
+              prefetch={false}
+              onNavigate={(e) => {
+                e.preventDefault();
+                gantiUrl(hrefParam("v", b ? "papan" : null));
+              }}
               data-uji={uji}
               className={cn(
                 "inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors outline-none",

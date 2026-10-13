@@ -3,11 +3,12 @@
 // Cari: nama, kode (Y7, FX-PM-…), isi, ID lama, atau URL (web_cari). Tempel URL tugas ClickUp / tautan kartu →
 // langsung membuka kartunya; URL list ClickUp (/v/l/…, /v/b/…) atau /l/<id> → membuka list (rujukan dari DB);
 // URL folder/space → info + tautan ke Jelajah (perbaikan P6). Pengalihan hanya saat pengguna menekan Cari, supaya
-// tombol Kembali dari kartu tidak terlempar lagi ke kartu yang sama.
+// tombol Kembali dari kartu tidak terlempar lagi ke kartu yang sama. ?q & ?space dibaca di klien; hasil cari tanpa
+// pengalihan hanya mengganti URL (history.replaceState), tanpa permintaan ke server.
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { IsiHalaman } from "@/components/layout/isi-halaman";
@@ -24,6 +25,7 @@ import { pesanGalat } from "@/lib/api/galat";
 import { rpc } from "@/lib/api/rpc";
 import { kunci } from "@/lib/kunci-query";
 import { klienBrowser } from "@/lib/supabase/client";
+import { gantiUrl } from "@/lib/url-dangkal";
 import type { HasilCari } from "@/types/domain";
 
 const SEMUA = "semua";
@@ -40,8 +42,11 @@ function tujuanLangsung(q: string, r: HasilCari): string | null {
   return null;
 }
 
-export function LayarCari({ q, space }: { q: string; space: string }) {
+export function LayarCari() {
   const router = useRouter();
+  const sp = useSearchParams();
+  const q = sp.get("q") ?? "";
+  const space = sp.get("space") ?? "";
   const qc = useQueryClient();
   const struktur = useStruktur();
   const [teks, setTeks] = useState(q);
@@ -57,7 +62,7 @@ export function LayarCari({ q, space }: { q: string; space: string }) {
     const sp = pilihSpace === SEMUA ? "" : pilihSpace;
     setGalatKirim(null);
     if (!kata) {
-      router.replace("/cari");
+      gantiUrl("/cari");
       return;
     }
     setSibuk(true);
@@ -68,10 +73,10 @@ export function LayarCari({ q, space }: { q: string; space: string }) {
       if (sp) u.set("space", sp);
       if (tujuan) {
         // simpan kata kunci di riwayat dulu (tanpa render ulang) supaya tombol Kembali kembali ke hasil cari
-        window.history.replaceState(null, "", `/cari?${u}`);
+        gantiUrl(`/cari?${u}`);
         router.push(tujuan);
       } else {
-        router.replace(`/cari?${u}`, { scroll: false });
+        gantiUrl(`/cari?${u}`);
       }
     } catch (err) {
       setGalatKirim(pesanGalat(err));
