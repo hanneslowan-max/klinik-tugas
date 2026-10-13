@@ -4,9 +4,10 @@
 // subtotal per bulan. Desktop: tabel (Tgl SP · No SP/No PO · Pelanggan · Produk · Pemilik · Nominal · Pembayaran);
 // HP: kartu. Tombol pensil membuka Data order (nominal, No SP, No PO, pembayaran) bagi yang berhak (rep pemilik + admin;
 // server tetap menegakkan). "Unduh CSV" = order yang sedang tampil, untuk rekap manual di Excel.
+// Rekap, subtotal per bulan, dan CSV selalu dari SEMUA order; hanya baris yang dirender dibatasi (`batas`, bertahap).
 import { Download, Pencil } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { Chip } from "@/components/umum/chip";
 import { Button } from "@/components/ui/button";
@@ -27,9 +28,13 @@ type Props = {
   leads: LeadRingkas[];
   namaKategori: (leadId: string) => string | undefined;
   bisaUbah: (lead: LeadRingkas) => boolean;
+  /** jumlah baris order yang dirender (urut kelompok); sisanya lewat `lagi` */
+  batas?: number;
+  /** kontrol "tampilkan lagi" bila masih ada baris yang belum dirender */
+  lagi?: (sisa: number) => ReactNode;
 };
 
-export function DaftarOrder({ leads, namaKategori, bisaUbah }: Props) {
+export function DaftarOrder({ leads, namaKategori, bisaUbah, batas = Infinity, lagi }: Props) {
   const { hariIni } = useProfil();
   const desktop = useDesktop();
   // lead terakhir yang diubah tetap disimpan saat dialog tertutup: dialog tetap ter-mount supaya animasi tutup jalan dan
@@ -41,6 +46,8 @@ export function DaftarOrder({ leads, namaKategori, bisaUbah }: Props) {
     setBukaUbah(true);
   };
   const r = kelompokOrder(leads);
+  const tampil = irisGrup(r.grup, batas);
+  const sisa = r.grup.reduce((n, g) => n + g.items.length, 0) - tampil.reduce((n, x) => n + x.items.length, 0);
 
   const unduh = () => {
     const urut = r.grup.flatMap((g) => g.items);
@@ -69,14 +76,14 @@ export function DaftarOrder({ leads, namaKategori, bisaUbah }: Props) {
         </Button>
       </div>
 
-      {r.grup.map((g) => (
+      {tampil.map(({ g, items }) => (
         <section key={g.kunci} aria-label={g.label} className="space-y-2" data-uji="grup-order" data-bulan={g.kunci}>
           <KepalaGrup g={g} />
           {desktop ? (
-            <TabelOrder items={g.items} hariIni={hariIni} namaKategori={namaKategori} bisaUbah={bisaUbah} onUbah={mulaiUbah} />
+            <TabelOrder items={items} hariIni={hariIni} namaKategori={namaKategori} bisaUbah={bisaUbah} onUbah={mulaiUbah} />
           ) : (
             <ul className="space-y-2">
-              {g.items.map((l) => (
+              {items.map((l) => (
                 <KartuOrder key={l.id} lead={l} hariIni={hariIni} kategori={namaKategori(l.id)} bisaUbah={bisaUbah(l)} onUbah={mulaiUbah} />
               ))}
             </ul>
@@ -84,9 +91,24 @@ export function DaftarOrder({ leads, namaKategori, bisaUbah }: Props) {
         </section>
       ))}
 
+      {sisa > 0 && lagi ? lagi(sisa) : null}
+
       {ubah ? <DialogOrder key={ubah.id} buka={bukaUbah} ubahBuka={setBukaUbah} lead={ubah} /> : null}
     </div>
   );
+}
+
+/** Iris tampilan SESUDAH pengelompokan (urut grup): kepala grup tetap menampilkan subtotal penuh. */
+function irisGrup(grup: GrupOrder[], batas: number): { g: GrupOrder; items: LeadRingkas[] }[] {
+  const hasil: { g: GrupOrder; items: LeadRingkas[] }[] = [];
+  let kuota = batas;
+  for (const g of grup) {
+    if (kuota <= 0) break;
+    const items = g.items.slice(0, kuota);
+    kuota -= items.length;
+    hasil.push({ g, items });
+  }
+  return hasil;
 }
 
 function Ubin({ label, nilai, nada, uji }: { label: string; nilai: string; nada?: "sukses" | "telat"; uji: string }) {

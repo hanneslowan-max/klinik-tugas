@@ -100,7 +100,8 @@ test("tombol Papan: lead mulai di 'Tanpa kategori'; kategori bisa ditambah & dig
 
   // tampilan Daftar tetap seperti semula
   await page.getByTestId("tab-daftar-lead").click();
-  await expect(page).toHaveURL(/\/pipeline$/);
+  // kata cari ikut tersimpan di URL (?q=…, dipulihkan saat Kembali dari detail); ?v=papan hilang
+  await expect(page).toHaveURL(/\/pipeline(\?q=[^&]*)?$/);
   await expect(page.getByTestId("baris-lead").filter({ hasText: PELANGGAN })).toBeVisible();
 });
 

@@ -401,3 +401,56 @@ test.describe("data awal dari server pada muat dokumen penuh (P1)", () => {
     }
   });
 });
+
+test("Pipeline volume (items ×60 lewat route): 50 baris dulu, tombol tampil-lagi, hitungan & rekap dari semua (P4)", async ({ page }) => {
+  const PELANGGAN = "PT Uji Volume Performa";
+  const acak = () => Math.random().toString(36).slice(2, 10).padEnd(8, "0");
+  const [pl, order, baru] = [`pl${acak()}`, `ld${acak()}`, `ld${acak()}`];
+  const ROMAWI = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
+  const ini = sqlLokal(`select to_char(public.hari_ini_wib(), 'YYYY-MM-DD')`);
+  const noSp = `${800 + Math.floor(Math.random() * 99)}/UJP/${ROMAWI[Number(ini.slice(5, 7)) - 1]}/${ini.slice(0, 4)}`;
+  const bersihAkses = beriAksesPipeline(AKUN.citra.id, "rep");
+  const bersih = () =>
+    sqlLokal(
+      `delete from public.lead where pelanggan_id in (select id from public.pelanggan where nama = '${PELANGGAN}');` +
+        ` delete from public.pelanggan where nama = '${PELANGGAN}';`,
+    );
+  bersih();
+  sqlLokal(
+    `insert into public.pelanggan (id, nama, kota) values ('${pl}', '${PELANGGAN}', 'Kediri');` +
+      ` insert into public.lead (id, pelanggan_id, sumber, pemilik, tahap, no_sp, tanggal_sp, nilai_transaksi) values` +
+      ` ('${order}', '${pl}', 'Google Ads', ${AKUN.citra.id}, 'ORDER', '${noSp}', '${ini}', 1000000),` +
+      ` ('${baru}', '${pl}', 'Referral', ${AKUN.citra.id}, 'BARU', null, null, null);` +
+      ` insert into public.lead_item (lead_id, produk, qty) values ('${order}', 'Roda', 2), ('${baru}', 'Roda', 3);`,
+  );
+  try {
+    // jawaban web_pipeline_daftar asli digandakan 60× (id unik) — volume tanpa menulis ribuan baris ke DB bersama
+    await page.route(/\/rest\/v1\/rpc\/web_pipeline_daftar/, async (route) => {
+      const res = await route.fetch();
+      const j = (await res.json()) as { items: { id: string; kode: string }[]; total: number };
+      const items = Array.from({ length: 60 }, (_, i) => j.items.map((l) => ({ ...l, id: `${l.id}v${i}`, kode: `${l.kode}-${i}` }))).flat();
+      await route.fulfill({ response: res, json: { ...j, items, total: items.length } });
+    });
+    await masuk(page, AKUN.citra.email);
+    await page.goto("/pipeline");
+    await page.getByTestId("cari-lead").fill(PELANGGAN);
+    await expect(page).toHaveURL(/[?&]q=PT\+Uji\+Volume\+Performa/);
+    const baris = page.getByTestId("baris-lead");
+    await expect(baris).toHaveCount(50);
+    await expect(page.getByText("120 lead", { exact: true })).toBeVisible();
+    const lagi = page.getByTestId("tampil-lagi");
+    await expect(lagi).toHaveText("Tampilkan 50 lagi (sisa 70)");
+    await lagi.dispatchEvent("click"); // tanpa menggulir (sentinel gulir tidak ikut menambah)
+    await expect(baris).toHaveCount(100);
+    await expect(lagi).toHaveText("Tampilkan 20 lagi (sisa 20)");
+
+    // tab Order: rekap dari SEMUA order (60 × Rp1.000.000), baris dirender bertahap
+    await page.getByRole("tablist", { name: "Saring lead" }).getByRole("tab", { name: "Order" }).click();
+    await expect(page.getByTestId("rekap-jumlah")).toHaveText("60");
+    await expect(page.getByTestId("rekap-nominal")).toHaveText("Rp60.000.000");
+    await expect(page.getByTestId("tampil-lagi")).toHaveText("Tampilkan 10 lagi (sisa 10)");
+  } finally {
+    bersih();
+    bersihAkses();
+  }
+});

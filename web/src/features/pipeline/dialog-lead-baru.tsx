@@ -3,6 +3,7 @@
 // Form "Lead baru" (§5, target isi <30 detik): perusahaan (dedup via web_pipeline_pelanggan_cari), PIC, kota,
 // telepon, produk (chips multi + qty/satuan per produk, qty wajib K5), kebutuhan, sumber (chips WAJIB, §3).
 // Tanggal/pemilik/tahap otomatis di server. Pesan validasi jelas; galat server (§3) ditampilkan apa adanya.
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -28,6 +29,7 @@ export function DialogLeadBaru({ buka, ubahBuka }: { buka: boolean; ubahBuka: (b
 
 function FormLeadBaru({ buka, ubahBuka }: { buka: boolean; ubahBuka: (b: boolean) => void }) {
   const buat = useLeadBaru();
+  const router = useRouter();
 
   const [nama, setNama] = useState("");
   const [pelangganId, setPelangganId] = useState<string | null>(null);
@@ -146,7 +148,10 @@ function FormLeadBaru({ buka, ubahBuka }: { buka: boolean; ubahBuka: (b: boolean
 
     try {
       const lead = await buat.mutateAsync(body);
-      toast.success(`Lead ${lead.kode} dibuat`);
+      // lead baru ada di ujung bawah daftar (urut diam_sejak naik) → beri jalan pintas ke detailnya
+      toast.success(`Lead ${lead.kode} dibuat`, {
+        action: { label: "Buka", onClick: () => router.push(`/pipeline/${encodeURIComponent(lead.id)}`) },
+      });
       tutup(false);
     } catch (e) {
       setGalat(pesanGalat(e));

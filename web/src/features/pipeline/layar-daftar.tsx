@@ -6,10 +6,12 @@
 // Dua tampilan (?v=papan): Daftar, atau Papan = kolom kategori PRIBADI pengguna, lead diseret antar kolom (papan-lead).
 // Tab Order (revisi #3–#7): rekap & tabel order per bulan SP (daftar-order). Saringan status + tanggal (?st, dari, sampai)
 // disaring di klien di atas hasil cari server (saringan-lead).
+// Volume (±2.000 lead): baris dirender bertahap 50-50 (sentinel gulir + tombol cadangan) dengan batas per kunci daftar
+// yang bertahan saat Kembali dari detail; kotak cari terpisah (ketikan tidak merender ulang daftar); baris di-memo.
 import { BarChart3, List, Plus, Search, ShieldCheck, SquareKanban } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { memo, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 import { IsiHalaman } from "@/components/layout/isi-halaman";
 import { IsiTautan } from "@/components/layout/petunjuk-tautan";
@@ -37,7 +39,88 @@ const TAMPILAN = [
   { papan: true, label: "Papan", Ikon: SquareKanban, uji: "tab-papan-lead" },
 ] as const;
 
-function BarisLead({ lead, hariIni, kategori }: { lead: LeadRingkas; hariIni: string; kategori?: string }) {
+const LANGKAH = 50;
+
+/**
+ * Batas baris yang dirender per kunci daftar (tab|pemilik|cari|saringan). Tingkat modul supaya bertahan saat halaman
+ * di-unmount (buka detail lead → Kembali): jumlah baris sama → posisi gulir bisa dipulihkan. Ganti kunci = mulai 50 lagi.
+ */
+const batasTersimpan = new Map<string, number>();
+
+function useBatasTampil(kunci: string) {
+  const [keadaan, setKeadaan] = useState(() => ({ kunci, batas: batasTersimpan.get(kunci) ?? LANGKAH }));
+  let batas = keadaan.batas;
+  if (keadaan.kunci !== kunci) {
+    batas = LANGKAH;
+    setKeadaan({ kunci, batas }); // sesuaikan state saat kunci berubah (saat render, bukan di efek)
+  }
+  useEffect(() => {
+    if (batasTersimpan.size > 50) batasTersimpan.clear(); // varian cari tak terbatas: jangan menumpuk
+    batasTersimpan.set(kunci, batas);
+  }, [kunci, batas]);
+  const tambah = () => setKeadaan((k) => ({ kunci: k.kunci, batas: k.batas + LANGKAH }));
+  return { batas, tambah };
+}
+
+/**
+ * Tombol "Tampilkan 50 lagi" yang juga menjadi sentinel gulir: saat mendekati layar (±600px) baris berikutnya
+ * ditambahkan otomatis; tombol tetap ada sebagai cadangan (keyboard, pembaca layar, IntersectionObserver tak ada).
+ */
+function TampilLagi({ sisa, tambah }: { sisa: number; tambah: () => void }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const saatTerlihat = useEffectEvent(() => tambah());
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (e) => {
+        if (e.some((x) => x.isIntersecting)) saatTerlihat();
+      },
+      { rootMargin: "600px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [sisa]);
+  return (
+    <button
+      ref={ref}
+      type="button"
+      onClick={tambah}
+      className="w-full rounded-lg border border-dashed py-2.5 text-sm font-medium text-primary hover:bg-muted"
+      data-uji="tampil-lagi"
+    >
+      Tampilkan {Math.min(LANGKAH, sisa)} lagi (sisa {sisa})
+    </button>
+  );
+}
+
+/** Kotak cari dengan isian lokal: ketikan hanya merender komponen ini; kata ter-debounce 300 ms dikirim ke induk (URL). */
+function KotakCari({ awal, ubah }: { awal: string; ubah: (q: string) => void }) {
+  const [isi, setIsi] = useState(awal);
+  const kirim = useEffectEvent((q: string) => {
+    if (q !== awal.trim()) ubah(q);
+  });
+  useEffect(() => {
+    const t = setTimeout(() => kirim(isi.trim()), 300);
+    return () => clearTimeout(t);
+  }, [isi]);
+  return (
+    <div className="relative">
+      <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+      <Input
+        value={isi}
+        onChange={(e) => setIsi(e.target.value)}
+        placeholder="Cari perusahaan, PIC, produk, No SP/PO, kode lead"
+        className="pl-9"
+        aria-label="Cari lead"
+        data-uji="cari-lead"
+      />
+    </div>
+  );
+}
+
+// memo: daftar besar tidak dirender ulang per baris saat induk berubah (data lead = objek cache yang sama)
+const BarisLead = memo(function BarisLead({ lead, hariIni, kategori }: { lead: LeadRingkas; hariIni: string; kategori?: string }) {
   const buka = lead.tahap === "BARU" || lead.tahap === "PENAWARAN";
   const panas = buka && lead.diam_hari > 7;
   const fu = buka && lead.fu_berikutnya ? infoFu(lead.fu_berikutnya, hariIni) : null;
@@ -85,7 +168,7 @@ function BarisLead({ lead, hariIni, kategori }: { lead: LeadRingkas; hariIni: st
       </IsiTautan>
     </Link>
   );
-}
+});
 
 function IsiDaftar({ akses }: { akses: AksesPipeline }) {
   const { member, hariIni, owner } = useProfil();
@@ -107,12 +190,9 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
   const pemilik: number | null =
     mParam === "semua" ? null : mParam && /^\d+$/.test(mParam) ? Number(mParam) : akses.peran === "rep" ? idSaya : null;
 
-  const [qInput, setQInput] = useState(sp.get("q") ?? "");
-  const [q, setQ] = useState(qInput.trim());
-  useEffect(() => {
-    const t = setTimeout(() => setQ(qInput.trim()), 300);
-    return () => clearTimeout(t);
-  }, [qInput]);
+  // kata cari ter-debounce disimpan di URL (?q): Kembali dari detail lead memulihkan pencarian
+  const qUrl = sp.get("q") ?? "";
+  const q = qUrl.trim();
 
   const [bukaBaru, setBukaBaru] = useState(false);
 
@@ -141,9 +221,14 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
 
   const daftar = usePipelineDaftar({ tab, pemilik, q });
   const kategori = usePipelineKategori();
-  const namaKategori = new Map(kategori.data?.kategori.map((k) => [k.id, k.nama]));
+  const namaKategori = useMemo(() => new Map(kategori.data?.kategori.map((k) => [k.id, k.nama])), [kategori.data]);
   const kategoriLead = (id: string) => namaKategori.get(kategori.data?.posisi[id] ?? "");
-  const tersaring = daftar.data ? saringLead(daftar.data.items, saringan, modeOrder) : [];
+  const { status: stSaring, dari: dariSaring, sampai: sampaiSaring } = saringan;
+  const tersaring = useMemo(
+    () => (daftar.data ? saringLead(daftar.data.items, { status: stSaring, dari: dariSaring, sampai: sampaiSaring }, modeOrder) : []),
+    [daftar.data, stSaring, dariSaring, sampaiSaring, modeOrder],
+  );
+  const { batas, tambah } = useBatasTampil([tab, pemilik ?? "semua", q, stSaring, dariSaring, sampaiSaring].join("|"));
   const bisaUbahOrder = (l: LeadRingkas) =>
     akses.bolehTulis && (akses.peran === "admin" || l.pemilik == null || Number(l.pemilik) === idSaya);
   const hitungan = daftar.data
@@ -249,17 +334,7 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
         ))}
       </div>
 
-      <div className="relative">
-        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-        <Input
-          value={qInput}
-          onChange={(e) => setQInput(e.target.value)}
-          placeholder="Cari perusahaan, PIC, produk, No SP/PO, kode lead"
-          className="pl-9"
-          aria-label="Cari lead"
-          data-uji="cari-lead"
-        />
-      </div>
+      <KotakCari awal={qUrl} ubah={(v) => setParam("q", v || null)} />
 
       <SaringanLead
         key={modeOrder ? "order" : "lead"}
@@ -302,16 +377,23 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
       ) : modeOrder ? (
         <>
           <p className="text-xs text-muted-foreground">{hitungan}</p>
-          <DaftarOrder leads={tersaring} namaKategori={kategoriLead} bisaUbah={bisaUbahOrder} />
+          <DaftarOrder
+            leads={tersaring}
+            namaKategori={kategoriLead}
+            bisaUbah={bisaUbahOrder}
+            batas={batas}
+            lagi={(sisa) => <TampilLagi sisa={sisa} tambah={tambah} />}
+          />
         </>
       ) : (
         <>
           <p className="text-xs text-muted-foreground">{hitungan}</p>
           <div className="space-y-2">
-            {tersaring.map((l) => (
+            {tersaring.slice(0, batas).map((l) => (
               <BarisLead key={l.id} lead={l} hariIni={hariIni} kategori={kategoriLead(l.id)} />
             ))}
           </div>
+          {tersaring.length > batas ? <TampilLagi sisa={tersaring.length - batas} tambah={tambah} /> : null}
         </>
       )}
 

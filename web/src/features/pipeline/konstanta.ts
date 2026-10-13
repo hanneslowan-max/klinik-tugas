@@ -59,17 +59,21 @@ export type KunciTab = (typeof TAB_DAFTAR)[number]["kunci"];
 
 export const ROMAWI = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"] as const;
 
+// Satu formatter untuk semua angka (keluaran identik dengan toLocaleString("id-ID")): toLocaleString membuat
+// formatter baru di setiap panggilan (±4× lebih lambat), terasa saat merender ribuan lead.
+const ANGKA = new Intl.NumberFormat("id-ID");
+
 /** 'Rp1.250.000' atau '—' bila kosong. */
 export function rupiah(n: number | null | undefined): string {
   if (n == null) return "—";
-  return `Rp${Number(n).toLocaleString("id-ID")}`;
+  return `Rp${ANGKA.format(Number(n))}`;
 }
 
 /** Ringkas daftar produk: 'Pallet Mesh · 40 unit' (produk pertama) + '+1' bila lebih. */
 export function ringkasProduk(items: { produk: string; qty: number; satuan: string }[]): string {
   if (!items.length) return "—";
   const [p, ...sisa] = items;
-  const utama = `${p.produk} · ${Number(p.qty).toLocaleString("id-ID")} ${p.satuan}`;
+  const utama = `${p.produk} · ${ANGKA.format(Number(p.qty))} ${p.satuan}`;
   return sisa.length ? `${utama} · +${sisa.length}` : utama;
 }
 
