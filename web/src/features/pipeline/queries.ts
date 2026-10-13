@@ -6,12 +6,17 @@ import { useQuery } from "@tanstack/react-query";
 import { rpc } from "@/lib/api/rpc";
 import { kunci } from "@/lib/kunci-query";
 import { klienBrowser } from "@/lib/supabase/client";
+import type { PipelineSaya } from "@/types/domain";
 
-/** Akses modul untuk pengguna ini (gerbang menu & layar, §6). */
-export function usePipelineSaya() {
+/**
+ * Akses modul untuk pengguna ini (gerbang menu & layar, §6). `awal` = hasil server dari layout (app) (KerangkaApp
+ * meneruskannya) → menu & GerbangPipeline siap sejak HTML pertama. Umur data = jam klien (bukan jam server).
+ */
+export function usePipelineSaya(awal?: PipelineSaya) {
   return useQuery({
     queryKey: kunci.pipelineSaya,
     queryFn: () => rpc(klienBrowser(), "web_pipeline_saya"),
+    initialData: awal,
     staleTime: 5 * 60_000,
   });
 }

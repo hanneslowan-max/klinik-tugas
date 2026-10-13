@@ -19,6 +19,7 @@ import { useProfil } from "@/features/profil/penyedia-profil";
 import { PenyimakRealtime } from "@/features/realtime/penyimak-realtime";
 import { LABEL_PERAN } from "@/lib/konstanta";
 import { cn } from "@/lib/utils";
+import type { PipelineSaya } from "@/types/domain";
 
 function KartuAkun() {
   const { member } = useProfil();
@@ -218,11 +219,13 @@ function NavBawah({ path, navUtama }: { path: string; navUtama: ItemNav[] }) {
   );
 }
 
-export function KerangkaApp({ children }: { children: ReactNode }) {
+export function KerangkaApp({ children, pipelineAwal }: { children: ReactNode; pipelineAwal?: PipelineSaya }) {
   const path = usePathname();
   usePelacakRiwayat();
   // Gerbang menu Pipeline (§6): sembunyikan dari anggota tanpa akses modul. Halaman tetap digerbangi GerbangPipeline + RLS server.
-  const aksesPipeline = usePipelineSaya();
+  // pipelineAwal (dari layout server) mengisi cache sebelum render pertama: menu tidak bergeser dan GerbangPipeline
+  // (turunan KerangkaApp) langsung lolos tanpa menunggu web_pipeline_saya dari browser.
+  const aksesPipeline = usePipelineSaya(pipelineAwal);
   const navUtama = NAV_UTAMA.filter((i) => !i.pipelineSaja || !!aksesPipeline.data?.peran);
   return (
     <div className="flex min-h-dvh">
