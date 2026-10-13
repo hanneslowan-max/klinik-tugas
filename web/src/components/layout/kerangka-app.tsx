@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 import { NAV_LAIN, NAV_UTAMA, type ItemNav } from "@/components/layout/navigasi";
+import { PetunjukTautan, useTautanMenunggu } from "@/components/layout/petunjuk-tautan";
 import { usePelacakRiwayat } from "@/components/layout/riwayat";
 import { AvatarAnggota } from "@/components/umum/avatar-anggota";
 import { Chip } from "@/components/umum/chip";
@@ -18,6 +19,7 @@ import { useProfil } from "@/features/profil/penyedia-profil";
 import { PenyimakRealtime } from "@/features/realtime/penyimak-realtime";
 import { LABEL_PERAN } from "@/lib/konstanta";
 import { cn } from "@/lib/utils";
+import type { PipelineSaya } from "@/types/domain";
 
 function KartuAkun() {
   const { member } = useProfil();
@@ -35,6 +37,25 @@ function KartuAkun() {
   );
 }
 
+/** Angka kecil (notifikasi belum dibaca) di item navigasi. */
+function Angka({ n }: { n?: number }) {
+  return n ? <span className="rounded-full bg-telat px-1.5 text-[11px] leading-5 font-bold text-white">{n > 99 ? "99+" : n}</span> : null;
+}
+
+// Isi item navigasi = turunan <Link> (useLinkStatus): saat diklik ikon & label LANGSUNG ber-warna aktif (sorotan
+// optimistis) sebelum halaman tujuan selesai dimuat. aria-current tetap dari usePathname (halaman yang benar-benar tampil).
+function IsiTautanSidebar({ item, angka }: { item: ItemNav; angka?: number }) {
+  const menunggu = useTautanMenunggu();
+  return (
+    <>
+      <item.Ikon className={cn("size-4.5", menunggu && "text-primary")} aria-hidden />
+      <span className={cn("flex-1", menunggu && "text-primary")}>{item.label}</span>
+      <Angka n={angka} />
+      <PetunjukTautan className="inset-y-2 left-0 w-0.5" />
+    </>
+  );
+}
+
 function TautanSidebar({ item, path, angka }: { item: ItemNav; path: string; angka?: number }) {
   const aktif = item.cocok(path);
   return (
@@ -42,14 +63,35 @@ function TautanSidebar({ item, path, angka }: { item: ItemNav; path: string; ang
       href={item.href}
       aria-current={aktif ? "page" : undefined}
       className={cn(
-        "flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+        "relative flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
         aktif && "bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary",
       )}
     >
-      <item.Ikon className="size-4.5" aria-hidden />
-      <span className="flex-1">{item.label}</span>
-      {angka ? <span className="rounded-full bg-telat px-1.5 text-[11px] leading-5 font-bold text-white">{angka > 99 ? "99+" : angka}</span> : null}
+      <IsiTautanSidebar item={item} angka={angka} />
     </Link>
+  );
+}
+
+function IsiTautanBawah({ item }: { item: ItemNav }) {
+  const menunggu = useTautanMenunggu();
+  return (
+    <>
+      <item.Ikon className={cn("size-5", menunggu && "text-primary")} aria-hidden />
+      <span className={cn(menunggu && "text-primary")}>{item.href === "/saya" ? "Saya" : item.label}</span>
+      <PetunjukTautan className="inset-x-5 top-0 h-0.5" />
+    </>
+  );
+}
+
+function IsiTautanMenu({ item, angka }: { item: ItemNav; angka?: number }) {
+  const menunggu = useTautanMenunggu();
+  return (
+    <>
+      <item.Ikon className={cn("size-4.5", menunggu ? "text-primary" : "text-muted-foreground")} aria-hidden />
+      <span className={cn("flex-1", menunggu && "text-primary")}>{item.label}</span>
+      <Angka n={angka} />
+      <PetunjukTautan className="inset-y-3 left-0 w-0.5" />
+    </>
   );
 }
 
@@ -101,7 +143,18 @@ function NavBawah({ path, navUtama }: { path: string; navUtama: ItemNav[] }) {
   const { owner, profil } = useProfil();
   const keluar = useKeluar();
   const [menu, setMenu] = useState(false);
-  const kelasItem = "flex flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground";
+  // Lembar Menu ditutup SESUDAH halaman berganti (path berubah), bukan saat tautan diklik: tautannya tetap ter-mount
+  // sehingga petunjuk menunggunya terlihat selama halaman tujuan dimuat. (Pola "sesuaikan state saat render".)
+  const [pathMenu, setPathMenu] = useState(path);
+  if (pathMenu !== path) {
+    setPathMenu(path);
+    setMenu(false);
+  }
+  // tautan ke halaman yang sedang tampil tidak mengganti path → tutup langsung
+  const tutupBilaSama = (href: string) => () => {
+    if (href === path) setMenu(false);
+  };
+  const kelasItem = "relative flex flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground";
   return (
     <>
       <nav
@@ -113,8 +166,7 @@ function NavBawah({ path, navUtama }: { path: string; navUtama: ItemNav[] }) {
           const aktif = item.cocok(path);
           return (
             <Link key={item.href} href={item.href} aria-current={aktif ? "page" : undefined} className={cn(kelasItem, aktif && "text-primary")}>
-              <item.Ikon className="size-5" aria-hidden />
-              {item.href === "/saya" ? "Saya" : item.label}
+              <IsiTautanBawah item={item} />
             </Link>
           );
         })}
@@ -131,22 +183,19 @@ function NavBawah({ path, navUtama }: { path: string; navUtama: ItemNav[] }) {
               <li key={item.href}>
                 <Link
                   href={item.href}
-                  onClick={() => setMenu(false)}
-                  className="flex h-12 items-center gap-3 px-4 text-sm font-medium"
+                  onClick={tutupBilaSama(item.href)}
+                  className="relative flex h-12 items-center gap-3 px-4 text-sm font-medium"
                   data-uji={`menu-${item.href.slice(1)}`}
                 >
-                  <item.Ikon className="size-4.5 text-muted-foreground" aria-hidden />
-                  <span className="flex-1">{item.label}</span>
-                  {item.href === "/notif" && profil.notif_belum ? (
-                    <span className="rounded-full bg-telat px-1.5 text-[11px] leading-5 font-bold text-white">{profil.notif_belum}</span>
-                  ) : null}
+                  <IsiTautanMenu item={item} angka={item.href === "/notif" ? profil.notif_belum : undefined} />
                 </Link>
               </li>
             ))}
             <li>
-              <Link href="/ganti-password" onClick={() => setMenu(false)} className="flex h-12 items-center gap-3 px-4 text-sm font-medium">
+              <Link href="/ganti-password" className="relative flex h-12 items-center gap-3 px-4 text-sm font-medium">
                 <KeyRound className="size-4.5 text-muted-foreground" aria-hidden />
                 Ganti password
+                <PetunjukTautan className="inset-y-3 left-0 w-0.5" />
               </Link>
             </li>
             <li>
@@ -170,11 +219,13 @@ function NavBawah({ path, navUtama }: { path: string; navUtama: ItemNav[] }) {
   );
 }
 
-export function KerangkaApp({ children }: { children: ReactNode }) {
+export function KerangkaApp({ children, pipelineAwal }: { children: ReactNode; pipelineAwal?: PipelineSaya }) {
   const path = usePathname();
   usePelacakRiwayat();
   // Gerbang menu Pipeline (§6): sembunyikan dari anggota tanpa akses modul. Halaman tetap digerbangi GerbangPipeline + RLS server.
-  const aksesPipeline = usePipelineSaya();
+  // pipelineAwal (dari layout server) mengisi cache sebelum render pertama: menu tidak bergeser dan GerbangPipeline
+  // (turunan KerangkaApp) langsung lolos tanpa menunggu web_pipeline_saya dari browser.
+  const aksesPipeline = usePipelineSaya(pipelineAwal);
   const navUtama = NAV_UTAMA.filter((i) => !i.pipelineSaja || !!aksesPipeline.data?.peran);
   return (
     <div className="flex min-h-dvh">

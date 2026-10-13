@@ -1,19 +1,26 @@
 "use client";
 
-// Tulis data Pipeline (fungsi web_pipeline_* SECURITY DEFINER). Setiap mutasi menyegarkan daftar + detail +
-// ringkasan (invalidasi akar kunci.semuaPipeline). Pesan galat DB (Bahasa Indonesia) diteruskan via GalatApi.
+// Tulis data Pipeline (fungsi web_pipeline_* SECURITY DEFINER). Mutasi lead mengembalikan lead terkini (bentuk sama
+// dengan web_pipeline_lead untuk penulis: j_pipeline_lead(id, false)) → langsung jadi cache detail; lalu daftar &
+// ringkasan dimuat ulang. Pesan galat DB (Bahasa Indonesia) diteruskan via GalatApi.
 import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import { rpc } from "@/lib/api/rpc";
 import { kunci } from "@/lib/kunci-query";
 import { klienBrowser } from "@/lib/supabase/client";
 import type { Json } from "@/types/database";
-import type { PapanKategori, PelangganCari, ProdukLead, SatuanItem, SumberLead } from "@/types/domain";
+import type { LeadDetail, PapanKategori, PelangganCari, ProdukLead, SatuanItem, StatusBayar, SumberLead } from "@/types/domain";
 
-function segarkanPipeline(qc: QueryClient, id?: string) {
+/**
+ * Sesudah mutasi lead: hasil mutasi = lead terkini → cache detail (tanpa web_pipeline_lead kedua), lalu muat ulang
+ * daftar & ringkasan saja (bukan akar ['pipeline']: akses, kategori, dan detail lain tidak berubah). Promise selesai
+ * sesudah daftar segar termuat — dialog (Lead baru, data order) menunggu ini sebelum menutup.
+ */
+function segarkanPipeline(qc: QueryClient, lead?: LeadDetail) {
+  if (lead) qc.setQueryData(kunci.pipelineLead(lead.id), lead);
   return Promise.all([
-    qc.invalidateQueries({ queryKey: kunci.semuaPipeline }),
-    id ? qc.invalidateQueries({ queryKey: kunci.pipelineLead(id) }) : null,
+    qc.invalidateQueries({ queryKey: kunci.semuaPipelineDaftar }),
+    qc.invalidateQueries({ queryKey: kunci.semuaPipelineRingkas }),
   ]);
 }
 
@@ -36,7 +43,7 @@ export function useLeadBaru() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: BodyLeadBaru) => rpc(klienBrowser(), "web_pipeline_lead_buat", { p: body as unknown as Json }),
-    onSuccess: (lead) => segarkanPipeline(qc, lead.id),
+    onSuccess: (lead) => segarkanPipeline(qc, lead),
   });
 }
 
@@ -51,7 +58,7 @@ export function useFuCatat() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: BodyFu) => rpc(klienBrowser(), "web_pipeline_fu_catat", { p: body as unknown as Json }),
-    onSuccess: (lead) => segarkanPipeline(qc, lead.id),
+    onSuccess: (lead) => segarkanPipeline(qc, lead),
   });
 }
 
@@ -72,7 +79,7 @@ export function useTahap() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: BodyTahap) => rpc(klienBrowser(), "web_pipeline_tahap", { p: body as unknown as Json }),
-    onSuccess: (lead) => segarkanPipeline(qc, lead.id),
+    onSuccess: (lead) => segarkanPipeline(qc, lead),
   });
 }
 
@@ -89,7 +96,29 @@ export function useLeadUbah() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: BodyLeadUbah) => rpc(klienBrowser(), "web_pipeline_lead_ubah", { p: body as unknown as Json }),
-    onSuccess: (lead) => segarkanPipeline(qc, lead.id),
+    onSuccess: (lead) => segarkanPipeline(qc, lead),
+  });
+}
+
+export type BodyOrderUbah = {
+  lead_id: string;
+  nilai_transaksi?: number;
+  tanggal_sp?: string;
+  /** nomor urut SP (angka) → server membangun nomor/KODE/ROMAWI/TAHUN dari tanggal SP */
+  nomor?: string;
+  no_po?: string | null;
+  bayar_status?: StatusBayar;
+  bayar_dp?: number | null;
+  tanggal_dp?: string | null;
+  tanggal_lunas?: string | null;
+};
+
+/** Ubah data order (nominal, No SP, No PO, pembayaran) — hanya kunci yang dikirim yang berubah. */
+export function useOrderUbah() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: BodyOrderUbah) => rpc(klienBrowser(), "web_pipeline_order_ubah", { p: body as unknown as Json }),
+    onSuccess: (lead) => segarkanPipeline(qc, lead),
   });
 }
 

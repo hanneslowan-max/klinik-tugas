@@ -268,3 +268,34 @@
   border: 1px solid var(--border);
   padding: 0.25rem 0.5rem;
 }
+
+/* Petunjuk navigasi (components/layout/petunjuk-tautan.tsx): tak terlihat sampai tautannya menunggu; muncul sesudah
+   ±120 ms (navigasi cepat tidak berkedip) lalu berdenyut sampai halaman berganti. */
+.petunjuk-tautan {
+  opacity: 0;
+}
+.petunjuk-tautan[data-pending] {
+  animation:
+    petunjuk-muncul 150ms ease 120ms forwards,
+    petunjuk-denyut 1s ease-in-out 270ms infinite;
+}
+@keyframes petunjuk-muncul {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes petunjuk-denyut {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .petunjuk-tautan[data-pending] {
+    animation: none;
+    opacity: 1;
+  }
+}

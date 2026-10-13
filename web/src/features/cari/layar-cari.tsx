@@ -3,12 +3,13 @@
 // Cari: nama, kode (Y7, FX-PM-…), isi, ID lama, atau URL (web_cari). Tempel URL tugas ClickUp / tautan kartu →
 // langsung membuka kartunya; URL list ClickUp (/v/l/…, /v/b/…) atau /l/<id> → membuka list (rujukan dari DB);
 // URL folder/space → info + tautan ke Jelajah (perbaikan P6). Pengalihan hanya saat pengguna menekan Cari, supaya
-// tombol Kembali dari kartu tidak terlempar lagi ke kartu yang sama.
+// tombol Kembali dari kartu tidak terlempar lagi ke kartu yang sama. ?q & ?space dibaca di klien; hasil cari tanpa
+// pengalihan hanya mengganti URL (history.replaceState), tanpa permintaan ke server.
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { IsiHalaman } from "@/components/layout/isi-halaman";
 import { KepalaHalaman } from "@/components/layout/kepala-halaman";
@@ -24,6 +25,7 @@ import { pesanGalat } from "@/lib/api/galat";
 import { rpc } from "@/lib/api/rpc";
 import { kunci } from "@/lib/kunci-query";
 import { klienBrowser } from "@/lib/supabase/client";
+import { gantiUrl } from "@/lib/url-dangkal";
 import type { HasilCari } from "@/types/domain";
 
 const SEMUA = "semua";
@@ -40,16 +42,42 @@ function tujuanLangsung(q: string, r: HasilCari): string | null {
   return null;
 }
 
-export function LayarCari({ q, space }: { q: string; space: string }) {
+export function LayarCari() {
   const router = useRouter();
+  const sp = useSearchParams();
+  const q = sp.get("q") ?? "";
+  const space = sp.get("space") ?? "";
   const qc = useQueryClient();
   const struktur = useStruktur();
   const [teks, setTeks] = useState(q);
   const [pilihSpace, setPilihSpace] = useState(space || SEMUA);
+  // ?q/?space berubah dari LUAR (ketuk menu Cari = /cari tanpa remount, Kembali/Maju) → isian ikut URL. Gema hasil Cari
+  // sendiri dikenali dari `tertulis` (nilai yang terakhir ditulis/diikuti layar ini), jadi ketikan / pilihan space
+  // selagi pencarian menunggu tidak tertimpa saat hasilnya menulis URL.
+  const [jejak, setJejak] = useState({ q, space, tertulis: `${q}\n${space}` });
+  if (jejak.q !== q || jejak.space !== space) {
+    setJejak({ q, space, tertulis: `${q}\n${space}` }); // sesuaikan state saat render, bukan di efek
+    if (`${q}\n${space}` !== jejak.tertulis) {
+      setTeks(q);
+      setPilihSpace(space || SEMUA);
+    }
+  }
   const [sibuk, setSibuk] = useState(false);
   const [galatKirim, setGalatKirim] = useState<string | null>(null);
+  // tautan diketuk selagi Cari menunggu jawaban → hasilnya tidak lagi menulis URL / mengalihkan: replaceState saat
+  // navigasi Next menunggu RSC akan membatalkan navigasi itu (lib/url-dangkal)
+  const klikTautan = useRef(0);
+  useEffect(() => {
+    const saatKlik = (e: MouseEvent) => {
+      const a = e.target instanceof Element ? e.target.closest("a[href]") : null;
+      if (a instanceof HTMLAnchorElement && !a.target && !(e.ctrlKey || e.metaKey || e.shiftKey || e.altKey)) klikTautan.current++;
+    };
+    document.addEventListener("click", saatKlik, true);
+    return () => document.removeEventListener("click", saatKlik, true);
+  }, []);
 
-  const hasil = useQuery({ queryKey: kunci.cari(q, space), queryFn: () => cari(q, space), enabled: Boolean(q) });
+  // hasil per kata kunci tidak perlu disimpan selama gcTime bawaan (30 mnt)
+  const hasil = useQuery({ queryKey: kunci.cari(q, space), queryFn: () => cari(q, space), enabled: Boolean(q), gcTime: 5 * 60_000 });
 
   async function kirim(e: FormEvent) {
     e.preventDefault();
@@ -57,21 +85,27 @@ export function LayarCari({ q, space }: { q: string; space: string }) {
     const sp = pilihSpace === SEMUA ? "" : pilihSpace;
     setGalatKirim(null);
     if (!kata) {
-      router.replace("/cari");
+      setJejak((j) => ({ ...j, tertulis: "\n" }));
+      gantiUrl("/cari");
       return;
     }
+    const nomorKlik = klikTautan.current;
     setSibuk(true);
     try {
-      const r = await qc.fetchQuery({ queryKey: kunci.cari(kata, sp), queryFn: () => cari(kata, sp) });
+      const r = await qc.fetchQuery({ queryKey: kunci.cari(kata, sp), queryFn: () => cari(kata, sp), gcTime: 5 * 60_000 });
+      // pengguna mengetuk tautan / sudah pindah halaman selama menunggu: navigasinya menang (jangan dibatalkan, jangan
+      // menimpa entri riwayat halaman lain)
+      if (klikTautan.current !== nomorKlik || window.location.pathname !== "/cari") return;
       const tujuan = tujuanLangsung(kata, r);
       const u = new URLSearchParams({ q: kata });
       if (sp) u.set("space", sp);
+      setJejak((j) => ({ ...j, tertulis: `${kata}\n${sp}` }));
       if (tujuan) {
         // simpan kata kunci di riwayat dulu (tanpa render ulang) supaya tombol Kembali kembali ke hasil cari
-        window.history.replaceState(null, "", `/cari?${u}`);
+        gantiUrl(`/cari?${u}`);
         router.push(tujuan);
       } else {
-        router.replace(`/cari?${u}`, { scroll: false });
+        gantiUrl(`/cari?${u}`);
       }
     } catch (err) {
       setGalatKirim(pesanGalat(err));

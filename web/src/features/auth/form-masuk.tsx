@@ -1,8 +1,13 @@
 "use client";
 
 // Masuk dengan email + password (akun dibuat owner; tanpa daftar mandiri).
+// Cache TanStack dibuang saat layar ini tampil DAN sesudah masuk: sesi yang dicabut/kedaluwarsa di tengah jalan membuat
+// proxy mengalihkan navigasi klien ke /masuk di dokumen yang sama (tanpa muat ulang, tanpa useKeluar), sehingga cache
+// masih berisi data akun sebelumnya — dan initialData akun baru (profil, akses Pipeline dari layout) hanya dipakai
+// bila cache kosong.
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { KotakPesan } from "@/components/umum/kotak-pesan";
 import { Button } from "@/components/ui/button";
@@ -20,9 +25,11 @@ function pesanMasuk(pesan: string) {
 
 export function FormMasuk({ lanjut }: { lanjut: string | null }) {
   const router = useRouter();
+  const qc = useQueryClient();
   const [galat, setGalat] = useState<string | null>(null);
   const [sibuk, setSibuk] = useState(false);
   const [lihat, setLihat] = useState(false);
+  useEffect(() => qc.clear(), [qc]);
 
   async function kirim(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -41,6 +48,7 @@ export function FormMasuk({ lanjut }: { lanjut: string | null }) {
         setGalat(pesanMasuk(error.message));
         return;
       }
+      qc.clear();
       router.replace(lanjutAman(lanjut, "/saya", ["/masuk"]));
       router.refresh();
     } catch (err) {

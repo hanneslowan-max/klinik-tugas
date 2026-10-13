@@ -40,6 +40,12 @@ const kolomTanpa = (page: Page) => page.locator('[data-uji="kolom-kategori"][dat
 const kolomBernama = (page: Page, nama: string) =>
   page.locator('[data-uji="kolom-kategori"]').filter({ has: page.locator('[data-uji="nama-kategori"]', { hasText: new RegExp(`^${nama}$`) }) });
 
+/** Batasi ke pelanggan tes (DB e2e dipakai bersama: lead lain bisa mendorong lead uji keluar dari 30 kartu pertama). */
+async function hanyaPelangganUji(page: Page) {
+  await page.getByTestId("cari-lead").fill(PELANGGAN);
+  await expect(page.locator('[data-uji="kartu-lead"]')).toHaveCount(1);
+}
+
 async function tambahKategori(page: Page, nama: string) {
   await page.getByTestId("tambah-kategori").click();
   await page.getByTestId("input-kategori").fill(nama);
@@ -68,6 +74,7 @@ test("tombol Papan: lead mulai di 'Tanpa kategori'; kategori bisa ditambah & dig
   await page.getByTestId("tab-papan-lead").click();
   await expect(page).toHaveURL(/\/pipeline\?v=papan/);
   await expect(page.getByTestId("papan-lead")).toBeVisible();
+  await hanyaPelangganUji(page);
   await expect(kolomTanpa(page).locator(`[data-id="${lead}"]`)).toBeVisible();
 
   await tambahKategori(page, "Prioritas");
@@ -93,7 +100,8 @@ test("tombol Papan: lead mulai di 'Tanpa kategori'; kategori bisa ditambah & dig
 
   // tampilan Daftar tetap seperti semula
   await page.getByTestId("tab-daftar-lead").click();
-  await expect(page).toHaveURL(/\/pipeline$/);
+  // kata cari ikut tersimpan di URL (?q=…, dipulihkan saat Kembali dari detail); ?v=papan hilang
+  await expect(page).toHaveURL(/\/pipeline(\?q=[^&]*)?$/);
   await expect(page.getByTestId("baris-lead").filter({ hasText: PELANGGAN })).toBeVisible();
 });
 
@@ -101,6 +109,7 @@ test("seret lead ke kategori → tersimpan pribadi, tampil di Daftar, hapus kate
   test.skip(diHp(page), "seret diuji di desktop (mouse); HP memakai tekan-tahan");
   await masuk(page, AKUN.citra.email);
   await page.goto("/pipeline?v=papan");
+  await hanyaPelangganUji(page);
   await expect(kolomTanpa(page).locator(`[data-id="${lead}"]`)).toBeVisible();
   await tambahKategori(page, "Hot");
 
@@ -116,6 +125,7 @@ test("seret lead ke kategori → tersimpan pribadi, tampil di Daftar, hapus kate
 
   // muat ulang: posisi bertahan
   await page.reload();
+  await hanyaPelangganUji(page);
   await expect(kolomBernama(page, "Hot").locator(`[data-id="${lead}"]`)).toBeVisible();
 
   // Daftar menampilkan chip kategori
@@ -124,6 +134,7 @@ test("seret lead ke kategori → tersimpan pribadi, tampil di Daftar, hapus kate
 
   // hapus kategori → lead kembali ke Tanpa kategori
   await page.getByTestId("tab-papan-lead").click();
+  await hanyaPelangganUji(page);
   await kolomBernama(page, "Hot").getByTestId("menu-kategori").click();
   await page.getByTestId("aksi-hapus-kategori").click();
   await page.getByTestId("konfirmasi-ya").click();
@@ -141,6 +152,7 @@ test("kategori pribadi: pengguna lain tidak melihat kategori citra", async ({ pa
   );
   await masuk(page, AKUN.dodi.email);
   await page.goto("/pipeline?v=papan");
+  await hanyaPelangganUji(page);
   await expect(kolomTanpa(page).locator(`[data-id="${lead}"]`)).toBeVisible();
   await expect(page.getByText("Rahasia Citra")).toHaveCount(0);
   await expect(page.locator('[data-uji="kolom-kategori"]')).toHaveCount(1);

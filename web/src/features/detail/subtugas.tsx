@@ -7,15 +7,16 @@ import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useDetail } from "@/features/detail/konteks";
 import { DaftarTugas } from "@/features/tugas/baris-tugas";
-import { DialogBuatTugas } from "@/features/tugas/dialog-buat-tugas";
+import { DialogBuatTugas, pramuatFormBuatTugas, usePramuatFormBuatTugas } from "@/features/tugas/dialog-buat-tugas";
 
 export function Subtugas() {
   const { d, bolehUbah, muat } = useDetail();
   const idJudul = useId();
   const [buka, setBuka] = useState(false);
   const t = d.task;
-  if (!d.subtasks.length && !bolehUbah) return null;
   const bolehTambah = bolehUbah && !t.parent_id;
+  usePramuatFormBuatTugas(bolehTambah); // form Sub-tugas dipramuat saat senggang
+  if (!d.subtasks.length && !bolehUbah) return null;
   return (
     <section aria-labelledby={idJudul} className="space-y-2" data-uji="subtugas">
       <div className="flex min-h-11 items-center gap-2">
@@ -23,7 +24,14 @@ export function Subtugas() {
           Sub-tugas ({d.subtasks.length})
         </h3>
         {bolehTambah ? (
-          <Button variant="outline" size="sm" onClick={() => setBuka(true)} data-uji="tambah-subtugas">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setBuka(true)}
+            onPointerDown={pramuatFormBuatTugas}
+            onFocus={pramuatFormBuatTugas}
+            data-uji="tambah-subtugas"
+          >
             <Plus aria-hidden />
             Sub-tugas
           </Button>

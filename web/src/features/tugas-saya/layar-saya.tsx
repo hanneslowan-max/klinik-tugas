@@ -2,10 +2,16 @@
 
 // Tugas Saya: Telat · Hari ini · ≤3 hari kerja · Nanti · Tanpa due (web_tugas_saya). Bisa melihat anggota lain.
 // Dua tampilan (di URL ?v=board): Daftar (grup per tenggat) atau Papan (kolom per tenggat, seret untuk ubah tenggat).
+// ?m (anggota) & ?v dibaca di klien dan diganti dengan history.replaceState (gantiUrl): tanpa permintaan ke server.
+// `awal` = Tugas Saya milik sendiri dari server (hanya muat dokumen penuh, lib/data-awal.ts) → langsung tampil di HTML.
+// Papan Saya SENGAJA diimpor statis (tidak lewat next/dynamic seperti papan list/lead): ?v=board dengan data awal
+// dirender di server, dan komponen lazy di server selalu ter-suspend → React 19.2 mengalirkan isinya di <template>
+// dengan jeda tampil (throttle) hingga ±300 ms sesudah frame pertama (lab: konten /saya?v=board +250–350 ms).
+// dnd-kit (±15 KB gz) ikut di JS /saya demi papan yang langsung tampil di HTML.
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, List, SquareKanban } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 import { IsiHalaman } from "@/components/layout/isi-halaman";
 import { KepalaHalaman } from "@/components/layout/kepala-halaman";
@@ -16,9 +22,11 @@ import { useProfil } from "@/features/profil/penyedia-profil";
 import { DaftarTugas } from "@/features/tugas/baris-tugas";
 import { PapanSaya } from "@/features/tugas-saya/papan-saya";
 import { rpc } from "@/lib/api/rpc";
+import { opsiDataAwal, type DataAwal } from "@/lib/data-awal";
 import { kunci } from "@/lib/kunci-query";
 import { klienBrowser } from "@/lib/supabase/client";
 import { fmtTanggal } from "@/lib/tanggal";
+import { gantiUrl } from "@/lib/url-dangkal";
 import { cn } from "@/lib/utils";
 import type { TugasSaya } from "@/types/domain";
 
@@ -35,13 +43,14 @@ const TAB = [
   { board: true, label: "Papan", Ikon: SquareKanban, uji: "tab-board" },
 ] as const;
 
-export function LayarSaya({ target }: { target: number | null }) {
-  const router = useRouter();
+export function LayarSaya({ awal }: { awal?: DataAwal<TugasSaya> }) {
   const { member } = useProfil();
   const idSaya = Number(member.id);
+  const sp = useSearchParams();
+  const m = sp.get("m");
+  const target = m && /^\d+$/.test(m) ? Number(m) : null;
   const bukanSaya = target !== null && target !== idSaya;
   const anggota = useAnggotaAktif();
-  const sp = useSearchParams();
   const board = sp.get("v") === "board";
 
   const hrefSaya = (m: number, keBoard: boolean) => {
@@ -55,6 +64,8 @@ export function LayarSaya({ target }: { target: number | null }) {
   const q = useQuery({
     queryKey: kunci.tugasSaya(bukanSaya ? target : null),
     queryFn: () => rpc(klienBrowser(), "web_tugas_saya", bukanSaya ? { p_member: target } : {}),
+    // data server hanya untuk kunci milik sendiri (argumen {} sama dengan ambilTugasSayaAwal)
+    ...opsiDataAwal(awal, !bukanSaya),
   });
 
   const judul = bukanSaya ? `Tugas ${q.data?.member?.username ?? ""}`.trim() : "Tugas Saya";
@@ -67,7 +78,7 @@ export function LayarSaya({ target }: { target: number | null }) {
       <IsiHalaman lebar={board} className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm text-muted-foreground">Tugas milik</span>
-          <Select value={String(pemilik)} onValueChange={(v) => router.replace(hrefSaya(Number(v), board))}>
+          <Select value={String(pemilik)} onValueChange={(v) => gantiUrl(hrefSaya(Number(v), board))}>
             <SelectTrigger className="h-9 min-w-44" aria-label="Tugas milik" data-uji="pilih-pemilik">
               <SelectValue />
             </SelectTrigger>
@@ -88,7 +99,11 @@ export function LayarSaya({ target }: { target: number | null }) {
                 aria-selected={board === b}
                 tabIndex={board === b ? 0 : -1}
                 href={hrefSaya(pemilik, b)}
-                replace
+                prefetch={false}
+                onNavigate={(e) => {
+                  e.preventDefault();
+                  gantiUrl(hrefSaya(pemilik, b));
+                }}
                 data-uji={uji}
                 className={cn(
                   "inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors outline-none pointer-coarse:h-11",

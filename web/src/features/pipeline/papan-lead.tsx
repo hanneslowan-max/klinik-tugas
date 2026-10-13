@@ -32,6 +32,7 @@ import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { IsiTautan } from "@/components/layout/petunjuk-tautan";
 import { Chip } from "@/components/umum/chip";
 import { useKonfirmasi } from "@/components/umum/konfirmasi";
 import { Button } from "@/components/ui/button";
@@ -172,6 +173,7 @@ export function PapanLead({ leads, papan }: Props) {
 
   return (
     <DndContext
+      id="papan-lead"
       sensors={sensors}
       collisionDetection={deteksi}
       onDragStart={mulai}
@@ -529,7 +531,7 @@ function IsiKartu({
             aria-describedby={petunjukSeret}
             className={cn(kelasNama, "outline-none focus-visible:ring-3 focus-visible:ring-ring/50")}
           >
-            {l.pelanggan}
+            <IsiTautan className="min-w-0">{l.pelanggan}</IsiTautan>
           </Link>
         )}
         <PilTahap tahap={l.tahap} className="shrink-0" />

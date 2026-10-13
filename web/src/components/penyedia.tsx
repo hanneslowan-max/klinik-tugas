@@ -9,7 +9,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { GalatApi } from "@/lib/api/galat";
 
-function buatQueryClient() {
+/** QueryClient aplikasi (diekspor untuk tes). */
+export function buatQueryClient() {
   return new QueryClient({
     queryCache: new QueryCache({
       onError: (e) => {
@@ -25,6 +26,11 @@ function buatQueryClient() {
     defaultOptions: {
       queries: {
         staleTime: 30_000,
+        // Simpan data layar yang tidak terpasang 30 mnt (bawaan 5 mnt): kembali ke Tugas Saya/List/Pipeline sesudah
+        // lama bekerja di detail langsung menampilkan data lama (disegarkan di latar), bukan skeleton + 1 RTT.
+        // JANGAN Infinity / ≥ 50 mnt: gcTime query = maks antar-observer, dan signed URL lampiran (berlaku 60 mnt)
+        // mengandalkan gcTime SEGAR_URL (50 mnt) supaya URL kedaluwarsa terbuang.
+        gcTime: 30 * 60_000,
         refetchOnWindowFocus: true,
         retry: (n, e) => !(e instanceof GalatApi && (e.sesiHabis || (e.status ?? 0) >= 400)) && n < 2,
       },

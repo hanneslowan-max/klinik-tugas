@@ -10,6 +10,7 @@ import { IsiHalaman } from "@/components/layout/isi-halaman";
 import { KepalaHalaman } from "@/components/layout/kepala-halaman";
 import { GalatMuat } from "@/components/umum/keadaan";
 import { KotakPesan } from "@/components/umum/kotak-pesan";
+import { muatMarkdown } from "@/components/umum/teks";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checklist } from "@/features/detail/checklist";
@@ -21,6 +22,12 @@ import { Subtugas } from "@/features/detail/subtugas";
 import { TabAktivitas, type TabDetail } from "@/features/detail/tab-aktivitas";
 import { BagianLampiran } from "@/features/lampiran/daftar-lampiran";
 import { GalatApi } from "@/lib/api/galat";
+import type { DataAwal } from "@/lib/data-awal";
+import type { DetailTugas } from "@/types/domain";
+
+// pustaka markdown (dimuat malas) mulai diunduh begitu modul ini dievaluasi di klien — saat hidrasi/navigasi /t,
+// sejajar web_detail — bukan sesudah komit hidrasi (efek) sehingga fase teks polos deskripsi lebih singkat
+if (typeof window !== "undefined") muatMarkdown().catch(() => {});
 
 function MemuatDetail() {
   return (
@@ -53,8 +60,8 @@ function LampiranDetail() {
   return <BagianLampiran taskId={id} lampiran={d.lampiran} bolehUbah={bolehUbah} onBerubah={segarkan} />;
 }
 
-export function LayarDetail({ id, tabAwal }: { id: string; tabAwal: TabDetail }) {
-  const q = useDataDetail(id);
+export function LayarDetail({ id, tabAwal, awal }: { id: string; tabAwal: TabDetail; awal?: DataAwal<DetailTugas> }) {
+  const q = useDataDetail(id, awal);
   const tidakAda = q.error instanceof GalatApi && q.error.tidakAda;
 
   if (!q.data || tidakAda) {

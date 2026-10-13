@@ -2,12 +2,13 @@
 
 // List: Daftar per status + Papan (Board) kanban (web_daftar). Filter & mode di URL (?v=board · a · s · d · selesai=1),
 // diperbarui dengan replaceState (tanpa entri riwayat, tanpa lompat gulir); tab Daftar ↔ Board membawa filter.
-// Board mengambil lebar penuh di desktop; tingginya = sisa layar di atas navigasi bawah HP.
-import { useQueryClient } from "@tanstack/react-query";
+// Board mengambil lebar penuh di desktop; tingginya = sisa layar di atas navigasi bawah HP. Papan (dnd-kit) dan form
+// Tugas baru (zod + react-hook-form) dimuat malas dengan pramuat (papan aktif / senggang / tab disentuh; form saat
+// senggang/FAB).
 import { ChevronRight, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { IsiHalaman } from "@/components/layout/isi-halaman";
@@ -19,23 +20,22 @@ import { Button } from "@/components/ui/button";
 import { DaftarStatus } from "@/features/list/daftar-status";
 import { bacaFilter, bacaMode, lolosFilter, urlList, type FilterList } from "@/features/list/filter";
 import { FilterLipat, FilterListIsi } from "@/features/list/filter-list";
-import { Papan } from "@/features/list/papan";
+import { Papan, pramuatPapanList } from "@/features/list/papan-malas";
 import { useDaftarList } from "@/features/list/queries";
 import { TabTampilan } from "@/features/list/tab-tampilan";
 import { urutStatus } from "@/features/list/urutan";
 import { useProfil } from "@/features/profil/penyedia-profil";
 import { listDatar, useStruktur } from "@/features/struktur/queries";
-import { DialogBuatTugas } from "@/features/tugas/dialog-buat-tugas";
+import { DialogBuatTugas, pramuatFormBuatTugas, usePramuatFormBuatTugas } from "@/features/tugas/dialog-buat-tugas";
 import { useUbahTugas } from "@/features/tugas/mutasi";
 import { statusToggle } from "@/features/tugas/util";
 import { GalatApi, pesanGalat } from "@/lib/api/galat";
-import { kunci } from "@/lib/kunci-query";
+import { saatSenggang } from "@/lib/impor-aman";
 import { cn } from "@/lib/utils";
 import type { Tugas } from "@/types/domain";
 
 export function LayarList({ listId }: { listId: string }) {
   const router = useRouter();
-  const qc = useQueryClient();
   const { member, hariIni, libur } = useProfil();
   const q = useSearchParams();
   const mode = bacaMode(q);
@@ -58,12 +58,25 @@ export function LayarList({ listId }: { listId: string }) {
     [data, filter, idSaya, hariIni, libur],
   );
   const adaFab = Boolean(list?.boleh_ubah && !list.archived);
+  // papan aktif → chunk papan diunduh sejajar dengan web_daftar; tampilan Daftar → papan dipramuat saat senggang sesudah
+  // daftar tiba (ketukan Papan pertama tidak menunggu / gagal karena sinyal putus); form Tugas baru juga saat senggang
+  const adaData = Boolean(data);
+  useEffect(() => {
+    if (board) {
+      pramuatPapanList();
+      return;
+    }
+    return adaData ? saatSenggang(pramuatPapanList) : undefined;
+  }, [board, adaData]);
+  usePramuatFormBuatTugas(adaFab);
 
   function ubahFilter(ubah: Partial<FilterList>) {
     // replaceState terintegrasi dengan router Next (useSearchParams ikut berubah) tanpa memuat ulang halaman server
     window.history.replaceState(null, "", urlList(listId, mode, { ...filter, ...ubah }));
   }
 
+  // Tombol tetap nonaktif sampai daftar terbaru tiba: mutateAsync baru selesai (berhasil maupun gagal) SESUDAH
+  // onSettled useUbahTugas memuat ulang daftar yang tampil — tanpa invalidasi kedua (itu web_daftar ke-2, +1 RTT).
   async function ubahSelesai(t: Tugas) {
     if (!list) return;
     try {
@@ -72,8 +85,6 @@ export function LayarList({ listId }: { listId: string }) {
     } catch (e) {
       toast.error(e instanceof GalatApi && e.konflik ? "Tugas sudah diubah orang lain. Daftar dimuat ulang." : pesanGalat(e));
     }
-    // tombol tetap nonaktif sampai daftar terbaru tiba (ikut muat ulang yang dipicu mutasi)
-    await qc.invalidateQueries({ queryKey: kunci.daftar(listId, termasukSelesai), exact: true }, { cancelRefetch: false });
   }
 
   const filterIsi = <FilterListIsi filter={filter} ubah={ubahFilter} statuses={statuses} />;
@@ -133,6 +144,8 @@ export function LayarList({ listId }: { listId: string }) {
           <Button
             type="button"
             onClick={() => setBuatBuka(true)}
+            onPointerDown={pramuatFormBuatTugas}
+            onFocus={pramuatFormBuatTugas}
             data-uji="buat-tugas"
             className={cn(
               "fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 h-13 gap-1.5 rounded-full px-5 text-base font-semibold shadow-lg",
