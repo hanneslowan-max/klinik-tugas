@@ -243,6 +243,48 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
 - **Tes:** `uji/db/20_notif_pisah.sql` (47 cek), `web/src/features/notif/dari.test.ts`, e2e
   `web/tests/e2e/notif-pisah.spec.ts` (HP + desktop; penerima uji Dodi supaya tidak mengganggu tes owner/Citra).
 
+## Revisi #2 gabungan (13 Okt 2026, branch `rev2` = `rev2-notif` + `rev-performa`, belum di-push)
+
+- **Isi:** notifikasi dipisah "Dari tim" / "Dari agent" (bagian di atas) + **muat halaman lebih cepat** (permintaan
+  Hannes: "loading page di seluruh halaman agak slow"). `rev-performa` berbasis `claude/trusting-bell-zz7ocs`
+  (`2fabbcf`), jadi tab Order + hak Pipeline ketat ikut masuk. Penyebab utama lambat: tiap layar baru menampilkan data
+  sesudah JS selesai dimuat lalu menunggu beberapa putaran klien ke Supabase (Sydney; pengguna di Indonesia).
+- **Perubahan performa (web):** Tugas Saya (`/saya`) dan detail tugas (`/t`) dibaca di server saat muat dokumen penuh
+  (data ikut di HTML); layout `(app)` membaca profil, hari libur, dan akses Pipeline bersamaan; preconnect ke Supabase;
+  umpan balik instan saat tautan diketuk (`useLinkStatus`); tab/filter yang hanya mengubah `?query` tanpa round-trip
+  server (`lib/url-dangkal.ts`, kini juga dipakai tab notifikasi); cache router 30 dtk (`staleTimes.dynamic`) +
+  `gcTime` TanStack 30 mnt; refetch ganda sesudah mutasi dihapus; impor subpath `radix-ui` (barrel dilarang eslint);
+  form buat tugas, papan dnd-kit, dan markdown dimuat saat perlu + pramuat saat idle; gagal muat potongan JS → pesan
+  lokal + "Coba lagi" (`lib/muat-komponen.tsx`), bukan layar galat; daftar Pipeline dirender bertahap 50 baris. Hasil
+  review: cache TanStack dibuang di layar masuk dan bila akun berganti (data akun lama tidak tampil sesudah sesi habis).
+- **Migrasi yang WAJIB diterapkan ke produksi SEBELUM merge ke `main`** (Hostinger langsung men-deploy `main`), urut,
+  lewati yang sudah terpasang: `20261013120000_pipeline_kategori`, `20261013121000_pipeline_hak_ketat`,
+  `20261013150000_pipeline_order`, `20261013160000_notif_pisah_agent` (tanpa ini `/notif` galat PGRST202),
+  `20261014090000_pipeline_daftar_cepat` (kontrak tidak berubah, urutan bebas, tapi ikutkan). Semuanya aditif; web lama
+  tetap jalan di atas DB baru. Cek sesudah terap: kueri `web_notif` / `web_notif_baca` di bagian notifikasi di atas.
+- **Hasil ukur** (lab lokal, BUKAN produksi: proxy latensi 60 ms per arah ke Supabase + 20 ms ke web, RTT 120/40 ms;
+  HP = CPU 4× lebih lambat, unduh 10 Mbps; median 3×; sebelum = `2fabbcf` (basis cabang), sesudah = `rev-performa`
+  P1–P14 sebelum perbaikan review, yang tidak mengubah JS awal rute). Konten nyata tampil, muat penuh cache dingin:
+
+  | halaman | HP sebelum → sesudah | desktop sebelum → sesudah |
+  |---|---|---|
+  | `/saya` | 2.374 → 468 ms | 1.141 → 298 ms |
+  | `/t/<id>` | 2.958 → 1.111 ms | 1.194 → 400 ms |
+  | `/l/<id>` | 2.968 → 2.190 ms | 1.245 → 960 ms |
+  | `/jelajah` | 2.587 → 1.782 ms | 1.043 → 838 ms |
+  | `/pipeline` | 2.747 → 2.354 ms | 1.399 → 944 ms |
+  | `/notif` | 2.263 → 1.848 ms | 1.059 → 849 ms |
+
+  TTFB ±335 → ±210 ms. Navigasi klien di HP: umpan balik sesudah ketuk ±160–460 → 5–14 ms (menu langsung aktif); cari
+  `q=uji` 765 → 345 ms. JS per rute (brotli) turun 37–109 KB (`/t` 399 → 290 KB). DB daftar Pipeline (2.053 lead)
+  324–378 → 103–138 ms. Belum diukur di produksi: bandingkan rasa muat di HP sesudah deploy.
+- **Tes gabungan `rev2`** (gabung tanpa konflik teks; satu penyesuaian: tab notifikasi memakai `gantiUrl`):
+  typecheck, lint, vitest (14 berkas, 87 tes), build hijau. e2e terhadap `next start` + Supabase lokal langsung, HP +
+  desktop: 90 lulus, 10 dilewati sengaja (khusus HP/desktop), `realtime.spec.ts` 2 gagal + 4 tidak jalan karena
+  Realtime tidak jalan lokal (`CHANNEL_ERROR`), bukan regresi. `uji/db`: 22 dari 23 berkas hijau (1.219 cek), termasuk
+  01/09/16 (hijau sejak `12a23ea`). `11_x` merah hanya karena kartu sisa `papan-saya.spec.ts` (soft delete, 9 kartu
+  dari putaran e2e sebelumnya) di DB bersama; lulus 74 cek bila kartu itu dibuang dulu dalam transaksi yang di-rollback.
+
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)
 Prasyarat dari Hannes: project Supabase baru `rhj-tugas` (akun/org baru, Sydney `ap-southeast-2` per keputusan 30/9, Free); env cloud `SUPABASE_ACCESS_TOKEN` (PAT akun baru) + `SUPABASE_PROJECT_REF`; `CLICKUP_API_TOKEN` (sudah ada); sesi baru supaya env terbaca. Semua langkah ke ClickUp **GET saja**. Tidak memakai MCP Supabase (itu ERP).
 
