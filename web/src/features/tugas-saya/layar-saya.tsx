@@ -4,10 +4,13 @@
 // Dua tampilan (di URL ?v=board): Daftar (grup per tenggat) atau Papan (kolom per tenggat, seret untuk ubah tenggat).
 // ?m (anggota) & ?v dibaca di klien dan diganti dengan history.replaceState (gantiUrl): tanpa permintaan ke server.
 // `awal` = Tugas Saya milik sendiri dari server (hanya muat dokumen penuh, lib/data-awal.ts) → langsung tampil di HTML.
+// Papan (dnd-kit, ±15 KB gz) dimuat malas: dipramuat saat ?v=board aktif (sejajar dengan data) atau tab Papan disentuh.
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, List, SquareKanban } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useEffect } from "react";
 
 import { IsiHalaman } from "@/components/layout/isi-halaman";
 import { KepalaHalaman } from "@/components/layout/kepala-halaman";
@@ -16,11 +19,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAnggotaAktif } from "@/features/anggota/queries";
 import { useProfil } from "@/features/profil/penyedia-profil";
 import { DaftarTugas } from "@/features/tugas/baris-tugas";
-import { PapanSaya } from "@/features/tugas-saya/papan-saya";
 import { rpc } from "@/lib/api/rpc";
 import { kunci } from "@/lib/kunci-query";
 import { klienBrowser } from "@/lib/supabase/client";
 import { opsiDataAwal, type DataAwal } from "@/lib/data-awal";
+import { imporAman, pramuat } from "@/lib/impor-aman";
 import { fmtTanggal } from "@/lib/tanggal";
 import { gantiUrl } from "@/lib/url-dangkal";
 import { cn } from "@/lib/utils";
@@ -33,6 +36,12 @@ const GRUP = [
   { kunci: "nanti", judul: "Nanti", warna: "text-foreground" },
   { kunci: "tanpa_due", judul: "Tanpa due", warna: "text-muted-foreground", tutup: true },
 ] as const satisfies readonly { kunci: keyof TugasSaya; judul: string; warna: string; tutup?: boolean }[];
+
+// SSR tetap (data awal ?v=board ikut di HTML); chunk dnd-kit hanya diunduh bila papan dipakai
+const PapanSaya = dynamic(() => imporAman(() => import("@/features/tugas-saya/papan-saya")).then((m) => m.PapanSaya), {
+  loading: () => <MemuatDaftar />,
+});
+const pramuatPapan = () => pramuat(() => import("@/features/tugas-saya/papan-saya"));
 
 const TAB = [
   { board: false, label: "Daftar", Ikon: List, uji: "tab-daftar" },
@@ -48,6 +57,10 @@ export function LayarSaya({ awal }: { awal?: DataAwal<TugasSaya> }) {
   const bukanSaya = target !== null && target !== idSaya;
   const anggota = useAnggotaAktif();
   const board = sp.get("v") === "board";
+  // papan aktif → unduh chunk papan SEKARANG (sejajar dengan web_tugas_saya), bukan sesudah data tiba
+  useEffect(() => {
+    if (board) pramuatPapan();
+  }, [board]);
 
   const hrefSaya = (m: number, keBoard: boolean) => {
     const p = new URLSearchParams();
@@ -100,6 +113,8 @@ export function LayarSaya({ awal }: { awal?: DataAwal<TugasSaya> }) {
                   e.preventDefault();
                   gantiUrl(hrefSaya(pemilik, b));
                 }}
+                onPointerDown={b ? pramuatPapan : undefined}
+                onFocus={b ? pramuatPapan : undefined}
                 data-uji={uji}
                 className={cn(
                   "inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors outline-none pointer-coarse:h-11",

@@ -2,25 +2,55 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 
-import { htmlAman } from "@/lib/markdown";
+import { imporAman } from "@/lib/impor-aman";
 import { pecahUrl } from "@/lib/teks";
 import { cn } from "@/lib/utils";
 
-const tanpaLangganan = () => () => {};
+// lib/markdown (markdown-it + DOMPurify, ±53 KB gz) dimuat MALAS: tidak ikut JS awal /t. Disimpan di tingkat modul
+// (sekali per halaman) dan diumumkan ke <Markdown> lewat useSyncExternalStore.
+type ModMarkdown = typeof import("@/lib/markdown");
+let modMarkdown: ModMarkdown | null = null;
+let janjiMarkdown: Promise<ModMarkdown> | null = null;
+const pendengarMarkdown = new Set<() => void>();
+
+/** Mulai unduh lib/markdown (aman dipanggil berkali-kali). Dipanggil saat detail tugas mount, sejajar web_detail. */
+export function muatMarkdown(): Promise<ModMarkdown> {
+  janjiMarkdown ??= imporAman(() => import("@/lib/markdown")).then(
+    (m) => {
+      modMarkdown = m;
+      for (const f of pendengarMarkdown) f();
+      return m;
+    },
+    (galat: unknown) => {
+      janjiMarkdown = null; // boleh dicoba lagi pada mount berikutnya; sementara tetap teks polos
+      throw galat;
+    },
+  );
+  return janjiMarkdown;
+}
+
+function langgananMarkdown(f: () => void) {
+  pendengarMarkdown.add(f);
+  muatMarkdown().catch(() => {});
+  return () => {
+    pendengarMarkdown.delete(f);
+  };
+}
 
 /**
  * Markdown → HTML yang sudah disaring DOMPurify (html:false di markdown-it). Dirender KLIEN-SAJA: DOMPurify butuh
- * DOM (di server ia tak bisa menyaring). HTML server & hidrasi pertama = teks polos (node teks React, TANPA
- * innerHTML), sesudah hidrasi = HTML aman. Mount klien biasa (navigasi) langsung HTML tanpa kedipan.
+ * DOM (di server ia tak bisa menyaring). HTML server, hidrasi pertama, dan selama lib/markdown belum termuat = teks
+ * polos (node teks React, TANPA innerHTML); sesudahnya = HTML aman. Mount klien saat lib sudah termuat (navigasi)
+ * langsung HTML tanpa kedipan.
  */
 export function Markdown({ teks, className, ...rest }: { teks: string | null | undefined; className?: string; "data-uji"?: string }) {
-  const klien = useSyncExternalStore(
-    tanpaLangganan,
-    () => true,
-    () => false,
+  const md = useSyncExternalStore(
+    langgananMarkdown,
+    () => modMarkdown,
+    () => null,
   );
-  const html = useMemo(() => (klien ? htmlAman(teks) : ""), [klien, teks]);
-  if (!klien) {
+  const html = useMemo(() => (md ? md.htmlAman(teks) : ""), [md, teks]);
+  if (!md) {
     return (
       <div className={cn("md break-words whitespace-pre-wrap", className)} data-uji={rest["data-uji"]}>
         {teks ?? ""}

@@ -455,3 +455,49 @@ test("Pipeline volume (items ×60 lewat route): 50 baris dulu, tombol tampil-lag
     bersihAkses();
   }
 });
+
+test.describe("version skew (P10)", () => {
+  // service worker diblokir: permintaan yang dilayani SW tidak bisa dicegat page.route
+  test.use({ serviceWorkers: "block" });
+
+  test("chunk form hilang sesudah deploy (404): halaman dimuat ulang SEKALI, tanpa loop; lalu form terbuka", async ({ page }) => {
+    test.skip(diHp(page), "cukup di desktop");
+    await masuk(page, AKUN.owner.email);
+    // chunk modul form Tugas baru dikenali dari isinya (pesan validasi zod) → 404 selama `blokir` (versi lama terhapus)
+    let blokir = true;
+    let ditolak = 0;
+    await page.route(/\/_next\/static\/chunks\/.*\.js$/, async (route) => {
+      const res = await route.fetch();
+      const isi = await res.text();
+      if (blokir && isi.includes("Nama tugas wajib diisi")) {
+        ditolak++;
+        return route.fulfill({ status: 404, body: "" });
+      }
+      return route.fulfill({ response: res, body: isi });
+    });
+    let muat = 0; // muat dokumen penuh (bukan replaceState/pushState)
+    page.on("load", () => muat++);
+
+    await page.goto(`/l/${SEED.listApp}`);
+    await expect(page.getByTestId("buat-tugas")).toBeVisible();
+    await page.getByTestId("buat-tugas").click();
+    // impor gagal → muat ulang sekali (penanda sessionStorage)
+    await expect.poll(() => muat, { timeout: 15_000 }).toBe(2);
+    await expect(page.getByTestId("buat-tugas")).toBeVisible();
+    expect(ditolak).toBeGreaterThan(0);
+
+    // masih 404 sesudah muat ulang → galat ditampilkan, TIDAK muat ulang lagi
+    await page.getByTestId("buat-tugas").click();
+    await expect(page.getByText("Terjadi kesalahan")).toBeVisible({ timeout: 15_000 });
+    await page.waitForTimeout(1000);
+    expect(muat).toBe(2);
+
+    // chunk tersedia lagi → form terbuka normal (penanda dibersihkan sesudah impor berhasil)
+    blokir = false;
+    await page.reload();
+    await page.getByTestId("buat-tugas").click();
+    await expect(page.getByTestId("dialog-buat-tugas")).toBeVisible();
+    await expect(page.getByLabel("Nama tugas")).toBeVisible();
+    await expect.poll(() => page.evaluate(() => sessionStorage.getItem("anvil:muat-ulang-chunk"))).toBeNull();
+  });
+});

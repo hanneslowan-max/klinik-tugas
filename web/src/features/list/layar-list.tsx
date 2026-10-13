@@ -2,11 +2,12 @@
 
 // List: Daftar per status + Papan (Board) kanban (web_daftar). Filter & mode di URL (?v=board · a · s · d · selesai=1),
 // diperbarui dengan replaceState (tanpa entri riwayat, tanpa lompat gulir); tab Daftar ↔ Board membawa filter.
-// Board mengambil lebar penuh di desktop; tingginya = sisa layar di atas navigasi bawah HP.
+// Board mengambil lebar penuh di desktop; tingginya = sisa layar di atas navigasi bawah HP. Papan (dnd-kit) dan form
+// Tugas baru (zod + react-hook-form) dimuat malas dengan pramuat (papan aktif / tab disentuh; form saat senggang/FAB).
 import { ChevronRight, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { IsiHalaman } from "@/components/layout/isi-halaman";
@@ -18,13 +19,13 @@ import { Button } from "@/components/ui/button";
 import { DaftarStatus } from "@/features/list/daftar-status";
 import { bacaFilter, bacaMode, lolosFilter, urlList, type FilterList } from "@/features/list/filter";
 import { FilterLipat, FilterListIsi } from "@/features/list/filter-list";
-import { Papan } from "@/features/list/papan";
+import { Papan, pramuatPapanList } from "@/features/list/papan-malas";
 import { useDaftarList } from "@/features/list/queries";
 import { TabTampilan } from "@/features/list/tab-tampilan";
 import { urutStatus } from "@/features/list/urutan";
 import { useProfil } from "@/features/profil/penyedia-profil";
 import { listDatar, useStruktur } from "@/features/struktur/queries";
-import { DialogBuatTugas } from "@/features/tugas/dialog-buat-tugas";
+import { DialogBuatTugas, pramuatFormBuatTugas, usePramuatFormBuatTugas } from "@/features/tugas/dialog-buat-tugas";
 import { useUbahTugas } from "@/features/tugas/mutasi";
 import { statusToggle } from "@/features/tugas/util";
 import { GalatApi, pesanGalat } from "@/lib/api/galat";
@@ -55,6 +56,11 @@ export function LayarList({ listId }: { listId: string }) {
     [data, filter, idSaya, hariIni, libur],
   );
   const adaFab = Boolean(list?.boleh_ubah && !list.archived);
+  // papan aktif → chunk papan diunduh sejajar dengan web_daftar; form Tugas baru dipramuat saat senggang
+  useEffect(() => {
+    if (board) pramuatPapanList();
+  }, [board]);
+  usePramuatFormBuatTugas(adaFab);
 
   function ubahFilter(ubah: Partial<FilterList>) {
     // replaceState terintegrasi dengan router Next (useSearchParams ikut berubah) tanpa memuat ulang halaman server
@@ -130,6 +136,8 @@ export function LayarList({ listId }: { listId: string }) {
           <Button
             type="button"
             onClick={() => setBuatBuka(true)}
+            onPointerDown={pramuatFormBuatTugas}
+            onFocus={pramuatFormBuatTugas}
             data-uji="buat-tugas"
             className={cn(
               "fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 h-13 gap-1.5 rounded-full px-5 text-base font-semibold shadow-lg",

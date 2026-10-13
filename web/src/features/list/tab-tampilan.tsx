@@ -7,6 +7,7 @@ import Link from "next/link";
 import type { KeyboardEvent } from "react";
 
 import { urlList, type FilterList, type ModeList } from "@/features/list/filter";
+import { pramuatPapanList } from "@/features/list/papan-malas";
 import { gantiUrl } from "@/lib/url-dangkal";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +46,8 @@ export function TabTampilan({ listId, mode, filter, className }: Props) {
               e.preventDefault();
               gantiUrl(href, { dorong: true });
             }}
+            onPointerDown={m === "board" ? pramuatPapanList : undefined}
+            onFocus={m === "board" ? pramuatPapanList : undefined}
             data-uji={uji}
             className={cn(
               "inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors outline-none pointer-coarse:h-11",

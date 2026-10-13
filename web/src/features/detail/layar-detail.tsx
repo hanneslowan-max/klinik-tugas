@@ -5,11 +5,13 @@
 // HP: satu kolom, field langsung sesudah kepala. Desktop lebar (≥ xl): field di kolom kanan yang menempel saat digulir.
 import { Search } from "lucide-react";
 import Link from "next/link";
+import { useEffect } from "react";
 
 import { IsiHalaman } from "@/components/layout/isi-halaman";
 import { KepalaHalaman } from "@/components/layout/kepala-halaman";
 import { GalatMuat } from "@/components/umum/keadaan";
 import { KotakPesan } from "@/components/umum/kotak-pesan";
+import { muatMarkdown } from "@/components/umum/teks";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checklist } from "@/features/detail/checklist";
@@ -57,6 +59,10 @@ function LampiranDetail() {
 
 export function LayarDetail({ id, tabAwal, awal }: { id: string; tabAwal: TabDetail; awal?: DataAwal<DetailTugas> }) {
   const q = useDataDetail(id, awal);
+  // pustaka markdown (dimuat malas) diunduh sejajar dengan web_detail, bukan sesudah deskripsi tampil
+  useEffect(() => {
+    muatMarkdown().catch(() => {});
+  }, []);
   const tidakAda = q.error instanceof GalatApi && q.error.tidakAda;
 
   if (!q.data || tidakAda) {

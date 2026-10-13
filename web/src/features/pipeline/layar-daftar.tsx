@@ -8,7 +8,9 @@
 // disaring di klien di atas hasil cari server (saringan-lead).
 // Volume (±2.000 lead): baris dirender bertahap 50-50 (sentinel gulir + tombol cadangan) dengan batas per kunci daftar
 // yang bertahan saat Kembali dari detail; kotak cari terpisah (ketikan tidak merender ulang daftar); baris di-memo.
+// Papan (dnd-kit) dimuat malas: dipramuat saat ?v=papan aktif atau tombol Papan disentuh/difokus.
 import { BarChart3, List, Plus, Search, ShieldCheck, SquareKanban } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { memo, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
@@ -25,11 +27,11 @@ import { DialogLeadBaru } from "@/features/pipeline/dialog-lead-baru";
 import { GerbangPipeline, type AksesPipeline } from "@/features/pipeline/gerbang";
 import { infoFu, ringkasProduk, rupiah, TAB_DAFTAR } from "@/features/pipeline/konstanta";
 import { bulanTersedia, saringLead, type SaringanLead as NilaiSaringan } from "@/features/pipeline/order";
-import { PapanLead } from "@/features/pipeline/papan-lead";
 import { PilTahap } from "@/features/pipeline/pil-tahap";
 import { usePipelineDaftar, usePipelineKategori } from "@/features/pipeline/queries";
 import { opsiStatus, SaringanLead, tanggalSah } from "@/features/pipeline/saringan-lead";
 import { useProfil } from "@/features/profil/penyedia-profil";
+import { imporAman, pramuat } from "@/lib/impor-aman";
 import { gantiUrl } from "@/lib/url-dangkal";
 import { cn } from "@/lib/utils";
 import type { LeadRingkas } from "@/types/domain";
@@ -38,6 +40,11 @@ const TAMPILAN = [
   { papan: false, label: "Daftar", Ikon: List, uji: "tab-daftar-lead" },
   { papan: true, label: "Papan", Ikon: SquareKanban, uji: "tab-papan-lead" },
 ] as const;
+
+const PapanLead = dynamic(() => imporAman(() => import("@/features/pipeline/papan-lead")).then((m) => m.PapanLead), {
+  loading: () => <MemuatDaftar />,
+});
+const pramuatPapan = () => pramuat(() => import("@/features/pipeline/papan-lead"));
 
 const LANGKAH = 50;
 
@@ -178,6 +185,10 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
   const tab = TAB_DAFTAR.find((t) => t.kunci === sp.get("tab"))?.kunci ?? "semua";
   const papan = sp.get("v") === "papan";
   const modeOrder = tab === "order";
+  // papan aktif → unduh chunk papan sejajar dengan data (bukan sesudah data tiba)
+  useEffect(() => {
+    if (papan) pramuatPapan();
+  }, [papan]);
   // nilai URL yang tidak sah untuk tab ini diabaikan (bukan mengosongkan daftar diam-diam)
   const stUrl = sp.get("st");
   const saringan: NilaiSaringan = {
@@ -277,6 +288,8 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
                 e.preventDefault();
                 gantiUrl(hrefParam("v", b ? "papan" : null));
               }}
+              onPointerDown={b ? pramuatPapan : undefined}
+              onFocus={b ? pramuatPapan : undefined}
               data-uji={uji}
               className={cn(
                 "inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors outline-none",
