@@ -8,6 +8,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
 
+import { IsiTautan } from "@/components/layout/petunjuk-tautan";
 import { TitikWarna } from "@/components/umum/status-pil";
 import { useTerkunci } from "@/features/profil/penyedia-profil";
 import { MetaTugas } from "@/features/tugas/baris-tugas";
@@ -137,7 +138,7 @@ function IsiKartu({ tugas: t, tautanRef, petunjukSeret, statis }: PropsIsi) {
           aria-describedby={petunjukSeret}
           className={cn(kelasNama, "outline-none focus-visible:ring-3 focus-visible:ring-ring/50")}
         >
-          {t.name}
+          <IsiTautan>{t.name}</IsiTautan>
         </Link>
       )}
       <div className="mt-1.5">

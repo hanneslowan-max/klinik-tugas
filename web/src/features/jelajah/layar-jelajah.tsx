@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight, Folder, Lock } from "lucide-react";
 import Link from "next/link";
 
 import { IsiHalaman } from "@/components/layout/isi-halaman";
+import { IsiTautan } from "@/components/layout/petunjuk-tautan";
 import { KepalaHalaman } from "@/components/layout/kepala-halaman";
 import { Chip } from "@/components/umum/chip";
 import { GalatMuat, Kosong, MemuatDaftar } from "@/components/umum/keadaan";
@@ -17,26 +18,24 @@ function TautanList({ list: l }: { list: ListStruktur }) {
   const { cermin } = useProfil();
   const n = l.hitungan ?? { terbuka: 0, telat: 0 };
   return (
-    <Link
-      href={`/l/${encodeURIComponent(l.id)}`}
-      className="flex min-h-12 items-center gap-3 rounded-lg px-3 py-2 hover:bg-muted"
-      data-list={l.id}
-    >
-      <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-        <span className="truncate text-sm font-medium">{l.name}</span>
-        {l.tidak_ditagih ? <Chip nada="garis">tidak ditagih</Chip> : null}
-        {l.archived ? <Chip nada="garis">arsip</Chip> : null}
-        {cermin && l.sumber === "clickup" ? (
-          <Chip nada="cermin" title="List ClickUp: hanya-baca selama mode cermin">
-            ClickUp
-          </Chip>
-        ) : null}
-      </span>
-      <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-        {n.telat ? <Chip nada="telat">{n.telat} telat</Chip> : null}
-        <span>{n.terbuka || 0} terbuka</span>
-        <ChevronRight className="size-4" aria-hidden />
-      </span>
+    <Link href={`/l/${encodeURIComponent(l.id)}`} className="block rounded-lg hover:bg-muted" data-list={l.id}>
+      <IsiTautan className="flex min-h-12 items-center gap-3 px-3 py-2" kelasPetunjuk="inset-x-3 bottom-0.5 h-0.5">
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          <span className="truncate text-sm font-medium">{l.name}</span>
+          {l.tidak_ditagih ? <Chip nada="garis">tidak ditagih</Chip> : null}
+          {l.archived ? <Chip nada="garis">arsip</Chip> : null}
+          {cermin && l.sumber === "clickup" ? (
+            <Chip nada="cermin" title="List ClickUp: hanya-baca selama mode cermin">
+              ClickUp
+            </Chip>
+          ) : null}
+        </span>
+        <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+          {n.telat ? <Chip nada="telat">{n.telat} telat</Chip> : null}
+          <span>{n.terbuka || 0} terbuka</span>
+          <ChevronRight className="size-4" aria-hidden />
+        </span>
+      </IsiTautan>
     </Link>
   );
 }

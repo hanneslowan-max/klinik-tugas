@@ -25,6 +25,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { IsiTautan } from "@/components/layout/petunjuk-tautan";
 import { MetaTugas } from "@/features/tugas/baris-tugas";
 import { useProfil, useTerkunci } from "@/features/profil/penyedia-profil";
 import { aturTahanan } from "@/features/realtime/tahanan";
@@ -207,7 +208,7 @@ function IsiKartu({
           aria-describedby={petunjukSeret}
           className={cn(kelasNama, "outline-none focus-visible:ring-3 focus-visible:ring-ring/50")}
         >
-          {t.name}
+          <IsiTautan>{t.name}</IsiTautan>
         </Link>
       )}
       <MetaTugas tugas={t} tampilList />

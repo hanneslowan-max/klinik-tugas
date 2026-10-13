@@ -11,6 +11,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { IsiHalaman } from "@/components/layout/isi-halaman";
+import { IsiTautan } from "@/components/layout/petunjuk-tautan";
 import { KepalaHalaman } from "@/components/layout/kepala-halaman";
 import { GalatMuat, Kosong, MemuatDaftar } from "@/components/umum/keadaan";
 import { Chip } from "@/components/umum/chip";
@@ -41,43 +42,45 @@ function BarisLead({ lead, hariIni, kategori }: { lead: LeadRingkas; hariIni: st
   return (
     <Link
       href={`/pipeline/${encodeURIComponent(lead.id)}`}
-      className="flex items-start gap-2 rounded-xl border bg-card px-3 py-2.5 transition-colors hover:bg-muted"
+      className="block rounded-xl border bg-card transition-colors hover:bg-muted"
       data-uji="baris-lead"
     >
-      <div className="min-w-0 flex-1 space-y-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate font-semibold">{lead.pelanggan}</span>
-          {lead.periksa ? <Chip nada="hari-ini">periksa</Chip> : null}
-          {kategori ? (
-            <Chip nada="garis" className="min-w-0 shrink truncate" data-uji="chip-kategori">
-              {kategori}
-            </Chip>
+      <IsiTautan className="flex items-start gap-2 px-3 py-2.5" kelasPetunjuk="inset-x-3 bottom-0.5 h-0.5">
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate font-semibold">{lead.pelanggan}</span>
+            {lead.periksa ? <Chip nada="hari-ini">periksa</Chip> : null}
+            {kategori ? (
+              <Chip nada="garis" className="min-w-0 shrink truncate" data-uji="chip-kategori">
+                {kategori}
+              </Chip>
+            ) : null}
+          </div>
+          <div className="truncate text-sm text-muted-foreground">{ringkasProduk(lead.produk)}</div>
+          <div className="truncate text-xs text-muted-foreground">
+            {lead.kode}
+            {lead.kota ? ` · ${lead.kota}` : ""}
+            {lead.pemilik_nama ? ` · ${lead.pemilik_nama}` : " · tanpa pemilik"}
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <PilTahap tahap={lead.tahap} />
+          {lead.tahap === "ORDER" ? (
+            <span className="text-xs font-medium tabular-nums">{rupiah(lead.nilai_transaksi)}</span>
+          ) : buka ? (
+            <>
+              {fu ? (
+                <span className={cn("text-xs whitespace-nowrap", fu.mendesak ? "font-semibold text-telat" : "text-muted-foreground")}>
+                  {fu.teks}
+                </span>
+              ) : null}
+              <span className={cn("text-xs tabular-nums", panas ? "font-semibold text-telat" : "text-muted-foreground")}>
+                diam {lead.diam_hari} hr
+              </span>
+            </>
           ) : null}
         </div>
-        <div className="truncate text-sm text-muted-foreground">{ringkasProduk(lead.produk)}</div>
-        <div className="truncate text-xs text-muted-foreground">
-          {lead.kode}
-          {lead.kota ? ` · ${lead.kota}` : ""}
-          {lead.pemilik_nama ? ` · ${lead.pemilik_nama}` : " · tanpa pemilik"}
-        </div>
-      </div>
-      <div className="flex shrink-0 flex-col items-end gap-1">
-        <PilTahap tahap={lead.tahap} />
-        {lead.tahap === "ORDER" ? (
-          <span className="text-xs font-medium tabular-nums">{rupiah(lead.nilai_transaksi)}</span>
-        ) : buka ? (
-          <>
-            {fu ? (
-              <span className={cn("text-xs whitespace-nowrap", fu.mendesak ? "font-semibold text-telat" : "text-muted-foreground")}>
-                {fu.teks}
-              </span>
-            ) : null}
-            <span className={cn("text-xs tabular-nums", panas ? "font-semibold text-telat" : "text-muted-foreground")}>
-              diam {lead.diam_hari} hr
-            </span>
-          </>
-        ) : null}
-      </div>
+      </IsiTautan>
     </Link>
   );
 }
