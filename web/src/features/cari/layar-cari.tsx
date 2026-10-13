@@ -54,7 +54,8 @@ export function LayarCari() {
   const [sibuk, setSibuk] = useState(false);
   const [galatKirim, setGalatKirim] = useState<string | null>(null);
 
-  const hasil = useQuery({ queryKey: kunci.cari(q, space), queryFn: () => cari(q, space), enabled: Boolean(q) });
+  // hasil per kata kunci tidak perlu disimpan selama gcTime bawaan (30 mnt)
+  const hasil = useQuery({ queryKey: kunci.cari(q, space), queryFn: () => cari(q, space), enabled: Boolean(q), gcTime: 5 * 60_000 });
 
   async function kirim(e: FormEvent) {
     e.preventDefault();
@@ -67,7 +68,7 @@ export function LayarCari() {
     }
     setSibuk(true);
     try {
-      const r = await qc.fetchQuery({ queryKey: kunci.cari(kata, sp), queryFn: () => cari(kata, sp) });
+      const r = await qc.fetchQuery({ queryKey: kunci.cari(kata, sp), queryFn: () => cari(kata, sp), gcTime: 5 * 60_000 });
       const tujuan = tujuanLangsung(kata, r);
       const u = new URLSearchParams({ q: kata });
       if (sp) u.set("space", sp);
