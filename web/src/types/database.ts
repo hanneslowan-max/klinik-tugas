@@ -564,6 +564,7 @@ export type Database = {
           jenis: string;
           member_id: number;
           read_at: string | null;
+          sumber: string | null;
           task_id: string | null;
         };
         Insert: {
@@ -574,6 +575,7 @@ export type Database = {
           jenis: string;
           member_id: number;
           read_at?: string | null;
+          sumber?: string | null;
           task_id?: string | null;
         };
         Update: {
@@ -584,6 +586,7 @@ export type Database = {
           jenis?: string;
           member_id?: number;
           read_at?: string | null;
+          sumber?: string | null;
           task_id?: string | null;
         };
         Relationships: [
@@ -1250,7 +1253,8 @@ export type Database = {
       mulai_web: { Args: { p_owner?: boolean }; Returns: number };
       norm_impor_komentar: { Args: { r: Json }; Returns: Json };
       norm_impor_tugas: { Args: { r: Json }; Returns: Json };
-      penilai: { Args: Record<PropertyKey, never>; Returns: number };
+      notif_dari_agent: { Args: { p_role: string; p_sumber: string }; Returns: boolean };
+      penilai:{ Args: Record<PropertyKey, never>; Returns: number };
       prioritas_dari: { Args: { v: Json }; Returns: number };
       ringkas_tugas: {
         Args: { t: Database["public"]["Tables"]["tasks"]["Row"] };
@@ -1355,8 +1359,8 @@ export type Database = {
         Returns: Json;
       };
       web_lampiran_hapus: { Args: { p_id: string }; Returns: Json };
-      web_notif: { Args: { p_limit?: number }; Returns: Json };
-      web_notif_baca: { Args: { p_ids?: number[] }; Returns: Json };
+      web_notif: { Args: { p_dari?: string; p_limit?: number }; Returns: Json };
+      web_notif_baca: { Args: { p_dari?: string; p_ids?: number[] }; Returns: Json };
       web_pindah: { Args: { p_list: string; p_task: string }; Returns: Json };
       web_pipeline_akses_daftar: {
         Args: Record<PropertyKey, never>;

@@ -287,18 +287,32 @@ export type HasilCari = {
   rujukan: { type: "list" | "folder" | "space" | "task"; id: string } | null;
 };
 
+/** Asal notifikasi: tim (anggota mengetik di web) | agent (akun bot / lewat token API; aturan SQL notif_dari_agent). */
+export type DariNotif = "tim" | "agent";
+
 export type Notifikasi = {
   id: number;
   jenis: "assign" | "mention" | "komentar";
-  task: { id: string; name: string; deleted: boolean } | null;
-  actor: AnggotaRingkas | null;
+  /** tertutup = kartu di space privat yang tidak bisa dilihat penerima (nama & cuplikan disamarkan) */
+  task: { id: string; name: string; deleted: boolean; tertutup?: boolean } | null;
+  actor: (AnggotaRingkas & { role?: Peran }) | null;
   cuplikan: string | null;
   comment_id: string | null;
   read_at: string | null;
   created_at: string;
+  dari: DariNotif;
+  /** pemicunya lewat token API; true + aktor bukan bot = agent memakai token milik anggota */
+  lewat_api: boolean;
 };
 
-export type DaftarNotif = { belum: number; items: Notifikasi[] };
+/** belum = TOTAL belum dibaca (angka lonceng) = belum_tim + belum_agent; dari = saringan tab (null = semua). */
+export type DaftarNotif = {
+  belum: number;
+  belum_tim: number;
+  belum_agent: number;
+  dari: DariNotif | null;
+  items: Notifikasi[];
+};
 
 export type TokenApi = {
   id: string;
