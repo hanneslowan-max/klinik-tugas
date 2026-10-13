@@ -41,8 +41,9 @@ function buatKartu(nama: string, extra: Record<string, unknown> = {}): string {
   return sebagai(AKUN.owner.id, `select (public.web_buat_tugas('${SEED.listApp}', '${body}'::jsonb))->>'id'`);
 }
 
+/** Hapus permanen kartu uji (ke Sampah lalu purge) supaya tidak menumpuk di list seed. */
 function hapusKartu(id: string) {
-  sebagai(AKUN.owner.id, `select public.web_hapus('${id}')`);
+  sebagai(AKUN.owner.id, `select public.web_hapus('${id}'); select public.web_purge('${id}')`);
 }
 
 /** Beri akses Pipeline sementara; kembalikan fungsi pembersih (hanya menghapus baris yang ditambahkan di sini). */
