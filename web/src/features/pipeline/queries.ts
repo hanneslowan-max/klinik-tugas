@@ -21,6 +21,12 @@ export function usePipelineSaya(awal?: PipelineSaya) {
   });
 }
 
+/**
+ * gcTime daftar lead: varian per kata cari (bisa ±1 MB tiap varian) dibuang dalam 5 mnt; daftar tanpa cari ikut
+ * bawaan QueryClient (30 mnt). Kunci gcTime HANYA dipasang bila ada cari: `gcTime: undefined` menimpa bawaan.
+ */
+export const opsiGcDaftar = (q: string): { gcTime?: number } => (q ? { gcTime: 5 * 60_000 } : {});
+
 /** Daftar lead tersaring (tab/pemilik/pencarian). */
 export function usePipelineDaftar(arg: { tab: string; pemilik: number | null; q: string }) {
   return useQuery({
@@ -32,8 +38,7 @@ export function usePipelineDaftar(arg: { tab: string; pemilik: number | null; q:
     // data lama dipakai selama mengetik cari / ganti pemilik di tab yang SAMA; ganti tab = tampilkan memuat (jangan
     // menampilkan isi & hitungan tab sebelumnya di bawah judul tab baru)
     placeholderData: (lama, kueriLama) => (kueriLama?.queryKey[2] === arg.tab ? lama : undefined),
-    // varian per kata cari (bisa ±1 MB tiap varian) dibuang cepat; daftar tanpa cari ikut gcTime bawaan (30 mnt)
-    gcTime: arg.q ? 5 * 60_000 : undefined,
+    ...opsiGcDaftar(arg.q),
   });
 }
 
