@@ -8,7 +8,7 @@ import { rpc } from "@/lib/api/rpc";
 import { kunci } from "@/lib/kunci-query";
 import { klienBrowser } from "@/lib/supabase/client";
 import type { Json } from "@/types/database";
-import type { PapanKategori, PelangganCari, ProdukLead, SatuanItem, SumberLead } from "@/types/domain";
+import type { PapanKategori, PelangganCari, ProdukLead, SatuanItem, StatusBayar, SumberLead } from "@/types/domain";
 
 function segarkanPipeline(qc: QueryClient, id?: string) {
   return Promise.all([
@@ -89,6 +89,28 @@ export function useLeadUbah() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: BodyLeadUbah) => rpc(klienBrowser(), "web_pipeline_lead_ubah", { p: body as unknown as Json }),
+    onSuccess: (lead) => segarkanPipeline(qc, lead.id),
+  });
+}
+
+export type BodyOrderUbah = {
+  lead_id: string;
+  nilai_transaksi?: number;
+  tanggal_sp?: string;
+  /** nomor urut SP (angka) → server membangun nomor/KODE/ROMAWI/TAHUN dari tanggal SP */
+  nomor?: string;
+  no_po?: string | null;
+  bayar_status?: StatusBayar;
+  bayar_dp?: number | null;
+  tanggal_dp?: string | null;
+  tanggal_lunas?: string | null;
+};
+
+/** Ubah data order (nominal, No SP, No PO, pembayaran) — hanya kunci yang dikirim yang berubah. */
+export function useOrderUbah() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: BodyOrderUbah) => rpc(klienBrowser(), "web_pipeline_order_ubah", { p: body as unknown as Json }),
     onSuccess: (lead) => segarkanPipeline(qc, lead.id),
   });
 }

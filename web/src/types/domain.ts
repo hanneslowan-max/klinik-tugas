@@ -358,6 +358,9 @@ export type AlasanBatal =
 export type JenisPelanggan = "perusahaan" | "perorangan";
 
 /** Hasil web_pipeline_saya: gerbang menu & layar (§6). kode_sp = kode SP aktor sendiri (pratinjau No SP). */
+/** Status pembayaran order (revisi #7). */
+export type StatusBayar = "BELUM" | "DP" | "LUNAS";
+
 export type PipelineSaya = { peran: PeranPipeline | null; boleh_ringkas: boolean; kode_sp: string | null };
 
 export type ItemLead = {
@@ -401,6 +404,14 @@ export type LeadRingkas = {
   fu_berikutnya: string | null;
   nilai_transaksi: number | null;
   no_sp: string | null;
+  tanggal_sp: string | null;
+  /** No PO dari customer (terpisah dari No SP RHJ) */
+  no_po: string | null;
+  /** null = order lama yang status bayarnya belum dicatat (atau lead belum ORDER) */
+  bayar_status: StatusBayar | null;
+  bayar_dp: number | null;
+  tanggal_dp: string | null;
+  tanggal_lunas: string | null;
   periksa: boolean;
   produk: ItemLeadRingkas[];
 };
@@ -424,6 +435,14 @@ export type LeadDetail = {
   no_sp: string | null;
   tanggal_sp: string | null;
   nilai_transaksi: number | null;
+  no_po: string | null;
+  bayar_status: StatusBayar | null;
+  bayar_dp: number | null;
+  tanggal_dp: string | null;
+  tanggal_lunas: string | null;
+  /** siapa & kapan data pembayaran terakhir diubah */
+  bayar_diubah_oleh_nama: string | null;
+  bayar_diubah_pada: string | null;
   alasan_batal: AlasanBatal | null;
   alasan_batal_lain: string | null;
   periksa: boolean;
@@ -550,6 +569,7 @@ export type HasilRpc = {
   web_pipeline_fu_catat: LeadDetail;
   web_pipeline_tahap: LeadDetail;
   web_pipeline_lead_ubah: LeadDetail;
+  web_pipeline_order_ubah: LeadDetail;
   web_pipeline_pelanggan_cari: PelangganCari[];
   web_pipeline_ringkas: RingkasPipeline;
   web_pipeline_akses_daftar: DaftarAksesPipeline;

@@ -180,13 +180,27 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   (`bash alat/sql-proyek.sh --migrasi`) SEBELUM merge**: Hostinger langsung men-deploy `main`, dan tanpa migrasi
   tampilan Papan galat (Daftar tetap jalan, hanya tanpa chip). Tes: `uji/db/19_pipeline_kategori.sql` (50 cek),
   `web/tests/e2e/pipeline-papan.spec.ts`.
+- **Revisi #3–#7 (13 Okt): tab Order.** Chip "Order" di layar Pipeline (`?tab=order`): rekap (jumlah, nominal,
+  terbayar, sisa tagihan), order dikelompokkan per bulan SP (terbaru dulu, subtotal per bulan), tabel di desktop / kartu di HP,
+  tombol pensil → dialog **Data order** (nominal, nomor urut SP → No SP dibangun ulang dari tanggal SP, **No PO customer**
+  — kolom terpisah dari No SP, keputusan Hannes —, pembayaran **Belum bayar / DP / Lunas** dengan nominal DP & sisa tagihan,
+  tanggal DP/lunas, jejak siapa/kapan), **Unduh CSV** (pemisah `;` + BOM untuk Excel Indonesia). Hak ubah: rep pemilik +
+  admin (= `pipeline_boleh_ubah`); 'baca' melihat saja. Order yang sudah ada sebelum migrasi = status bayar **"Belum dicatat"**
+  (tidak diketahui; tidak dihitung sebagai piutang, bisa disaring & diisi bertahap); lead yang menjadi ORDER sesudahnya otomatis
+  "Belum bayar" (trigger). **Filter** (semua tab, di URL `st`/`dari`/`sampai`): status = status bayar di tab Order / tahap di tab
+  lain; tanggal = tanggal SP di tab Order / tanggal masuk di tab lain, dengan pintasan bulan. **Cari** (server) kini juga
+  mencocokkan PIC (bukan untuk peran 'baca'), produk & spesifikasi, No SP & No PO sebagian. Detail lead ORDER menampilkan No SP,
+  No PO, nominal, pembayaran + tombol Data order. Migrasi `20261013150000_pipeline_order` (kolom lead baru, trigger, redefinisi
+  `j_pipeline_lead` / `j_pipeline_lead_ringkas` / `inti_pipeline_daftar` — field hanya bertambah —, `web_pipeline_order_ubah`).
+  Tes: `uji/db/22_pipeline_order.sql` (42 cek), `web/src/features/pipeline/order.test.ts`, `web/tests/e2e/pipeline-order.spec.ts`.
+  **Terapkan ke produksi bersama migrasi lain, SEBELUM merge.**
 - **Hak Pipeline dirapikan (13 Okt, migrasi `20261013121000_pipeline_hak_ketat`).** Sejak PR #8 tes DB 01/09/16 merah
   (CI tidak menjalankan `uji/db`, jadi tak terlihat di PR): hak bawaan Supabase memberi service_role hak tulis langsung ke
   7 tabel + 4 sequence Pipeline, `web_pipeline_*` bisa dipanggil service_role, dan pembantu `pipeline_wr` /
   `pipeline_akses_saya` bisa dipanggil role API. Sekarang fail-closed: tabel SELECT saja, sequence tertutup,
   `web_pipeline_*` → authenticated, `x_pipeline_*` → service_role, `boleh_pipeline*` → authenticated (dipakai policy RLS),
   pembantu lain internal. Tidak ada pemanggil yang bergantung pada hak yang dicabut (web/Edge/CLI hanya lewat fungsi; impor
-  berjalan sebagai postgres). Tes: 01 (+cek sequence service_role), 09 (jumlah `web_*` 47, `api_/x_/impor_` 35), 16
+  berjalan sebagai postgres). Tes: 01 (+cek sequence service_role), 09 (jumlah `web_*` 47 → 48 sesudah tab Order, `api_/x_/impor_` 35), 16
   (allowlist + 2 pembantu RLS Pipeline), baru `21_pipeline_hak.sql` (18 cek: hak + semua jalur aplikasi tetap jalan).
   **Terapkan ke produksi bersama migrasi kategori, SEBELUM merge.** Semua `uji/db` hijau. Catatan: `11_x` merah bila dijalankan
   sesudah e2e `papan-saya.spec.ts` di DB yang sama (kartu uji yang di-soft-delete menambah hitungan list "Latihan Uji");

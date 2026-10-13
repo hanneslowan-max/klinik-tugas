@@ -3,6 +3,8 @@
 // Layar "Lead saya" (§5): tab Semua / Diam >7 hari / Pallet Mesh / Penawaran, pencarian, tombol Lead baru.
 // Rep default melihat leadnya sendiri; admin/baca default semua lead. Filter pemilik & tab disimpan di URL.
 // Dua tampilan (?v=papan): Daftar, atau Papan = kolom kategori PRIBADI pengguna, lead diseret antar kolom (papan-lead).
+// Tab Order (revisi #3–#7): rekap & tabel order per bulan SP (daftar-order). Saringan status + tanggal (?st, dari, sampai)
+// disaring di klien di atas hasil cari server (saringan-lead).
 import { BarChart3, List, Plus, Search, ShieldCheck, SquareKanban } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -14,12 +16,15 @@ import { GalatMuat, Kosong, MemuatDaftar } from "@/components/umum/keadaan";
 import { Chip } from "@/components/umum/chip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DaftarOrder } from "@/features/pipeline/daftar-order";
 import { DialogLeadBaru } from "@/features/pipeline/dialog-lead-baru";
 import { GerbangPipeline, type AksesPipeline } from "@/features/pipeline/gerbang";
 import { infoFu, ringkasProduk, rupiah, TAB_DAFTAR } from "@/features/pipeline/konstanta";
+import { bulanTersedia, saringLead, type SaringanLead as NilaiSaringan } from "@/features/pipeline/order";
 import { PapanLead } from "@/features/pipeline/papan-lead";
 import { PilTahap } from "@/features/pipeline/pil-tahap";
 import { usePipelineDaftar, usePipelineKategori } from "@/features/pipeline/queries";
+import { SaringanLead } from "@/features/pipeline/saringan-lead";
 import { useProfil } from "@/features/profil/penyedia-profil";
 import { cn } from "@/lib/utils";
 import type { LeadRingkas } from "@/types/domain";
@@ -85,6 +90,9 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
 
   const tab = TAB_DAFTAR.find((t) => t.kunci === sp.get("tab"))?.kunci ?? "semua";
   const papan = sp.get("v") === "papan";
+  const modeOrder = tab === "order";
+  const tgl = (k: string) => (/^\d{4}-\d{2}-\d{2}$/.test(sp.get(k) ?? "") ? sp.get(k) : null);
+  const saringan: NilaiSaringan = { status: sp.get("st") || null, dari: tgl("dari"), sampai: tgl("sampai") };
   // pemilik: ?m=<id> | "semua". Rep default ke dirinya; admin/baca default semua.
   const mParam = sp.get("m");
   const pemilik: number | null =
@@ -99,18 +107,39 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
 
   const [bukaBaru, setBukaBaru] = useState(false);
 
-  const hrefParam = (kunci: string, nilai: string | null) => {
+  const hrefParams = (ubah: Record<string, string | null>) => {
     const p = new URLSearchParams(sp.toString());
-    if (nilai) p.set(kunci, nilai);
-    else p.delete(kunci);
+    for (const [kunci, nilai] of Object.entries(ubah)) {
+      if (nilai) p.set(kunci, nilai);
+      else p.delete(kunci);
+    }
     const s = p.toString();
     return s ? `/pipeline?${s}` : "/pipeline";
   };
+  const hrefParam = (kunci: string, nilai: string | null) => hrefParams({ [kunci]: nilai });
   const setParam = (kunci: string, nilai: string | null) => router.replace(hrefParam(kunci, nilai));
+  const setSaringan = (f: NilaiSaringan) => router.replace(hrefParams({ st: f.status, dari: f.dari, sampai: f.sampai }));
+  // status & tanggal berarti lain di tab Order (status bayar, tanggal SP) → dibuang saat pindah masuk/keluar tab Order
+  const pindahTab = (kunci: string) =>
+    router.replace(
+      hrefParams({
+        tab: kunci === "semua" ? null : kunci,
+        ...((kunci === "order") !== modeOrder ? { st: null, dari: null, sampai: null } : {}),
+      }),
+    );
 
   const daftar = usePipelineDaftar({ tab, pemilik, q });
   const kategori = usePipelineKategori();
   const namaKategori = new Map(kategori.data?.kategori.map((k) => [k.id, k.nama]));
+  const kategoriLead = (id: string) => namaKategori.get(kategori.data?.posisi[id] ?? "");
+  const tersaring = daftar.data ? saringLead(daftar.data.items, saringan, modeOrder) : [];
+  const bisaUbahOrder = (l: LeadRingkas) =>
+    akses.bolehTulis && (akses.peran === "admin" || l.pemilik == null || Number(l.pemilik) === idSaya);
+  const hitungan = daftar.data
+    ? tersaring.length === daftar.data.total
+      ? `${daftar.data.total} ${modeOrder ? "order" : "lead"}`
+      : `${tersaring.length} dari ${daftar.data.total} ${modeOrder ? "order" : "lead"}`
+    : "";
 
   return (
     <div className="space-y-3">
@@ -192,7 +221,7 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
             key={t.kunci}
             role="tab"
             aria-selected={tab === t.kunci}
-            onClick={() => setParam("tab", t.kunci === "semua" ? null : t.kunci)}
+            onClick={() => pindahTab(t.kunci)}
             className={cn(
               "inline-flex min-h-9 items-center rounded-full border px-3 text-sm whitespace-nowrap transition-colors",
               tab === t.kunci
@@ -210,12 +239,21 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
         <Input
           value={qInput}
           onChange={(e) => setQInput(e.target.value)}
-          placeholder="Cari perusahaan / kode lead"
+          placeholder="Cari perusahaan, PIC, produk, No SP/PO, kode lead"
           className="pl-9"
           aria-label="Cari lead"
           data-uji="cari-lead"
         />
       </div>
+
+      <SaringanLead
+        key={modeOrder ? "order" : "lead"}
+        modeOrder={modeOrder}
+        nilai={saringan}
+        ubah={setSaringan}
+        hariIni={hariIni}
+        bulan={modeOrder && daftar.data ? bulanTersedia(daftar.data.items) : []}
+      />
 
       {papan ? (
         daftar.isError || kategori.isError ? (
@@ -228,24 +266,34 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
         ) : (
           <>
             <p className="text-xs text-muted-foreground">
-              {daftar.data.total} lead · Kategori di papan ini pribadi, hanya terlihat oleh Anda. Menyeret lead tidak mengubah
-              tahapnya.
+              {hitungan} · Kategori di papan ini pribadi, hanya terlihat oleh Anda. Menyeret lead tidak mengubah tahapnya.
             </p>
-            <PapanLead leads={daftar.data.items} papan={kategori.data} />
+            <PapanLead leads={tersaring} papan={kategori.data} />
           </>
         )
       ) : daftar.isError ? (
         <GalatMuat galat={daftar.error} ulang={() => void daftar.refetch()} />
       ) : daftar.isPending ? (
         <MemuatDaftar />
-      ) : daftar.data.items.length === 0 ? (
-        <Kosong>{q ? "Tidak ada lead yang cocok." : "Belum ada lead."}</Kosong>
+      ) : tersaring.length === 0 ? (
+        <Kosong>
+          {q || daftar.data.items.length
+            ? `Tidak ada ${modeOrder ? "order" : "lead"} yang cocok.`
+            : modeOrder
+              ? "Belum ada order."
+              : "Belum ada lead."}
+        </Kosong>
+      ) : modeOrder ? (
+        <>
+          <p className="text-xs text-muted-foreground">{hitungan}</p>
+          <DaftarOrder leads={tersaring} namaKategori={kategoriLead} bisaUbah={bisaUbahOrder} />
+        </>
       ) : (
         <>
-          <p className="text-xs text-muted-foreground">{daftar.data.total} lead</p>
+          <p className="text-xs text-muted-foreground">{hitungan}</p>
           <div className="space-y-2">
-            {daftar.data.items.map((l) => (
-              <BarisLead key={l.id} lead={l} hariIni={hariIni} kategori={namaKategori.get(kategori.data?.posisi[l.id] ?? "")} />
+            {tersaring.map((l) => (
+              <BarisLead key={l.id} lead={l} hariIni={hariIni} kategori={kategoriLead(l.id)} />
             ))}
           </div>
         </>
@@ -257,11 +305,13 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
 }
 
 export function LayarDaftar() {
-  const papan = useSearchParams().get("v") === "papan";
+  const sp = useSearchParams();
+  // papan & tabel Order butuh lebar penuh
+  const lebar = sp.get("v") === "papan" || sp.get("tab") === "order";
   return (
     <>
       <KepalaHalaman judul="Pipeline" />
-      <IsiHalaman lebar={papan} className="space-y-4">
+      <IsiHalaman lebar={lebar} className="space-y-4">
         <GerbangPipeline>{(akses) => <IsiDaftar akses={akses} />}</GerbangPipeline>
       </IsiHalaman>
     </>

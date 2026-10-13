@@ -2,21 +2,23 @@
 
 // Detail lead (§5): info kv, tombol aksi (Catat FU / Penawaran / Order / Batal / Alihkan / Klaim / Ubah),
 // dan log gabungan aktivitas + riwayat tahap. 'baca' (Yosie) melihat tanpa telepon/PIC & tanpa tombol tulis (§6).
-import { ArrowRightLeft, FileText, Hand, Pencil, PhoneCall, ShoppingCart, XCircle } from "lucide-react";
+import { ArrowRightLeft, FileText, Hand, Pencil, PhoneCall, ReceiptText, ShoppingCart, XCircle } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { IsiHalaman } from "@/components/layout/isi-halaman";
 import { KepalaHalaman } from "@/components/layout/kepala-halaman";
 import { GalatMuat, MemuatDaftar } from "@/components/umum/keadaan";
+import { Chip } from "@/components/umum/chip";
 import { KotakPesan } from "@/components/umum/kotak-pesan";
 import { Button } from "@/components/ui/button";
 import { useAnggota } from "@/features/anggota/queries";
 import { DialogFu } from "@/features/pipeline/dialog-fu";
+import { DialogOrder } from "@/features/pipeline/dialog-order";
 import { DialogTahap, type AksiTahap } from "@/features/pipeline/dialog-tahap";
 import { DialogUbah } from "@/features/pipeline/dialog-ubah";
 import { GerbangPipeline, type AksesPipeline } from "@/features/pipeline/gerbang";
-import { rupiah } from "@/features/pipeline/konstanta";
+import { BAYAR, BAYAR_BELUM_DICATAT, rupiah } from "@/features/pipeline/konstanta";
 import { PilTahap } from "@/features/pipeline/pil-tahap";
 import { useLeadUbah } from "@/features/pipeline/mutasi";
 import { usePipelineLead } from "@/features/pipeline/queries";
@@ -43,6 +45,7 @@ function IsiDetail({ lead, akses }: { lead: LeadDetail; akses: AksesPipeline }) 
   const [fu, setFu] = useState(false);
   const [ubah, setUbah] = useState(false);
   const [aksi, setAksi] = useState<AksiTahap | null>(null);
+  const [dataOrder, setDataOrder] = useState(false);
 
   const namaAnggota = (id: IdAnggota | null | undefined) =>
     id == null ? "sistem" : (anggota.data?.find((m) => Number(m.id) === Number(id))?.username ?? `#${id}`);
@@ -110,10 +113,19 @@ function IsiDetail({ lead, akses }: { lead: LeadDetail; akses: AksesPipeline }) 
         <Baris dt="Pemilik">{lead.pemilik_nama || <span className="text-muted-foreground">tanpa pemilik</span>}</Baris>
         {lead.nilai_penawaran != null ? <Baris dt="Penawaran">{rupiah(lead.nilai_penawaran)}</Baris> : null}
         {lead.tahap === "ORDER" ? (
-          <Baris dt="Order">
-            <span className="font-mono">{lead.no_sp}</span> · {rupiah(lead.nilai_transaksi)}
-            {lead.tanggal_sp ? ` · ${fmtTanggal(lead.tanggal_sp)}` : ""}
-          </Baris>
+          <>
+            <Baris dt="No SP">
+              <span className="font-mono">{lead.no_sp || "—"}</span>
+              {lead.tanggal_sp ? <span className="text-muted-foreground"> · {fmtTanggal(lead.tanggal_sp)}</span> : null}
+            </Baris>
+            <Baris dt="No PO">{lead.no_po || <span className="text-muted-foreground">—</span>}</Baris>
+            <Baris dt="Nominal">
+              <span className="font-medium tabular-nums">{rupiah(lead.nilai_transaksi)}</span>
+            </Baris>
+            <Baris dt="Pembayaran">
+              <InfoBayar lead={lead} />
+            </Baris>
+          </>
         ) : null}
         {lead.tahap === "BATAL" ? (
           <Baris dt="Alasan batal">
@@ -154,6 +166,12 @@ function IsiDetail({ lead, akses }: { lead: LeadDetail; akses: AksesPipeline }) 
             <Button type="button" variant="outline" size="sm" onClick={lakukanKlaim} disabled={klaim.isPending}>
               <Hand aria-hidden />
               Klaim
+            </Button>
+          ) : null}
+          {lead.tahap === "ORDER" ? (
+            <Button type="button" variant="outline" size="sm" onClick={() => setDataOrder(true)} data-uji="aksi-data-order">
+              <ReceiptText aria-hidden />
+              Data order
             </Button>
           ) : null}
           <Button type="button" variant="ghost" size="sm" onClick={() => setUbah(true)} data-uji="aksi-ubah">
@@ -199,7 +217,36 @@ function IsiDetail({ lead, akses }: { lead: LeadDetail; akses: AksesPipeline }) 
           <DialogFu buka={fu} ubahBuka={setFu} leadId={lead.id} />
           <DialogUbah buka={ubah} ubahBuka={setUbah} lead={lead} />
           {aksi ? <DialogTahap buka={!!aksi} ubahBuka={(b) => !b && setAksi(null)} lead={lead} aksi={aksi} /> : null}
+          {lead.tahap === "ORDER" ? <DialogOrder buka={dataOrder} ubahBuka={setDataOrder} lead={lead} /> : null}
         </>
+      ) : null}
+    </div>
+  );
+}
+
+/** Status bayar + rincian (DP & sisa, tanggal lunas) + jejak siapa/kapan dicatat. */
+function InfoBayar({ lead }: { lead: LeadDetail }) {
+  const b = lead.bayar_status ? BAYAR[lead.bayar_status] : BAYAR_BELUM_DICATAT;
+  const sisa = lead.nilai_transaksi != null && lead.bayar_dp != null ? Math.max(0, lead.nilai_transaksi - lead.bayar_dp) : null;
+  return (
+    <div className="space-y-0.5">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <Chip nada={b.nada} data-uji="detail-bayar">
+          {b.label}
+        </Chip>
+        {lead.bayar_status === "DP" ? (
+          <span className="tabular-nums">
+            DP {rupiah(lead.bayar_dp)}
+            {lead.tanggal_dp ? ` (${fmtTanggal(lead.tanggal_dp)})` : ""}
+            {sisa != null ? ` · sisa ${rupiah(sisa)}` : ""}
+          </span>
+        ) : null}
+        {lead.bayar_status === "LUNAS" && lead.tanggal_lunas ? <span>{fmtTanggal(lead.tanggal_lunas)}</span> : null}
+      </div>
+      {lead.bayar_diubah_pada ? (
+        <p className="text-xs text-muted-foreground">
+          dicatat {lead.bayar_diubah_oleh_nama ?? "sistem"} · {fmtWaktu(lead.bayar_diubah_pada)}
+        </p>
       ) : null}
     </div>
   );

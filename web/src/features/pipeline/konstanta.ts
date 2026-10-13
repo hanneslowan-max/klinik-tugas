@@ -4,7 +4,7 @@ import type { VariantProps } from "class-variance-authority";
 
 import type { chipVariants } from "@/components/umum/chip";
 import { fmtTanggal, selisihHari } from "@/lib/tanggal";
-import type { AlasanBatal, JenisAktivitas, ProdukLead, SatuanItem, SumberLead, TahapLead } from "@/types/domain";
+import type { AlasanBatal, JenisAktivitas, ProdukLead, SatuanItem, StatusBayar, SumberLead, TahapLead } from "@/types/domain";
 
 export const PRODUK: ProdukLead[] = [
   "Roda", "Pallet Mesh", "Airport Trolley", "Shopping Cart",
@@ -37,6 +37,14 @@ export const TAHAP: Record<TahapLead, { label: string; nada: NadaChip }> = {
   DIALIHKAN: { label: "DIALIHKAN", nada: "biasa" },
 };
 
+/** Status pembayaran order (revisi #7). null = order lama yang status bayarnya belum dicatat. */
+export const BAYAR: Record<StatusBayar, { label: string; nada: NadaChip }> = {
+  BELUM: { label: "Belum bayar", nada: "telat" },
+  DP: { label: "DP", nada: "hari-ini" },
+  LUNAS: { label: "Lunas", nada: "sukses" },
+};
+export const BAYAR_BELUM_DICATAT = { label: "Belum dicatat", nada: "biasa" as NadaChip };
+
 /** Tab daftar "Lead saya" (§5). Kunci = nilai `tab` yang diterima web_pipeline_daftar. */
 export const TAB_DAFTAR = [
   { kunci: "semua", label: "Semua" },
@@ -44,6 +52,7 @@ export const TAB_DAFTAR = [
   { kunci: "diam", label: "Diam >7 hari" },
   { kunci: "pm", label: "Pallet Mesh" },
   { kunci: "penawaran", label: "Penawaran" },
+  { kunci: "order", label: "Order" },
 ] as const;
 
 export type KunciTab = (typeof TAB_DAFTAR)[number]["kunci"];

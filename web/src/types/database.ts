@@ -1371,6 +1371,7 @@ export type Database = {
       web_pipeline_lead: { Args: { p_id: string }; Returns: Json };
       web_pipeline_lead_buat: { Args: { p: Json }; Returns: Json };
       web_pipeline_lead_ubah: { Args: { p: Json }; Returns: Json };
+      web_pipeline_order_ubah: { Args: { p: Json }; Returns: Json };
       web_pipeline_pelanggan_cari: { Args: { p_q: string }; Returns: Json };
       web_pipeline_ringkas: { Args: { p: Json }; Returns: Json };
       web_pipeline_saya: { Args: Record<PropertyKey, never>; Returns: Json };
