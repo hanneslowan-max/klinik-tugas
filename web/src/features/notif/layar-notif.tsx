@@ -26,6 +26,7 @@ import { rpc } from "@/lib/api/rpc";
 import { kunci } from "@/lib/kunci-query";
 import { klienBrowser } from "@/lib/supabase/client";
 import { fmtRelatif, fmtWaktu } from "@/lib/tanggal";
+import { gantiUrl } from "@/lib/url-dangkal";
 import { cn } from "@/lib/utils";
 import type { DaftarNotif, DariNotif, Notifikasi } from "@/types/domain";
 
@@ -90,8 +91,8 @@ export function LayarNotif() {
 
   function gantiTab(d: DariNotif) {
     if (d === dari) return;
-    // replaceState terintegrasi dengan router Next (useSearchParams ikut berubah) tanpa memuat ulang halaman server
-    window.history.replaceState(null, "", hrefNotif(d));
+    // URL dangkal (replaceState, lib/url-dangkal): useSearchParams ikut berubah tanpa round-trip ke server
+    gantiUrl(hrefNotif(d));
   }
 
   function bacaSatu(n: Notifikasi) {
