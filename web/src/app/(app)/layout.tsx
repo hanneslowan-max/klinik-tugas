@@ -1,5 +1,7 @@
 // Penjaga semua layar yang butuh login: sesi sah (proxy sudah mengalihkan tamu), anggota aktif, dan wajib ganti
-// password sementara. Profil & hari libur dimuat di server lalu diteruskan ke klien.
+// password sementara. Profil & hari libur dimuat di server lalu diteruskan ke klien. Keduanya dibaca BERSAMAAN
+// (bukan berurutan): HTML baru terkirim sesudah layout selesai, jadi tiap panggilan berurutan ke Supabase menambah
+// satu round-trip pada setiap muat penuh.
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -13,6 +15,10 @@ import { KotakPesan } from "@/components/umum/kotak-pesan";
 export default async function LayoutApp({ children }: LayoutProps<"/">) {
   const path = (await headers()).get("x-path") || "/saya";
   const lanjut = encodeURIComponent(path);
+
+  // hari libur dibaca bersamaan dengan web_saya; hasilnya dibuang bila ternyata dialihkan / akun belum aktif.
+  // Galatnya ditelan di sini (libur kosong), jadi tidak pernah memunculkan "Gagal memuat".
+  const janjiLibur = ambilLibur().catch((): string[] => []);
 
   let profil;
   try {
@@ -33,7 +39,7 @@ export default async function LayoutApp({ children }: LayoutProps<"/">) {
   }
   if (profil.member.harus_ganti_password) redirect(`/ganti-password?lanjut=${lanjut}`);
 
-  const libur = await ambilLibur();
+  const libur = await janjiLibur;
   return (
     <PenyediaProfil awal={profil} liburAwal={libur}>
       <KerangkaApp>{children}</KerangkaApp>
