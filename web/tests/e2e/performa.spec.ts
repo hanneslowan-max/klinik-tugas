@@ -354,6 +354,11 @@ test.describe("data awal dari server pada muat dokumen penuh (P1)", () => {
       expect(await dok.text()).toContain("Performa · kartu di HTML");
       const rsc = await page.request.get("/saya", { headers: { rsc: "1" } });
       expect(await rsc.text()).not.toContain("Performa · kartu di HTML");
+      // ?v=board: papan langsung di HTML (bukan dialirkan lewat <template> Suspense yang tampil tertunda ±300 ms)
+      const papan = await (await page.request.get("/saya?v=board", { headers: { "sec-fetch-dest": "document" } })).text();
+      expect(papan).toContain('data-uji="papan-saya"');
+      expect(papan).toContain("Performa · kartu di HTML");
+      expect(papan).not.toMatch(/<template id="B:/);
       // ?m=… (anggota lain) tidak memakai data server
       const lain = await page.request.get(`/saya?m=${AKUN.citra.id}`, { headers: { "sec-fetch-dest": "document" } });
       expect(await lain.text()).not.toContain("Performa · kartu di HTML");
