@@ -5,6 +5,9 @@
 //
 // Untuk <Link>: pasang `onNavigate={(e) => { e.preventDefault(); gantiUrl(href) }}` + `prefetch={false}`.
 // onNavigate tidak dipanggil untuk Ctrl/Cmd/Shift/klik tengah, jadi "buka di tab baru" tetap jalan.
+// AWAS: panggil serempak dari handler klik/ketik, bukan dari timer/async. replaceState/pushState = ACTION_RESTORE yang
+// menggantikan navigasi Next yang sedang menunggu RSC (tautan yang baru diketuk diabaikan) — lihat KotakCari Pipeline
+// dan kirim() di LayarCari (sesudah await: hanya bila tidak ada tautan yang diketuk selama menunggu).
 
 /** replaceState (baku) atau pushState (`dorong`: buat entri riwayat baru, mis. Daftar ↔ Papan di list). */
 export function gantiUrl(url: string, { dorong = false }: { dorong?: boolean } = {}) {

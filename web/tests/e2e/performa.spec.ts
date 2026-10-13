@@ -200,6 +200,105 @@ test.describe("URL dangkal tanpa RSC (P7)", () => {
     }
   });
 
+  test("Pipeline: ketik cari lalu langsung ketuk baris (RSC lambat) → detail tetap terbuka; Kembali memulihkan cari", async ({ page }) => {
+    const bersih = beriAksesPipeline(AKUN.owner.id, "admin");
+    try {
+      await masuk(page, AKUN.owner.email);
+      await page.goto("/pipeline");
+      const baris = page.getByTestId("baris-lead");
+      await expect(baris.first()).toBeVisible();
+      await page.waitForLoadState("networkidle");
+      await tahanRsc(page, 800); // > debounce cari 300 ms: penulisan URL tertunda tidak boleh membatalkan navigasi
+      const cari = page.getByTestId("cari-lead");
+      const tujuan = (await baris.first().getAttribute("href")) as string;
+      await cari.fill("P");
+      await baris.first().click();
+      await expect(page).toHaveURL(new RegExp(`${tujuan}$`));
+      await page.goBack();
+      await expect(cari).toHaveValue(""); // ketikan yang belum diterapkan dibuang (tidak pernah masuk URL)
+
+      // kata yang sudah diterapkan (URL ?q) dipulihkan saat Kembali dari detail lead
+      await cari.fill("PT");
+      await expect(page).toHaveURL(/\/pipeline\?q=PT$/);
+      const tujuan2 = (await baris.first().getAttribute("href")) as string;
+      await baris.first().click();
+      await expect(page).toHaveURL(new RegExp(`${tujuan2}$`));
+      await page.goBack();
+      await expect(page).toHaveURL(/\/pipeline\?q=PT$/);
+      await expect(cari).toHaveValue("PT");
+
+      // ketik lalu langsung klik tab (tombol) / Papan (tautan URL-dangkal): kata ditulis serempak, ikut di URL
+      await cari.fill("PT S");
+      await page.getByRole("tablist", { name: "Saring lead" }).getByRole("tab", { name: "Penawaran" }).click();
+      await expect(page).toHaveURL(/\/pipeline\?q=PT\+S&tab=penawaran$/);
+      await cari.fill("PT Su");
+      await page.getByTestId("tab-papan-lead").click();
+      await expect(page).toHaveURL(/\/pipeline\?q=PT\+Su&tab=penawaran&v=papan$/);
+      await expect(cari).toHaveValue("PT Su");
+    } finally {
+      bersih();
+    }
+  });
+
+  test("Pipeline & Cari: ketuk menu aktif = isian ikut URL (kosong), daftar tidak tersaring", async ({ page }) => {
+    const bersih = beriAksesPipeline(AKUN.owner.id, "admin");
+    try {
+      await masuk(page, AKUN.owner.email);
+      await page.goto("/pipeline");
+      const baris = page.getByTestId("baris-lead");
+      await expect(baris.first()).toBeVisible();
+      const cari = page.getByTestId("cari-lead");
+      await cari.fill("zzzz-tidak-ada");
+      await expect(page).toHaveURL(/\?q=zzzz-tidak-ada$/);
+      await expect(page.getByText("Tidak ada lead yang cocok.")).toBeVisible();
+      await tautanNav(page, "/pipeline").click();
+      await expect(page).toHaveURL(/\/pipeline$/);
+      await expect(cari).toHaveValue("");
+      await expect(baris.first()).toBeVisible();
+      await page.waitForTimeout(500); // debounce kotak cari tidak menulis kata lama kembali
+      await expect(page).toHaveURL(/\/pipeline$/);
+      await expect(cari).toHaveValue("");
+
+      await tautanNav(page, "/cari").click();
+      await expect(page).toHaveURL(/\/cari$/);
+      const kata = page.getByLabel("Kata kunci");
+      await kata.fill("Latihan");
+      await page.getByRole("combobox", { name: "Space" }).click();
+      await page.getByRole("option", { name: "Ruang Uji B" }).click(); // space list "Latihan Uji"
+      await page.getByTestId("tombol-cari").click();
+      await expect(page).toHaveURL(/\/cari\?q=Latihan&space=rsujib0001$/);
+      await expect(page.getByTestId("baris-tugas").first()).toBeVisible();
+      await tautanNav(page, "/cari").click();
+      await expect(page).toHaveURL(/\/cari$/);
+      await expect(kata).toHaveValue("");
+      await expect(page.getByRole("combobox", { name: "Space" })).toHaveText("Semua space");
+      await expect(page.getByTestId("baris-tugas")).toHaveCount(0);
+    } finally {
+      bersih();
+    }
+  });
+
+  test("Cari: tautan diketuk selagi pencarian menunggu → navigasinya menang (tidak ditarik kembali ke /cari)", async ({ page }) => {
+    await masuk(page, AKUN.owner.email);
+    await page.goto("/cari?q=Latihan");
+    const baris = page.getByTestId("baris-tugas");
+    await expect(baris.first()).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    await page.route(/\/rest\/v1\/rpc\/web_cari/, async (route) => {
+      await new Promise((r) => setTimeout(r, 600));
+      await route.fallback();
+    });
+    await tahanRsc(page, 1500); // jawaban web_cari tiba SELAGI navigasi menunggu RSC
+    const tujuan = (await baris.first().locator("a[href^='/t/']").first().getAttribute("href")) as string;
+    await page.getByLabel("Kata kunci").fill("Uji");
+    await page.getByTestId("tombol-cari").click();
+    await expect(page.getByTestId("tombol-cari")).toHaveText("Mencari…");
+    await baris.first().locator("a[href^='/t/']").first().click();
+    await expect(page).toHaveURL(new RegExp(`${tujuan}$`));
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(new RegExp(`${tujuan}$`));
+  });
+
   test("muat langsung dengan parameter URL tampil benar", async ({ page }) => {
     await masuk(page, AKUN.owner.email);
     await page.goto(`/saya?m=${AKUN.citra.id}&v=board`);
@@ -468,13 +567,21 @@ test.describe("version skew (P10)", () => {
   test("chunk form hilang sesudah deploy (404): halaman dimuat ulang SEKALI, tanpa loop; lalu form terbuka", async ({ page }) => {
     test.skip(diHp(page), "cukup di desktop");
     await masuk(page, AKUN.owner.email);
-    // chunk modul form Tugas baru dikenali dari isinya (pesan validasi zod) → 404 selama `blokir` (versi lama terhapus)
+    // chunk modul form Tugas baru dikenali dari isinya (pesan validasi zod) → 404 selama `blokir` (versi lama terhapus);
+    // URL-nya diingat supaya pemeriksaan HEAD dari imporAman juga dijawab 404
     let blokir = true;
     let ditolak = 0;
+    const hilang = new Set<string>();
     await page.route(/\/_next\/static\/chunks\/.*\.js$/, async (route) => {
+      const url = route.request().url();
+      if (blokir && hilang.has(url)) {
+        ditolak++;
+        return route.fulfill({ status: 404, body: "" });
+      }
       const res = await route.fetch();
       const isi = await res.text();
       if (blokir && isi.includes("Nama tugas wajib diisi")) {
+        hilang.add(url);
         ditolak++;
         return route.fulfill({ status: 404, body: "" });
       }
@@ -497,6 +604,14 @@ test.describe("version skew (P10)", () => {
     await page.waitForTimeout(1000);
     expect(muat).toBe(2);
 
+    // penanda kedaluwarsa (deploy berikutnya, tab yang sama): muat ulang otomatis lagi, bukan layar galat
+    await page.evaluate(() => sessionStorage.setItem("anvil:muat-ulang-chunk", String(Date.now() - 3 * 60_000)));
+    await page.reload();
+    await expect(page.getByTestId("buat-tugas")).toBeVisible();
+    expect(muat).toBe(3);
+    await page.getByTestId("buat-tugas").click();
+    await expect.poll(() => muat, { timeout: 15_000 }).toBe(4);
+
     // chunk tersedia lagi → form terbuka normal (penanda dibersihkan sesudah impor berhasil)
     blokir = false;
     await page.reload();
@@ -504,5 +619,45 @@ test.describe("version skew (P10)", () => {
     await expect(page.getByTestId("dialog-buat-tugas")).toBeVisible();
     await expect(page.getByLabel("Nama tugas")).toBeVisible();
     await expect.poll(() => page.evaluate(() => sessionStorage.getItem("anvil:muat-ulang-chunk"))).toBeNull();
+  });
+
+  test("galat jaringan saat memuat chunk (bukan 404): TIDAK dimuat ulang; coba sekali lagi", async ({ page }) => {
+    test.skip(diHp(page), "cukup di desktop");
+    await masuk(page, AKUN.owner.email);
+    // unduhan chunk form diputus (chunk masih ada di server: HEAD dijawab 200) sebanyak `putus` kali
+    let putus = 2;
+    let gagal = 0;
+    await page.route(/\/_next\/static\/chunks\/.*\.js$/, async (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      const res = await route.fetch();
+      const isi = await res.text();
+      if (gagal < putus && isi.includes("Nama tugas wajib diisi")) {
+        gagal++;
+        return route.abort("internetdisconnected");
+      }
+      return route.fulfill({ response: res, body: isi });
+    });
+    let muat = 0;
+    page.on("load", () => muat++);
+
+    await page.goto(`/l/${SEED.listApp}`);
+    await expect(page.getByTestId("buat-tugas")).toBeVisible();
+    await expect.poll(() => gagal, { timeout: 15_000 }).toBe(1); // pramuat saat senggang gagal (diam-diam)
+    // klik: unduhan gagal lagi → chunk masih ada → dicoba sekali lagi → form terbuka, tanpa muat ulang
+    await page.getByTestId("buat-tugas").click();
+    await expect(page.getByLabel("Nama tugas")).toBeVisible();
+    expect(gagal).toBe(2);
+    expect(muat).toBe(1);
+    await page.keyboard.press("Escape");
+
+    // putus terus (offline sesaat): galat ditampilkan, TIDAK muat ulang, tanpa penanda
+    putus = 99;
+    await page.reload();
+    await expect(page.getByTestId("buat-tugas")).toBeVisible();
+    await page.getByTestId("buat-tugas").click();
+    await expect(page.getByText("Terjadi kesalahan")).toBeVisible({ timeout: 15_000 });
+    await page.waitForTimeout(1000);
+    expect(muat).toBe(2);
+    expect(await page.evaluate(() => sessionStorage.getItem("anvil:muat-ulang-chunk"))).toBeNull();
   });
 });

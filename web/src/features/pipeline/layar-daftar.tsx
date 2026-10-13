@@ -48,6 +48,17 @@ const pramuatPapan = () => pramuat(() => import("@/features/pipeline/papan-lead"
 
 const LANGKAH = 50;
 
+/** URL /pipeline dari parameter `dasar` dengan sebagian parameter diganti (null/kosong = hapus). */
+function urlPipeline(dasar: string, ubah: Record<string, string | null>) {
+  const p = new URLSearchParams(dasar);
+  for (const [kunci, nilai] of Object.entries(ubah)) {
+    if (nilai) p.set(kunci, nilai);
+    else p.delete(kunci);
+  }
+  const s = p.toString();
+  return s ? `/pipeline?${s}` : "/pipeline";
+}
+
 /**
  * Batas baris yang dirender per kunci daftar (tab|pemilik|cari|saringan). Tingkat modul supaya bertahan saat halaman
  * di-unmount (buka detail lead → Kembali): jumlah baris sama → posisi gulir bisa dipulihkan. Ganti kunci = mulai 50 lagi.
@@ -101,20 +112,78 @@ function TampilLagi({ sisa, tambah }: { sisa: number; tambah: () => void }) {
   );
 }
 
-/** Kotak cari dengan isian lokal: ketikan hanya merender komponen ini; kata ter-debounce 300 ms dikirim ke induk (URL). */
-function KotakCari({ awal, ubah }: { awal: string; ubah: (q: string) => void }) {
-  const [isi, setIsi] = useState(awal);
-  const kirim = useEffectEvent((q: string) => {
-    if (q !== awal.trim()) ubah(q);
+/**
+ * Kotak cari dengan isian lokal: ketikan hanya merender komponen ini; kata ter-debounce 300 ms ditulis ke URL (?q)
+ * lewat `tulis` (daftar disaring dari URL; Kembali dari detail lead memulihkan pencarian).
+ * - Tulisan tertunda tidak boleh jatuh saat navigasi sedang menunggu RSC: replaceState = ACTION_RESTORE di router
+ *   Next yang MENGGANTIKAN navigasi itu (ketukan diabaikan). Maka klik selagi timer menunggu (fase capture dokumen,
+ *   sebelum onClick <Link>): tautan yang berpindah halaman → timer dibatalkan & ketikan yang belum diterapkan
+ *   dibuang; klik lain (tab/saringan, tautan URL-dangkal `data-url-dangkal`, Ctrl/Shift+klik) → ditulis SEKARANG,
+ *   serempak sebelum handler-nya. Kembali/Maju (popstate) → dibatalkan.
+ * - ?q berubah dari luar (ketuk menu Pipeline = /pipeline tanpa remount, Kembali/Maju) → isian ikut URL. Gema tulisan
+ *   sendiri dikenali dari `tertulis`, jadi ketikan lanjutan tidak tertimpa.
+ */
+function KotakCari({ nilaiUrl, tulis }: { nilaiUrl: string; tulis: (q: string) => void }) {
+  const [isi, setIsi] = useState(nilaiUrl);
+  const [jejak, setJejak] = useState({ url: nilaiUrl, tertulis: nilaiUrl.trim() });
+  if (jejak.url !== nilaiUrl) {
+    setJejak({ url: nilaiUrl, tertulis: nilaiUrl.trim() }); // sesuaikan state saat render, bukan di efek
+    if (nilaiUrl.trim() !== jejak.tertulis) setIsi(nilaiUrl);
+  }
+  const input = useRef<HTMLInputElement>(null);
+  const tunda = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const kirim = useEffectEvent(() => {
+    const q = isi.trim();
+    if (q === nilaiUrl.trim()) return;
+    setJejak((j) => ({ ...j, tertulis: q }));
+    tulis(q);
   });
+  const buang = useEffectEvent(() => setIsi(nilaiUrl));
   useEffect(() => {
-    const t = setTimeout(() => kirim(isi.trim()), 300);
-    return () => clearTimeout(t);
+    const t = setTimeout(() => {
+      tunda.current = undefined;
+      kirim();
+    }, 300);
+    tunda.current = t;
+    return () => {
+      clearTimeout(t);
+      if (tunda.current === t) tunda.current = undefined;
+    };
   }, [isi]);
+  useEffect(() => {
+    const henti = () => {
+      clearTimeout(tunda.current);
+      tunda.current = undefined;
+    };
+    const saatKlik = (e: MouseEvent) => {
+      if (tunda.current === undefined || e.target === input.current) return;
+      henti();
+      const a = e.target instanceof Element ? e.target.closest("a[href]") : null;
+      const pindah =
+        a instanceof HTMLAnchorElement &&
+        !a.hasAttribute("data-url-dangkal") &&
+        !a.target &&
+        !(e.ctrlKey || e.metaKey || e.shiftKey || e.altKey);
+      if (pindah) buang();
+      else kirim();
+    };
+    const saatKembali = () => {
+      if (tunda.current === undefined) return;
+      henti();
+      buang();
+    };
+    document.addEventListener("click", saatKlik, true);
+    window.addEventListener("popstate", saatKembali);
+    return () => {
+      document.removeEventListener("click", saatKlik, true);
+      window.removeEventListener("popstate", saatKembali);
+    };
+  }, []);
   return (
     <div className="relative">
       <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
       <Input
+        ref={input}
         value={isi}
         onChange={(e) => setIsi(e.target.value)}
         placeholder="Cari perusahaan, PIC, produk, No SP/PO, kode lead"
@@ -207,28 +276,22 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
 
   const [bukaBaru, setBukaBaru] = useState(false);
 
-  const hrefParams = (ubah: Record<string, string | null>) => {
-    const p = new URLSearchParams(sp.toString());
-    for (const [kunci, nilai] of Object.entries(ubah)) {
-      if (nilai) p.set(kunci, nilai);
-      else p.delete(kunci);
-    }
-    const s = p.toString();
-    return s ? `/pipeline?${s}` : "/pipeline";
+  const hrefParam = (kunci: string, nilai: string | null) => urlPipeline(sp.toString(), { [kunci]: nilai }); // href <Link>
+  // handler: dasarnya URL SAAT INI, bukan sp render terakhir (kotak cari bisa baru saja menulis ?q di klik yang sama)
+  const gantiParams = (ubah: Record<string, string | null>) => {
+    if (window.location.pathname !== "/pipeline") return; // sudah berpindah halaman (mis. Kembali sedang berjalan)
+    gantiUrl(urlPipeline(window.location.search, ubah));
   };
-  const hrefParam = (kunci: string, nilai: string | null) => hrefParams({ [kunci]: nilai });
-  const setParam = (kunci: string, nilai: string | null) => gantiUrl(hrefParam(kunci, nilai));
-  const setSaringan = (f: NilaiSaringan) => gantiUrl(hrefParams({ st: f.status, dari: f.dari, sampai: f.sampai }));
+  const setParam = (kunci: string, nilai: string | null) => gantiParams({ [kunci]: nilai });
+  const setSaringan = (f: NilaiSaringan) => gantiParams({ st: f.status, dari: f.dari, sampai: f.sampai });
   // status selalu dibuang saat ganti tab (pilihannya beda per tab); tanggal berarti lain di tab Order (tanggal SP) →
   // dibuang saat pindah masuk/keluar tab Order
   const pindahTab = (kunci: string) =>
-    gantiUrl(
-      hrefParams({
-        tab: kunci === "semua" ? null : kunci,
-        st: null,
-        ...((kunci === "order") !== modeOrder ? { dari: null, sampai: null } : {}),
-      }),
-    );
+    gantiParams({
+      tab: kunci === "semua" ? null : kunci,
+      st: null,
+      ...((kunci === "order") !== modeOrder ? { dari: null, sampai: null } : {}),
+    });
 
   const daftar = usePipelineDaftar({ tab, pemilik, q });
   const kategori = usePipelineKategori();
@@ -286,8 +349,9 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
               prefetch={false}
               onNavigate={(e) => {
                 e.preventDefault();
-                gantiUrl(hrefParam("v", b ? "papan" : null));
+                setParam("v", b ? "papan" : null);
               }}
+              data-url-dangkal
               onPointerDown={b ? pramuatPapan : undefined}
               onFocus={b ? pramuatPapan : undefined}
               data-uji={uji}
@@ -347,7 +411,7 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
         ))}
       </div>
 
-      <KotakCari awal={qUrl} ubah={(v) => setParam("q", v || null)} />
+      <KotakCari nilaiUrl={qUrl} tulis={(v) => setParam("q", v || null)} />
 
       <SaringanLead
         key={modeOrder ? "order" : "lead"}

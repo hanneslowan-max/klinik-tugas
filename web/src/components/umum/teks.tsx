@@ -2,20 +2,21 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 
-import { imporAman } from "@/lib/impor-aman";
 import { pecahUrl } from "@/lib/teks";
 import { cn } from "@/lib/utils";
 
 // lib/markdown (markdown-it + DOMPurify, ±53 KB gz) dimuat MALAS: tidak ikut JS awal /t. Disimpan di tingkat modul
-// (sekali per halaman) dan diumumkan ke <Markdown> lewat useSyncExternalStore.
+// (sekali per halaman) dan diumumkan ke <Markdown> lewat useSyncExternalStore. Gagal memuat (jaringan, chunk hilang
+// sesudah deploy) TIDAK memuat ulang halaman (bukan imporAman): teks polos sudah cadangan yang aman, dan muat ulang
+// otomatis di /t bisa menghapus draf komentar.
 type ModMarkdown = typeof import("@/lib/markdown");
 let modMarkdown: ModMarkdown | null = null;
 let janjiMarkdown: Promise<ModMarkdown> | null = null;
 const pendengarMarkdown = new Set<() => void>();
 
-/** Mulai unduh lib/markdown (aman dipanggil berkali-kali). Dipanggil saat detail tugas mount, sejajar web_detail. */
+/** Mulai unduh lib/markdown (aman dipanggil berkali-kali). Dipanggil saat modul detail tugas dievaluasi. */
 export function muatMarkdown(): Promise<ModMarkdown> {
-  janjiMarkdown ??= imporAman(() => import("@/lib/markdown")).then(
+  janjiMarkdown ??= import("@/lib/markdown").then(
     (m) => {
       modMarkdown = m;
       for (const f of pendengarMarkdown) f();

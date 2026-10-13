@@ -5,7 +5,6 @@
 // HP: satu kolom, field langsung sesudah kepala. Desktop lebar (≥ xl): field di kolom kanan yang menempel saat digulir.
 import { Search } from "lucide-react";
 import Link from "next/link";
-import { useEffect } from "react";
 
 import { IsiHalaman } from "@/components/layout/isi-halaman";
 import { KepalaHalaman } from "@/components/layout/kepala-halaman";
@@ -25,6 +24,10 @@ import { BagianLampiran } from "@/features/lampiran/daftar-lampiran";
 import { GalatApi } from "@/lib/api/galat";
 import type { DataAwal } from "@/lib/data-awal";
 import type { DetailTugas } from "@/types/domain";
+
+// pustaka markdown (dimuat malas) mulai diunduh begitu modul ini dievaluasi di klien — saat hidrasi/navigasi /t,
+// sejajar web_detail — bukan sesudah komit hidrasi (efek) sehingga fase teks polos deskripsi lebih singkat
+if (typeof window !== "undefined") muatMarkdown().catch(() => {});
 
 function MemuatDetail() {
   return (
@@ -59,10 +62,6 @@ function LampiranDetail() {
 
 export function LayarDetail({ id, tabAwal, awal }: { id: string; tabAwal: TabDetail; awal?: DataAwal<DetailTugas> }) {
   const q = useDataDetail(id, awal);
-  // pustaka markdown (dimuat malas) diunduh sejajar dengan web_detail, bukan sesudah deskripsi tampil
-  useEffect(() => {
-    muatMarkdown().catch(() => {});
-  }, []);
   const tidakAda = q.error instanceof GalatApi && q.error.tidakAda;
 
   if (!q.data || tidakAda) {

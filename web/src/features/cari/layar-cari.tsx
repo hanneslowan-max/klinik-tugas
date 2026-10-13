@@ -9,7 +9,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { IsiHalaman } from "@/components/layout/isi-halaman";
 import { KepalaHalaman } from "@/components/layout/kepala-halaman";
@@ -51,8 +51,26 @@ export function LayarCari() {
   const struktur = useStruktur();
   const [teks, setTeks] = useState(q);
   const [pilihSpace, setPilihSpace] = useState(space || SEMUA);
+  // ?q/?space berubah (hasil Cari sendiri, ketuk menu Cari = /cari tanpa remount, Kembali/Maju) → isian ikut URL
+  const [dariUrl, setDariUrl] = useState({ q, space });
+  if (dariUrl.q !== q || dariUrl.space !== space) {
+    setDariUrl({ q, space }); // sesuaikan state saat render, bukan di efek
+    setTeks(q);
+    setPilihSpace(space || SEMUA);
+  }
   const [sibuk, setSibuk] = useState(false);
   const [galatKirim, setGalatKirim] = useState<string | null>(null);
+  // tautan diketuk selagi Cari menunggu jawaban → hasilnya tidak lagi menulis URL / mengalihkan: replaceState saat
+  // navigasi Next menunggu RSC akan membatalkan navigasi itu (lib/url-dangkal)
+  const klikTautan = useRef(0);
+  useEffect(() => {
+    const saatKlik = (e: MouseEvent) => {
+      const a = e.target instanceof Element ? e.target.closest("a[href]") : null;
+      if (a instanceof HTMLAnchorElement && !a.target && !(e.ctrlKey || e.metaKey || e.shiftKey || e.altKey)) klikTautan.current++;
+    };
+    document.addEventListener("click", saatKlik, true);
+    return () => document.removeEventListener("click", saatKlik, true);
+  }, []);
 
   // hasil per kata kunci tidak perlu disimpan selama gcTime bawaan (30 mnt)
   const hasil = useQuery({ queryKey: kunci.cari(q, space), queryFn: () => cari(q, space), enabled: Boolean(q), gcTime: 5 * 60_000 });
@@ -66,9 +84,13 @@ export function LayarCari() {
       gantiUrl("/cari");
       return;
     }
+    const nomorKlik = klikTautan.current;
     setSibuk(true);
     try {
       const r = await qc.fetchQuery({ queryKey: kunci.cari(kata, sp), queryFn: () => cari(kata, sp), gcTime: 5 * 60_000 });
+      // pengguna mengetuk tautan / sudah pindah halaman selama menunggu: navigasinya menang (jangan dibatalkan, jangan
+      // menimpa entri riwayat halaman lain)
+      if (klikTautan.current !== nomorKlik || window.location.pathname !== "/cari") return;
       const tujuan = tujuanLangsung(kata, r);
       const u = new URLSearchParams({ q: kata });
       if (sp) u.set("space", sp);
