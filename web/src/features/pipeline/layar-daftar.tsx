@@ -24,7 +24,7 @@ import { bulanTersedia, saringLead, type SaringanLead as NilaiSaringan } from "@
 import { PapanLead } from "@/features/pipeline/papan-lead";
 import { PilTahap } from "@/features/pipeline/pil-tahap";
 import { usePipelineDaftar, usePipelineKategori } from "@/features/pipeline/queries";
-import { SaringanLead } from "@/features/pipeline/saringan-lead";
+import { opsiStatus, SaringanLead, tanggalSah } from "@/features/pipeline/saringan-lead";
 import { useProfil } from "@/features/profil/penyedia-profil";
 import { cn } from "@/lib/utils";
 import type { LeadRingkas } from "@/types/domain";
@@ -91,8 +91,13 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
   const tab = TAB_DAFTAR.find((t) => t.kunci === sp.get("tab"))?.kunci ?? "semua";
   const papan = sp.get("v") === "papan";
   const modeOrder = tab === "order";
-  const tgl = (k: string) => (/^\d{4}-\d{2}-\d{2}$/.test(sp.get(k) ?? "") ? sp.get(k) : null);
-  const saringan: NilaiSaringan = { status: sp.get("st") || null, dari: tgl("dari"), sampai: tgl("sampai") };
+  // nilai URL yang tidak sah untuk tab ini diabaikan (bukan mengosongkan daftar diam-diam)
+  const stUrl = sp.get("st");
+  const saringan: NilaiSaringan = {
+    status: stUrl && opsiStatus(tab).some((o) => o.v === stUrl) ? stUrl : null,
+    dari: tanggalSah(sp.get("dari")),
+    sampai: tanggalSah(sp.get("sampai")),
+  };
   // pemilik: ?m=<id> | "semua". Rep default ke dirinya; admin/baca default semua.
   const mParam = sp.get("m");
   const pemilik: number | null =
@@ -119,12 +124,14 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
   const hrefParam = (kunci: string, nilai: string | null) => hrefParams({ [kunci]: nilai });
   const setParam = (kunci: string, nilai: string | null) => router.replace(hrefParam(kunci, nilai));
   const setSaringan = (f: NilaiSaringan) => router.replace(hrefParams({ st: f.status, dari: f.dari, sampai: f.sampai }));
-  // status & tanggal berarti lain di tab Order (status bayar, tanggal SP) → dibuang saat pindah masuk/keluar tab Order
+  // status selalu dibuang saat ganti tab (pilihannya beda per tab); tanggal berarti lain di tab Order (tanggal SP) →
+  // dibuang saat pindah masuk/keluar tab Order
   const pindahTab = (kunci: string) =>
     router.replace(
       hrefParams({
         tab: kunci === "semua" ? null : kunci,
-        ...((kunci === "order") !== modeOrder ? { st: null, dari: null, sampai: null } : {}),
+        st: null,
+        ...((kunci === "order") !== modeOrder ? { dari: null, sampai: null } : {}),
       }),
     );
 
@@ -248,6 +255,7 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
 
       <SaringanLead
         key={modeOrder ? "order" : "lead"}
+        tab={tab}
         modeOrder={modeOrder}
         nilai={saringan}
         ubah={setSaringan}

@@ -22,8 +22,9 @@ import type { LeadRingkas, StatusBayar } from "@/types/domain";
 /** Cukup data order dari baris daftar (LeadRingkas) atau detail (LeadDetail). */
 export type DataOrder = Pick<
   LeadRingkas,
-  "id" | "kode" | "no_sp" | "tanggal_sp" | "nilai_transaksi" | "no_po" | "bayar_status" | "bayar_dp" | "tanggal_dp" | "tanggal_lunas"
-> & { pemilik_kode_sp?: string | null };
+  | "id" | "kode" | "no_sp" | "tanggal_sp" | "nilai_transaksi" | "no_po" | "bayar_status" | "bayar_dp" | "tanggal_dp"
+  | "tanggal_lunas" | "pemilik_kode_sp"
+>;
 
 const POLA_SP = /^(\d+)\/(RSG|MCE)\/(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)\/(20\d\d)$/;
 const STATUS: StatusBayar[] = ["BELUM", "DP", "LUNAS"];
@@ -45,7 +46,8 @@ function IsiOrder({ lead, onSelesai }: { lead: DataOrder; onSelesai: () => void 
   const kodeSp = cocok?.[2] ?? lead.pemilik_kode_sp ?? null;
 
   const [nomor, setNomor] = useState(nomorAwal);
-  const [tanggalSp, setTanggalSp] = useState(lead.tanggal_sp ?? hariIni);
+  // tanggal SP kosong (data lama) TIDAK diisi hari ini: menyimpan hal lain tidak boleh memindah order ke bulan berjalan
+  const [tanggalSp, setTanggalSp] = useState(lead.tanggal_sp ?? "");
   const [noPo, setNoPo] = useState(lead.no_po ?? "");
   const [nilai, setNilai] = useState(lead.nilai_transaksi != null ? String(lead.nilai_transaksi) : "");
   const [status, setStatus] = useState<StatusBayar | null>(lead.bayar_status);
@@ -64,10 +66,11 @@ function IsiOrder({ lead, onSelesai }: { lead: DataOrder; onSelesai: () => void 
     if (!nilaiAngka) return setGalat("Nominal order wajib diisi (> 0).");
     if (nilaiAngka !== lead.nilai_transaksi) body.nilai_transaksi = nilaiAngka;
 
-    if (!tanggalSp) return setGalat("Isi tanggal SP.");
-    const tanggalBerubah = tanggalSp !== lead.tanggal_sp;
+    if (!tanggalSp && lead.tanggal_sp) return setGalat("Tanggal SP tidak boleh dikosongkan.");
+    const tanggalBerubah = Boolean(tanggalSp) && tanggalSp !== lead.tanggal_sp;
     if (tanggalBerubah) body.tanggal_sp = tanggalSp;
     if (nomorAwal && !angka(nomor)) return setGalat("Isi nomor urut SP.");
+    if (angka(nomor) && angka(nomor) !== nomorAwal && !tanggalSp) return setGalat("Isi tanggal SP untuk membentuk No SP.");
     // No SP berpola: kirim nomor bila nomor ATAU tanggal berubah, supaya bulan/tahun di No SP ikut tanggal SP
     if (angka(nomor) && (angka(nomor) !== nomorAwal || tanggalBerubah)) body.nomor = angka(nomor);
 
@@ -128,6 +131,7 @@ function IsiOrder({ lead, onSelesai }: { lead: DataOrder; onSelesai: () => void 
           <div className="space-y-1.5">
             <Label htmlFor="od-tsp">Tanggal SP</Label>
             <Input id="od-tsp" type="date" max={hariIni} value={tanggalSp} onChange={(e) => setTanggalSp(e.target.value)} />
+            {!lead.tanggal_sp && !tanggalSp ? <p className="text-xs text-muted-foreground">Belum tercatat.</p> : null}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="od-po">No PO customer</Label>

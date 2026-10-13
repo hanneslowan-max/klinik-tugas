@@ -140,11 +140,13 @@ const LABEL_BAYAR: Record<StatusBayar, string> = { BELUM: "Belum bayar", DP: "DP
 
 /**
  * CSV untuk rekap manual (Excel Indonesia): pemisah ';', UTF-8 dengan BOM, angka tanpa pemisah ribuan, tanggal YYYY-MM-DD.
- * Urutan baris = urutan yang diberikan.
+ * Urutan baris = urutan yang diberikan. Teks bebas (nama, kota, No PO) yang diawali = + - @ diberi awalan ' supaya Excel
+ * tidak menjalankannya sebagai formula (CSV injection); angka tetap angka.
  */
 export function csvOrder(leads: LeadRingkas[]): string {
   const sel = (v: string | number | null | undefined) => {
-    const s = v == null ? "" : String(v);
+    let s = v == null ? "" : String(v);
+    if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
     return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const kepala = [

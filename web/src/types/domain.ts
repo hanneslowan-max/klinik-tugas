@@ -399,6 +399,8 @@ export type LeadRingkas = {
   kota: string | null;
   pemilik: IdAnggota | null;
   pemilik_nama: string | null;
+  /** kode SP pemilik (RSG/MCE) — pratinjau No SP di dialog Data order */
+  pemilik_kode_sp: string | null;
   tanggal_masuk: string;
   diam_hari: number;
   fu_berikutnya: string | null;

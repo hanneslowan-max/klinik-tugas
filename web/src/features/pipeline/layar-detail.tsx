@@ -22,6 +22,7 @@ import { BAYAR, BAYAR_BELUM_DICATAT, rupiah } from "@/features/pipeline/konstant
 import { PilTahap } from "@/features/pipeline/pil-tahap";
 import { useLeadUbah } from "@/features/pipeline/mutasi";
 import { usePipelineLead } from "@/features/pipeline/queries";
+import { useProfil } from "@/features/profil/penyedia-profil";
 import { pesanGalat } from "@/lib/api/galat";
 import { fmtTanggal, fmtWaktu } from "@/lib/tanggal";
 import type { AktivitasLead, IdAnggota, LeadDetail, RiwayatTahapLead } from "@/types/domain";
@@ -50,8 +51,11 @@ function IsiDetail({ lead, akses }: { lead: LeadDetail; akses: AksesPipeline }) 
   const namaAnggota = (id: IdAnggota | null | undefined) =>
     id == null ? "sistem" : (anggota.data?.find((m) => Number(m.id) === Number(id))?.username ?? `#${id}`);
 
+  const { member } = useProfil();
   const buka = lead.tahap === "BARU" || lead.tahap === "PENAWARAN";
   const bisaKlaim = akses.bolehTulis && lead.pemilik == null;
+  // sama dengan pipeline_boleh_ubah & tab Order: admin, pemilik, atau lead tanpa pemilik
+  const bisaUbahOrder = lead.tahap === "ORDER" && (akses.peran === "admin" || lead.pemilik == null || Number(lead.pemilik) === Number(member.id));
 
   const log: ItemLog[] = [
     ...lead.aktivitas.map((a) => ({ kind: "fu" as const, waktu: a.waktu, a })),
@@ -168,7 +172,7 @@ function IsiDetail({ lead, akses }: { lead: LeadDetail; akses: AksesPipeline }) 
               Klaim
             </Button>
           ) : null}
-          {lead.tahap === "ORDER" ? (
+          {bisaUbahOrder ? (
             <Button type="button" variant="outline" size="sm" onClick={() => setDataOrder(true)} data-uji="aksi-data-order">
               <ReceiptText aria-hidden />
               Data order
@@ -217,7 +221,7 @@ function IsiDetail({ lead, akses }: { lead: LeadDetail; akses: AksesPipeline }) 
           <DialogFu buka={fu} ubahBuka={setFu} leadId={lead.id} />
           <DialogUbah buka={ubah} ubahBuka={setUbah} lead={lead} />
           {aksi ? <DialogTahap buka={!!aksi} ubahBuka={(b) => !b && setAksi(null)} lead={lead} aksi={aksi} /> : null}
-          {lead.tahap === "ORDER" ? <DialogOrder buka={dataOrder} ubahBuka={setDataOrder} lead={lead} /> : null}
+          {bisaUbahOrder ? <DialogOrder buka={dataOrder} ubahBuka={setDataOrder} lead={lead} /> : null}
         </>
       ) : null}
     </div>

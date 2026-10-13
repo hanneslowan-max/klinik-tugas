@@ -47,6 +47,21 @@ select uji.sama(uji.ambil('o') ->> 'no_sp', '77/RSG/I/2026', 'ubah: No SP = nomo
 select uji.galat($$select public.web_pipeline_order_ubah('{"lead_id":"ldujiord1","no_sp":"SP-77"}')$$,
   'PT400', 'ubah: No SP teks bebas di luar pola ditolak', 'pola', 'INPUT_001');
 select uji.sama(public.web_pipeline_order_ubah('{"lead_id":"ldujiord1","no_po":""}') ->> 'no_po', null, 'ubah: No PO kosong = dihapus');
+select uji.galat($$select public.web_pipeline_order_ubah('{"lead_id":"ldujiord1","nilai_transaksi":"12.5"}')$$,
+  'PT400', 'ubah: nominal bukan angka bulat → 400 (bukan galat cast mentah)', 'angka bulat', 'INPUT_001');
+select uji.galat($$select public.web_pipeline_order_ubah('{"lead_id":"ldujiord1","nilai_transaksi":"9999999999999999999"}')$$,
+  'PT400', 'ubah: nominal terlalu besar → 400', 'angka bulat', 'INPUT_001');
+reset role;
+-- order impor: kode di No SP (MCE) berbeda dengan kode pemilik (citra = RSG) → kode lama DIPERTAHANKAN saat dibangun ulang
+update public.lead set no_sp = '12/MCE/IX/2026', tanggal_sp = '2026-09-10' where id = 'ldujiord1';
+select uji.jadi('22222222-2222-4222-8222-222222222222');
+select uji.sama(public.web_pipeline_order_ubah('{"lead_id":"ldujiord1","nomor":"12","tanggal_sp":"2026-09-30"}') ->> 'no_sp',
+  '12/MCE/IX/2026', 'ubah tanggal (bulan sama): kode SP lama dipertahankan, No SP tetap');
+select uji.sama(public.web_pipeline_order_ubah('{"lead_id":"ldujiord1","nomor":"12","tanggal_sp":"2026-08-15"}') ->> 'no_sp',
+  '12/MCE/VIII/2026', 'ubah tanggal (bulan lain): bulan romawi ikut, kode SP lama dipertahankan');
+reset role;
+update public.lead set no_sp = '77/RSG/I/2026', tanggal_sp = '2026-01-15' where id = 'ldujiord1';
+select uji.jadi('22222222-2222-4222-8222-222222222222');
 
 -- ------------------------------------------------------------ pembayaran
 select uji.galat($$select public.web_pipeline_order_ubah('{"lead_id":"ldujiord1","bayar_status":"DP"}')$$,
@@ -55,6 +70,10 @@ select uji.galat($$select public.web_pipeline_order_ubah('{"lead_id":"ldujiord1"
   'PT400', 'DP >= nominal order ditolak (tandai Lunas)', 'Lunas', 'INPUT_001');
 select uji.galat($$select public.web_pipeline_order_ubah('{"lead_id":"ldujiord1","bayar_status":"SEBAGIAN"}')$$,
   'PT400', 'status bayar tak dikenal ditolak', null, 'INPUT_001');
+select uji.galat($$select public.web_pipeline_order_ubah('{"lead_id":"ldujiord1","tanggal_lunas":"2026-10-01"}')$$,
+  'PT400', 'data bayar tanpa bayar_status ditolak (tidak diabaikan diam-diam)', 'bayar_status', 'INPUT_001');
+select uji.galat($$select public.web_pipeline_order_ubah('{"lead_id":"ldujiord1","bayar_status":"LUNAS","bayar_dp":999999999}')$$,
+  'PT400', 'LUNAS: DP tercatat ≥ nominal ditolak', 'lebih kecil', 'INPUT_001');
 select uji.simpan('o', public.web_pipeline_order_ubah('{"lead_id":"ldujiord1","bayar_status":"DP","bayar_dp":5000000}'));
 select uji.cek(uji.ambil('o') ->> 'bayar_status' = 'DP' and (uji.ambil('o') ->> 'bayar_dp')::bigint = 5000000
   and uji.ambil('o') ->> 'tanggal_dp' = public.hari_ini_wib()::text, 'DP: nominal tersimpan, tanggal DP default hari ini');
@@ -74,6 +93,18 @@ select uji.simpan('jejak', to_jsonb((select bayar_diubah_pada::text from public.
 select public.web_pipeline_order_ubah('{"lead_id":"ldujiord1","nilai_transaksi":13000000}');
 select uji.sama(to_jsonb((select bayar_diubah_pada::text from public.lead where id = 'ldujiord1')), uji.ambil('jejak'),
   'ubah nominal saja: jejak pembayaran tidak berubah');
+-- catatan riwayat: setiap perubahan tercatat (siapa, lama → baru); rencana FU tidak terhapus
+select uji.cek(exists (select 1 from public.lead_aktivitas where lead_id = 'ldujiord1' and jenis = 'Catatan' and oleh = 100000002
+  and hasil like 'Data order diubah:%Nominal Rp12.500.000 → Rp13.000.000%'), 'riwayat: perubahan nominal tercatat (lama → baru)');
+select uji.cek(exists (select 1 from public.lead_aktivitas where lead_id = 'ldujiord1'
+  and hasil like '%Pembayaran DP Rp5.000.000 (%) → Lunas (%'), 'riwayat: perubahan pembayaran tercatat');
+select uji.cek(exists (select 1 from public.lead_aktivitas where lead_id = 'ldujiord1'
+  and hasil like '%No SP 12/MCE/IX/2026 → 12/MCE/VIII/2026%'), 'riwayat: perubahan No SP tercatat');
+reset role;
+update public.lead set fu_berikutnya = '2026-12-01' where id = 'ldujiord1';
+select uji.jadi('22222222-2222-4222-8222-222222222222');
+select public.web_pipeline_order_ubah('{"lead_id":"ldujiord1","no_po":"PO-FU"}');
+select uji.sama((select fu_berikutnya::text from public.lead where id = 'ldujiord1'), '2026-12-01', 'catatan riwayat tidak menghapus rencana FU');
 reset role;
 
 -- ------------------------------------------------------------ hak & aturan
@@ -119,7 +150,7 @@ select uji.sama(pg_temp.cari('5/RSG'), array['ldujiord2'], 'cari: No SP sebagian
 select uji.sama(pg_temp.cari('100%'), array[]::text[], 'cari: % dari pengguna bukan wildcard');
 select uji.sama(pg_temp.cari(null, 'order'), array['ldujiord1', 'ldujiord2'], 'tab order: kedua order');
 select uji.simpan('r', (select e from jsonb_array_elements(public.web_pipeline_daftar('{"tab":"order"}') -> 'items') e where e ->> 'id' = 'ldujiord1'));
-select uji.cek(uji.ambil('r') ?& array['tanggal_sp', 'no_po', 'bayar_status', 'bayar_dp', 'tanggal_dp', 'tanggal_lunas'], 'baris ringkas memuat field order baru');
+select uji.cek(uji.ambil('r') ?& array['tanggal_sp', 'no_po', 'bayar_status', 'bayar_dp', 'tanggal_dp', 'tanggal_lunas', 'pemilik_kode_sp'], 'baris ringkas memuat field order baru');
 reset role;
 select uji.jadi('33333333-3333-4333-8333-333333333333');
 select uji.sama(pg_temp.cari('hartono'), array[]::text[], 'baca: tidak bisa mencari nama PIC (PIC disamarkan untuknya)');

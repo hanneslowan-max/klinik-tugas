@@ -89,8 +89,40 @@ test("tab Order: rekap, kelompok per bulan SP, saringan status bayar", async ({ 
   await expect(baris(page, lunas)).toBeVisible();
   // pindah ke tab lain membuang saringan status bayar
   await page.getByTestId("saring-status-LUNAS").click();
+  await expect(page).toHaveURL(/st=LUNAS/);
   await page.getByRole("tab", { name: "Semua" }).click();
+  await expect(page).toHaveURL(/\/pipeline(\?(?!.*st=).*)?$/);
   await expect(page).not.toHaveURL(/st=/);
+});
+
+test("Papan + tab Order + saringan Lunas: hanya order lunas", async ({ page }) => {
+  await masuk(page, AKUN.citra.email);
+  await page.goto("/pipeline?tab=order&v=papan&st=LUNAS");
+  await page.getByTestId("cari-lead").fill(PELANGGAN);
+  await expect(page.locator(`[data-uji="kartu-lead"][data-id="${lunas}"]`)).toBeVisible();
+  await expect(page.locator(`[data-uji="kartu-lead"][data-id="${belum}"]`)).toHaveCount(0);
+  await expect(page.locator(`[data-uji="kartu-lead"][data-id="${baru}"]`)).toHaveCount(0);
+  // status tak dikenal di URL diabaikan (bukan mengosongkan daftar)
+  await page.goto("/pipeline?tab=order&st=ngawur");
+  await hanyaPelangganUji(page);
+});
+
+test("saringan tanggal bisa diketik dengan keyboard (draf lokal, URL diisi saat tanggal lengkap)", async ({ page }) => {
+  test.skip(diHp(page), "HP memakai pemilih tanggal bawaan");
+  await bukaOrder(page);
+  await page.getByTestId("tombol-saringan").click();
+  const tahun = sqlLokal(`select extract(year from public.hari_ini_wib())::int`);
+  // 01-01: urutan segmen dd/mm atau mm/dd tidak berpengaruh
+  const dari = page.getByTestId("saring-dari");
+  await dari.focus();
+  await page.keyboard.type(`0101${tahun}`, { delay: 60 });
+  await expect(dari).toHaveValue(`${tahun}-01-01`);
+  await expect(page).toHaveURL(new RegExp(`dari=${tahun}-01-01`));
+  await page.keyboard.press("Tab");
+  await expect(dari).toHaveValue(`${tahun}-01-01`);
+  // order tes dengan tanggal SP >= 1 Januari tahun ini tetap tampil sesuai data
+  const harap = Number(sqlLokal(`select count(*) from public.lead where id in ('${lunas}', '${belum}') and tanggal_sp >= '${tahun}-01-01'`));
+  await expect(page.locator('[data-uji="baris-order"]')).toHaveCount(harap);
 });
 
 test("Data order: isi No PO + DP → sisa tagihan, lalu Lunas", async ({ page }) => {

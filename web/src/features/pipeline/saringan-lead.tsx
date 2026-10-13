@@ -4,7 +4,7 @@
 // status (tab Order = status bayar, tab lain = tahap) + rentang tanggal (tab Order = tanggal SP, tab lain = tanggal masuk)
 // dengan pintasan bulan. Disimpan di URL (st, dari, sampai) oleh layar daftar; panel terbuka bila ada saringan aktif.
 import { ChevronDown, SlidersHorizontal, X } from "lucide-react";
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,10 +18,17 @@ const STATUS_ORDER: { v: string; label: string }[] = [
   ...(["BELUM", "DP", "LUNAS"] as StatusBayar[]).map((v) => ({ v, label: BAYAR[v].label })),
   { v: BELUM_DICATAT, label: BAYAR_BELUM_DICATAT.label },
 ];
-const STATUS_TAHAP: { v: string; label: string }[] = (["BARU", "PENAWARAN", "ORDER", "BATAL", "DIALIHKAN"] as TahapLead[]).map((v) => ({
-  v,
-  label: TAHAP[v].label,
-}));
+/** Status yang bisa dipilih di tab ini (nilai lain di URL diabaikan). Tab FU/Diam/PM hanya memuat lead terbuka; tab Penawaran
+ * hanya satu tahap → tanpa pilihan status. */
+export function opsiStatus(tab: string): { v: string; label: string }[] {
+  if (tab === "order") return STATUS_ORDER;
+  const tahap: TahapLead[] =
+    tab === "penawaran" ? [] : tab === "semua" ? ["BARU", "PENAWARAN", "ORDER", "BATAL", "DIALIHKAN"] : ["BARU", "PENAWARAN"];
+  return tahap.map((v) => ({ v, label: TAHAP[v].label }));
+}
+
+/** Tanggal saringan yang sah ('YYYY-MM-DD', tahun 2000–2099); selain itu null. */
+export const tanggalSah = (s: string | null | undefined) => (s && /^20\d{2}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(s) ? s : null);
 
 const kelasChip = (aktif: boolean) =>
   cn(
@@ -31,6 +38,7 @@ const kelasChip = (aktif: boolean) =>
   );
 
 type Props = {
+  tab: string;
   modeOrder: boolean;
   nilai: SaringanLead;
   ubah: (f: SaringanLead) => void;
@@ -39,10 +47,10 @@ type Props = {
   bulan: string[];
 };
 
-export function SaringanLead({ modeOrder, nilai: f, ubah, hariIni, bulan }: Props) {
+export function SaringanLead({ tab, modeOrder, nilai: f, ubah, hariIni, bulan }: Props) {
   const aktif = jumlahSaringan(f);
   const [buka, setBuka] = useState(aktif > 0);
-  const status = modeOrder ? STATUS_ORDER : STATUS_TAHAP;
+  const status = opsiStatus(tab);
   const bulanIni = hariIni.slice(0, 7);
   const pintasan = [
     { label: "Bulan ini", ...rentangBulan(bulanIni) },
@@ -71,6 +79,7 @@ export function SaringanLead({ modeOrder, nilai: f, ubah, hariIni, bulan }: Prop
 
       {buka ? (
         <div className="space-y-3 rounded-xl border bg-card p-3" data-uji="panel-saringan">
+          {status.length ? (
           <div className="space-y-1.5">
             <div className="text-xs font-medium text-muted-foreground">{modeOrder ? "Status pembayaran" : "Tahap"}</div>
             <div role="group" aria-label={modeOrder ? "Status pembayaran" : "Tahap"} className="flex flex-wrap gap-1.5">
@@ -91,6 +100,7 @@ export function SaringanLead({ modeOrder, nilai: f, ubah, hariIni, bulan }: Prop
               ))}
             </div>
           </div>
+          ) : null}
 
           <div className="space-y-1.5">
             <div className="text-xs font-medium text-muted-foreground">{modeOrder ? "Tanggal SP" : "Tanggal masuk"}</div>
@@ -126,13 +136,11 @@ export function SaringanLead({ modeOrder, nilai: f, ubah, hariIni, bulan }: Prop
                 <Label htmlFor="saring-dari" className="text-xs font-normal">
                   Dari
                 </Label>
-                <Input
+                <InputTanggal
                   id="saring-dari"
-                  type="date"
-                  value={f.dari ?? ""}
+                  nilai={f.dari}
                   max={f.sampai ?? undefined}
-                  onChange={(e) => ubah({ ...f, dari: e.target.value || null })}
-                  className="h-9 w-40"
+                  simpan={(v) => ubah({ ...f, dari: v })}
                   data-uji="saring-dari"
                 />
               </div>
@@ -140,13 +148,11 @@ export function SaringanLead({ modeOrder, nilai: f, ubah, hariIni, bulan }: Prop
                 <Label htmlFor="saring-sampai" className="text-xs font-normal">
                   Sampai
                 </Label>
-                <Input
+                <InputTanggal
                   id="saring-sampai"
-                  type="date"
-                  value={f.sampai ?? ""}
+                  nilai={f.sampai}
                   min={f.dari ?? undefined}
-                  onChange={(e) => ubah({ ...f, sampai: e.target.value || null })}
-                  className="h-9 w-40"
+                  simpan={(v) => ubah({ ...f, sampai: v })}
                   data-uji="saring-sampai"
                 />
               </div>
@@ -155,5 +161,47 @@ export function SaringanLead({ modeOrder, nilai: f, ubah, hariIni, bulan }: Prop
         </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Input tanggal dengan draf lokal: ketikan keyboard (dd/mm/yyyy, per segmen) tidak langsung ditulis ke URL — tiap ketukan
+ * memicu router.replace async yang menimpa isian, dan segmen tahun yang belum lengkap (mis. 0002) ikut tersaring. Disimpan
+ * saat tanggal sudah sah (tahun 2000–2099) atau saat fokus pergi (kosong = hapus saringan).
+ */
+function InputTanggal({
+  nilai,
+  simpan,
+  ...rest
+}: { nilai: string | null; simpan: (v: string | null) => void } & Omit<ComponentProps<"input">, "value" | "onChange" | "type">) {
+  const [draf, setDraf] = useState(nilai ?? "");
+  const [dariLuar, setDariLuar] = useState(nilai);
+  if (nilai !== dariLuar) {
+    // nilai berubah dari luar (pintasan bulan, Reset, kembali/maju) → samakan draf saat render
+    setDariLuar(nilai);
+    setDraf(nilai ?? "");
+  }
+  return (
+    <Input
+      {...rest}
+      type="date"
+      value={draf}
+      onChange={(e) => {
+        setDraf(e.target.value);
+        const sah = tanggalSah(e.target.value);
+        if (sah && sah !== nilai) simpan(sah);
+      }}
+      onBlur={() => {
+        // kosong = hapus saringan; isian tak sah/setengah jadi = kembali ke nilai tersimpan
+        if (!draf) {
+          if (nilai) simpan(null);
+          return;
+        }
+        const sah = tanggalSah(draf);
+        if (!sah) setDraf(nilai ?? "");
+        else if (sah !== nilai) simpan(sah);
+      }}
+      className="h-9 w-40"
+    />
   );
 }

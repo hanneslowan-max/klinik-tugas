@@ -24,7 +24,9 @@ export function usePipelineDaftar(arg: { tab: string; pemilik: number | null; q:
       rpc(klienBrowser(), "web_pipeline_daftar", {
         p: { tab: arg.tab, pemilik: arg.pemilik ?? undefined, q: arg.q || undefined },
       }),
-    placeholderData: (lama) => lama,
+    // data lama dipakai selama mengetik cari / ganti pemilik di tab yang SAMA; ganti tab = tampilkan memuat (jangan
+    // menampilkan isi & hitungan tab sebelumnya di bawah judul tab baru)
+    placeholderData: (lama, kueriLama) => (kueriLama?.queryKey[2] === arg.tab ? lama : undefined),
   });
 }
 

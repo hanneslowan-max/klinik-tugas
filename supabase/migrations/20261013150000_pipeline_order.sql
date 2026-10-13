@@ -92,7 +92,7 @@ create or replace function public.j_pipeline_lead_ringkas(p_id text)
 returns jsonb language sql stable security definer set search_path = '' as $$
   select jsonb_build_object(
     'id', l.id, 'kode', l.kode, 'tahap', l.tahap, 'sumber', l.sumber,
-    'pelanggan', pg.nama, 'kota', pg.kota, 'pemilik', l.pemilik, 'pemilik_nama', mp.username,
+    'pelanggan', pg.nama, 'kota', pg.kota, 'pemilik', l.pemilik, 'pemilik_nama', mp.username, 'pemilik_kode_sp', pa.kode_sp,
     'tanggal_masuk', l.tanggal_masuk, 'diam_hari', greatest(0, public.hari_ini_wib() - l.diam_sejak::date),
     'fu_berikutnya', l.fu_berikutnya,
     'nilai_transaksi', l.nilai_transaksi, 'no_sp', l.no_sp, 'tanggal_sp', l.tanggal_sp, 'no_po', l.no_po,
@@ -103,6 +103,7 @@ returns jsonb language sql stable security definer set search_path = '' as $$
   from public.lead l
     join public.pelanggan pg on pg.id = l.pelanggan_id
     left join public.members mp on mp.id = l.pemilik
+    left join public.pipeline_akses pa on pa.member_id = l.pemilik
   where l.id = p_id
 $$;
 
@@ -148,12 +149,32 @@ begin
               from unnest(coalesce(v_ids, '{}')) as x));
 end; $$;
 
+-- ============================================================ pembantu teks catatan riwayat
+-- 'Rp12.500.000' (atau '—'); dipakai catatan aktivitas perubahan data order.
+create or replace function public.pipeline_rupiah(n bigint)
+returns text language sql stable set search_path = '' as $$
+  select case when n is null then '—' else 'Rp' || replace(to_char(n, 'FM999,999,999,999,999,999'), ',', '.') end
+$$;
+
+-- 'Belum dicatat' | 'Belum bayar' | 'DP Rp5.000.000 (02-10-2026)' | 'Lunas (12-10-2026)'
+create or replace function public.pipeline_bayar_teks(p_status text, p_dp bigint, p_tgl_dp date, p_tgl_lunas date)
+returns text language sql stable set search_path = '' as $$
+  select case p_status
+    when 'BELUM' then 'Belum bayar'
+    when 'DP' then format('DP %s (%s)', public.pipeline_rupiah(p_dp), coalesce(to_char(p_tgl_dp, 'DD-MM-YYYY'), '—'))
+    when 'LUNAS' then format('Lunas (%s)', coalesce(to_char(p_tgl_lunas, 'DD-MM-YYYY'), '—'))
+    else 'Belum dicatat' end
+$$;
+
 -- ============================================================ ubah data order (#5 nominal, #6 No SP, No PO, #7 pelunasan)
 -- p = {lead_id, nilai_transaksi?, tanggal_sp?, nomor? | no_sp?, no_po?, bayar_status?, bayar_dp?, tanggal_dp?, tanggal_lunas?}
 -- Hanya kunci yang ADA di p yang diubah. No SP: 'nomor' (angka) → dibangun ulang nomor/KODE/ROMAWI/TAHUN dari tanggal SP
 -- (pola sama dengan web_pipeline_tahap); 'no_sp' = teks lengkap (divalidasi pola). Tanpa keduanya No SP tidak disentuh.
 -- Pembayaran: BELUM (hapus DP & tanggal) | DP (nominal DP > 0 dan < nominal order, tanggal DP) | LUNAS (tanggal lunas;
--- riwayat DP dipertahankan). Tanggal tidak boleh di masa depan. Jejak siapa/kapan diperbarui bila data bayar berubah.
+-- riwayat DP dipertahankan). bayar_dp/tanggal_dp/tanggal_lunas hanya bersama bayar_status. Tanggal tidak boleh di masa depan.
+-- Baris lead dikunci (FOR UPDATE) supaya dua pengubah bersamaan tidak saling menimpa. Setiap perubahan dicatat sebagai
+-- aktivitas 'Catatan' (siapa, lama → baru) — nominal & tanggal SP menentukan omzet per rep di Ringkasan. Jejak bayar
+-- (bayar_diubah_oleh/pada) diperbarui bila data pembayaran berubah.
 create or replace function public.inti_pipeline_order_ubah(p jsonb)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
@@ -161,8 +182,10 @@ declare
   v_hari date := public.hari_ini_wib();
   v_nilai bigint; v_tgl_sp date; v_sp text; v_kode text; v_po text;
   v_status text; v_dp bigint; v_tgl_dp date; v_tgl_lunas date;
+  v_catat text[] := '{}';
 begin
   v_lead := public.pipeline_lead_wajib(p->>'lead_id');
+  select * into v_lead from public.lead where id = v_lead.id for update;   -- serialkan pengubah bersamaan
   perform public.pipeline_boleh_ubah(v_lead.pemilik);
   if v_lead.tahap <> 'ORDER' then
     perform public.lempar('PT409', 'Data order hanya untuk lead berstatus ORDER', 'KONFLIK_001');
@@ -171,8 +194,11 @@ begin
   -- nominal
   v_nilai := v_lead.nilai_transaksi;
   if p ? 'nilai_transaksi' then
-    v_nilai := nullif(p->>'nilai_transaksi', '')::bigint;
-    if v_nilai is null or v_nilai <= 0 then perform public.lempar('PT400', 'Nominal order wajib > 0', 'INPUT_001'); end if;
+    if coalesce(p->>'nilai_transaksi', '') !~ '^\d{1,15}$' then
+      perform public.lempar('PT400', 'Nominal order wajib angka bulat > 0', 'INPUT_001');
+    end if;
+    v_nilai := (p->>'nilai_transaksi')::bigint;
+    if v_nilai <= 0 then perform public.lempar('PT400', 'Nominal order wajib > 0', 'INPUT_001'); end if;
   end if;
 
   -- tanggal SP
@@ -187,9 +213,9 @@ begin
   v_sp := v_lead.no_sp;
   if nullif(p->>'nomor', '') is not null then
     if v_tgl_sp is null then perform public.lempar('PT400', 'Tanggal SP wajib untuk membentuk No SP', 'INPUT_001'); end if;
-    select kode_sp into v_kode from public.pipeline_akses where member_id = v_lead.pemilik;
-    -- order impor tanpa pemilik: pakai kode di No SP lama bila ada
-    v_kode := coalesce(v_kode, substring(v_lead.no_sp from '^\d+/(RSG|MCE)/'));
+    -- kode SP: pertahankan kode di No SP lama (nomor dokumen asli; pemilik bisa berbeda pada order impor), baru kode pemilik
+    v_kode := coalesce(substring(v_lead.no_sp from '^\d+/(RSG|MCE)/'),
+                       (select kode_sp from public.pipeline_akses where member_id = v_lead.pemilik));
     if v_kode is null then perform public.lempar('PT400', 'Pemilik lead belum punya kode SP (RSG/MCE)', 'INPUT_001'); end if;
     v_sp := regexp_replace(p->>'nomor', '[^0-9]', '', 'g') || '/' || v_kode || '/'
           || public.pipeline_romawi(extract(month from v_tgl_sp)::int) || '/' || extract(year from v_tgl_sp)::text;
@@ -214,6 +240,12 @@ begin
 
   -- pembayaran
   v_status := v_lead.bayar_status; v_dp := v_lead.bayar_dp; v_tgl_dp := v_lead.tanggal_dp; v_tgl_lunas := v_lead.tanggal_lunas;
+  if (p ? 'bayar_dp' or p ? 'tanggal_dp' or p ? 'tanggal_lunas') and not p ? 'bayar_status' then
+    perform public.lempar('PT400', 'Data pembayaran harus dikirim bersama bayar_status', 'INPUT_001');
+  end if;
+  if nullif(p->>'bayar_dp', '') is not null and p->>'bayar_dp' !~ '^\d{1,15}$' then
+    perform public.lempar('PT400', 'Nominal DP wajib angka bulat > 0', 'INPUT_001');
+  end if;
   if p ? 'bayar_status' then
     v_status := nullif(p->>'bayar_status', '');
     if v_status is null or v_status not in ('BELUM', 'DP', 'LUNAS') then
@@ -238,6 +270,9 @@ begin
     end if;
   end if;
   if v_dp is not null and v_dp <= 0 then perform public.lempar('PT400', 'Nominal DP wajib > 0', 'INPUT_001'); end if;
+  if v_status = 'LUNAS' and v_dp is not null and v_nilai is not null and v_dp >= v_nilai then
+    perform public.lempar('PT400', 'Nominal DP yang tercatat harus lebih kecil dari nominal order', 'INPUT_001');
+  end if;
   if v_tgl_dp > v_hari or v_tgl_lunas > v_hari then
     perform public.lempar('PT400', 'Tanggal pembayaran tidak boleh di masa depan', 'INPUT_001');
   end if;
@@ -253,6 +288,30 @@ begin
                                then now() else bayar_diubah_pada end
    where id = v_lead.id;
 
+  -- catatan riwayat (lama → baru) untuk setiap isian yang berubah
+  if v_nilai is distinct from v_lead.nilai_transaksi then
+    v_catat := v_catat || format('Nominal %s → %s', public.pipeline_rupiah(v_lead.nilai_transaksi), public.pipeline_rupiah(v_nilai));
+  end if;
+  if v_tgl_sp is distinct from v_lead.tanggal_sp then
+    v_catat := v_catat || format('Tanggal SP %s → %s', coalesce(to_char(v_lead.tanggal_sp, 'DD-MM-YYYY'), '—'), to_char(v_tgl_sp, 'DD-MM-YYYY'));
+  end if;
+  if v_sp is distinct from v_lead.no_sp then
+    v_catat := v_catat || format('No SP %s → %s', coalesce(v_lead.no_sp, '—'), v_sp);
+  end if;
+  if v_po is distinct from v_lead.no_po then
+    v_catat := v_catat || format('No PO %s → %s', coalesce(v_lead.no_po, '—'), coalesce(v_po, '—'));
+  end if;
+  if (v_status, v_dp, v_tgl_dp, v_tgl_lunas) is distinct from (v_lead.bayar_status, v_lead.bayar_dp, v_lead.tanggal_dp, v_lead.tanggal_lunas) then
+    v_catat := v_catat || format('Pembayaran %s → %s',
+      public.pipeline_bayar_teks(v_lead.bayar_status, v_lead.bayar_dp, v_lead.tanggal_dp, v_lead.tanggal_lunas),
+      public.pipeline_bayar_teks(v_status, v_dp, v_tgl_dp, v_tgl_lunas));
+  end if;
+  if cardinality(v_catat) > 0 then
+    -- rencana_berikutnya dipertahankan: trigger aktivitas menyalinnya ke lead.fu_berikutnya
+    insert into public.lead_aktivitas (lead_id, oleh, jenis, hasil, rencana_berikutnya)
+    values (v_lead.id, public.aktor(), 'Catatan', 'Data order diubah: ' || array_to_string(v_catat, '; '), v_lead.fu_berikutnya);
+  end if;
+
   return public.j_pipeline_lead(v_lead.id, false);
 exception when unique_violation then
   perform public.lempar('PT409', format('No SP sudah dipakai lead lain: %s', v_sp), 'KONFLIK_001');
@@ -263,6 +322,7 @@ begin perform public.mulai_web(); return public.inti_pipeline_order_ubah(p); end
 
 -- ============================================================ hak (fail-closed, pola 20261013121000)
 revoke all on function
-  public.pipeline_lead_bayar_awal(), public.inti_pipeline_order_ubah(jsonb), public.web_pipeline_order_ubah(jsonb)
+  public.pipeline_lead_bayar_awal(), public.inti_pipeline_order_ubah(jsonb), public.web_pipeline_order_ubah(jsonb),
+  public.pipeline_rupiah(bigint), public.pipeline_bayar_teks(text, bigint, date, date)
 from public, anon, authenticated, service_role;
 grant execute on function public.web_pipeline_order_ubah(jsonb) to authenticated;

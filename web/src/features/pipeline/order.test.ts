@@ -9,7 +9,7 @@ import type { LeadRingkas } from "@/types/domain";
 function lead(kode: string, sebagian: Partial<LeadRingkas>): LeadRingkas {
   return {
     id: `ld${kode}`, kode, tahap: "ORDER", sumber: "Google Ads", pelanggan: `PT ${kode}`, kota: null, pemilik: null,
-    pemilik_nama: null, tanggal_masuk: "2026-01-01", diam_hari: 0, fu_berikutnya: null, nilai_transaksi: null, no_sp: null,
+    pemilik_nama: null, pemilik_kode_sp: null, tanggal_masuk: "2026-01-01", diam_hari: 0, fu_berikutnya: null, nilai_transaksi: null, no_sp: null,
     tanggal_sp: null, no_po: null, bayar_status: "BELUM", bayar_dp: null, tanggal_dp: null, tanggal_lunas: null,
     periksa: false, produk: [], ...sebagian,
   };
@@ -110,5 +110,13 @@ describe("csvOrder", () => {
     expect(baris[1]).toContain(";Roda 1.000 pcs;");
     expect(baris[1]).toContain(";1200000;DP;200000;;200000;1000000;");
     expect(baris[2]).toContain(";Belum dicatat;");
+  });
+
+  it("teks yang diawali = + - @ tidak dijalankan Excel sebagai formula; angka tetap angka", () => {
+    const csv = csvOrder([lead("L-00011", { pelanggan: "=HYPERLINK(\"x\")", kota: "+62", no_po: "@SUM(A1)", nilai_transaksi: 500 })]);
+    const b = csv.trim().split("\r\n")[1];
+    expect(b).toContain(`;"'=HYPERLINK(""x"")";'+62;`);
+    expect(b).toContain(";'@SUM(A1);");
+    expect(b).toContain(";500;");
   });
 });

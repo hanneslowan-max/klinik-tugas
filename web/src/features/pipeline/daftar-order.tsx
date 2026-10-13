@@ -32,7 +32,14 @@ type Props = {
 export function DaftarOrder({ leads, namaKategori, bisaUbah }: Props) {
   const { hariIni } = useProfil();
   const desktop = useDesktop();
+  // lead terakhir yang diubah tetap disimpan saat dialog tertutup: dialog tetap ter-mount supaya animasi tutup jalan dan
+  // fokus kembali ke tombol pensil
   const [ubah, setUbah] = useState<LeadRingkas | null>(null);
+  const [bukaUbah, setBukaUbah] = useState(false);
+  const mulaiUbah = (l: LeadRingkas) => {
+    setUbah(l);
+    setBukaUbah(true);
+  };
   const r = kelompokOrder(leads);
 
   const unduh = () => {
@@ -66,18 +73,18 @@ export function DaftarOrder({ leads, namaKategori, bisaUbah }: Props) {
         <section key={g.kunci} aria-label={g.label} className="space-y-2" data-uji="grup-order" data-bulan={g.kunci}>
           <KepalaGrup g={g} />
           {desktop ? (
-            <TabelOrder items={g.items} hariIni={hariIni} namaKategori={namaKategori} bisaUbah={bisaUbah} onUbah={setUbah} />
+            <TabelOrder items={g.items} hariIni={hariIni} namaKategori={namaKategori} bisaUbah={bisaUbah} onUbah={mulaiUbah} />
           ) : (
             <ul className="space-y-2">
               {g.items.map((l) => (
-                <KartuOrder key={l.id} lead={l} hariIni={hariIni} kategori={namaKategori(l.id)} bisaUbah={bisaUbah(l)} onUbah={setUbah} />
+                <KartuOrder key={l.id} lead={l} hariIni={hariIni} kategori={namaKategori(l.id)} bisaUbah={bisaUbah(l)} onUbah={mulaiUbah} />
               ))}
             </ul>
           )}
         </section>
       ))}
 
-      {ubah ? <DialogOrder buka ubahBuka={(b) => !b && setUbah(null)} lead={ubah} /> : null}
+      {ubah ? <DialogOrder key={ubah.id} buka={bukaUbah} ubahBuka={setBukaUbah} lead={ubah} /> : null}
     </div>
   );
 }
@@ -151,7 +158,18 @@ type PropsBaris = {
 function TabelOrder({ items, hariIni, namaKategori, bisaUbah, onUbah }: PropsBaris) {
   return (
     <div className="overflow-x-auto rounded-xl border">
-      <table className="w-full text-sm">
+      {/* table-fixed + colgroup: kolom sejajar di semua tabel bulan */}
+      <table className="w-full min-w-[52rem] table-fixed text-sm">
+        <colgroup>
+          <col className="w-[10%]" />
+          <col className="w-[16%]" />
+          <col className="w-[21%]" />
+          <col className="w-[16%]" />
+          <col className="w-[10%]" />
+          <col className="w-[12%]" />
+          <col className="w-[11%]" />
+          <col className="w-[4%]" />
+        </colgroup>
         <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
           <tr>
             <th className="px-3 py-2 font-medium whitespace-nowrap">Tgl SP</th>
@@ -173,10 +191,10 @@ function TabelOrder({ items, hariIni, namaKategori, bisaUbah, onUbah }: PropsBar
               <tr key={l.id} className="align-top hover:bg-muted/40" data-uji="baris-order" data-id={l.id}>
                 <td className="px-3 py-2 whitespace-nowrap tabular-nums">{l.tanggal_sp ? fmtTanggal(l.tanggal_sp, hariIni) : "—"}</td>
                 <td className="px-3 py-2">
-                  <div className="font-mono text-xs whitespace-nowrap">{l.no_sp || "—"}</div>
+                  <div className="font-mono text-xs break-all">{l.no_sp || "—"}</div>
                   {l.no_po ? <div className="text-xs text-muted-foreground">{labelPo(l.no_po)}</div> : null}
                 </td>
-                <td className="max-w-64 px-3 py-2">
+                <td className="px-3 py-2 break-words">
                   <Link href={`/pipeline/${encodeURIComponent(l.id)}`} className="font-medium hover:underline">
                     {l.pelanggan}
                   </Link>
@@ -191,8 +209,8 @@ function TabelOrder({ items, hariIni, namaKategori, bisaUbah, onUbah }: PropsBar
                     </Chip>
                   ) : null}
                 </td>
-                <td className="max-w-56 px-3 py-2 text-muted-foreground">{ringkasProduk(l.produk)}</td>
-                <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{l.pemilik_nama ?? "—"}</td>
+                <td className="px-3 py-2 break-words text-muted-foreground">{ringkasProduk(l.produk)}</td>
+                <td className="truncate px-3 py-2 text-muted-foreground">{l.pemilik_nama ?? "—"}</td>
                 <td className="px-3 py-2 text-right font-medium whitespace-nowrap tabular-nums">{rupiah(l.nilai_transaksi)}</td>
                 <td className="px-3 py-2 text-right">
                   <PilBayar lead={l} hariIni={hariIni} />
