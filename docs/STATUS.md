@@ -192,7 +192,7 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   mencocokkan PIC (bukan untuk peran 'baca'), produk & spesifikasi, No SP & No PO sebagian. Detail lead ORDER menampilkan No SP,
   No PO, nominal, pembayaran + tombol Data order. Migrasi `20261013150000_pipeline_order` (kolom lead baru, trigger, redefinisi
   `j_pipeline_lead` / `j_pipeline_lead_ringkas` / `inti_pipeline_daftar` — field hanya bertambah —, `web_pipeline_order_ubah`).
-  Tes: `uji/db/22_pipeline_order.sql` (42 cek), `web/src/features/pipeline/order.test.ts`, `web/tests/e2e/pipeline-order.spec.ts`.
+  Tes: `uji/db/22_pipeline_order.sql` (52 cek), `web/src/features/pipeline/order.test.ts`, `web/tests/e2e/pipeline-order.spec.ts`.
   **Terapkan ke produksi bersama migrasi lain, SEBELUM merge.**
 - **Hak Pipeline dirapikan (13 Okt, migrasi `20261013121000_pipeline_hak_ketat`).** Sejak PR #8 tes DB 01/09/16 merah
   (CI tidak menjalankan `uji/db`, jadi tak terlihat di PR): hak bawaan Supabase memberi service_role hak tulis langsung ke
@@ -205,7 +205,7 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   **Terapkan ke produksi bersama migrasi kategori, SEBELUM merge.** Semua `uji/db` hijau. Catatan: `11_x` merah bila dijalankan
   sesudah e2e `papan-saya.spec.ts` di DB yang sama (kartu uji yang di-soft-delete menambah hitungan list "Latihan Uji");
   jalankan `uji/db` sebelum e2e atau sesudah `supabase db reset`.
-- **Performa daftar Pipeline (13 Okt, revisi "loading terasa lambat", migrasi `20261014090000_pipeline_daftar_cepat`).**
+- **Performa daftar Pipeline (13 Okt, revisi "loading terasa lambat", migrasi `20261013170000_pipeline_daftar_cepat`).**
   `inti_pipeline_daftar` kini membangun semua baris dalam satu kueri set-based (`j_pipeline_lead_ringkas_banyak`), bukan
   `j_pipeline_lead_ringkas` per lead: lokal 2.053 lead 324–378 → 103–138 ms per muat/refetch. Kontrak JSON TIDAK berubah
   (keluaran lama vs baru identik), jadi bisa dipasang ke produksi sebelum/sesudah deploy web (manual oleh Hannes).
@@ -243,7 +243,7 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
 - **Tes:** `uji/db/20_notif_pisah.sql` (47 cek), `web/src/features/notif/dari.test.ts`, e2e
   `web/tests/e2e/notif-pisah.spec.ts` (HP + desktop; penerima uji Dodi supaya tidak mengganggu tes owner/Citra).
 
-## Revisi #2 gabungan (13 Okt 2026, branch `rev2` = `rev2-notif` + `rev-performa`, belum di-push)
+## Revisi #2 gabungan (13 Okt 2026, `rev2-notif` + `rev-performa`, sudah di branch `claude/trusting-bell-zz7ocs`)
 
 - **Isi:** notifikasi dipisah "Dari tim" / "Dari agent" (bagian di atas) + **muat halaman lebih cepat** (permintaan
   Hannes: "loading page di seluruh halaman agak slow"). `rev-performa` berbasis `claude/trusting-bell-zz7ocs`
@@ -260,7 +260,7 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
 - **Migrasi yang WAJIB diterapkan ke produksi SEBELUM merge ke `main`** (Hostinger langsung men-deploy `main`), urut,
   lewati yang sudah terpasang: `20261013120000_pipeline_kategori`, `20261013121000_pipeline_hak_ketat`,
   `20261013150000_pipeline_order`, `20261013160000_notif_pisah_agent` (tanpa ini `/notif` galat PGRST202),
-  `20261014090000_pipeline_daftar_cepat` (kontrak tidak berubah, urutan bebas, tapi ikutkan). Semuanya aditif; web lama
+  `20261013170000_pipeline_daftar_cepat` (kontrak tidak berubah, urutan bebas, tapi ikutkan). Semuanya aditif; web lama
   tetap jalan di atas DB baru. Cek sesudah terap: kueri `web_notif` / `web_notif_baca` di bagian notifikasi di atas.
 - **Hasil ukur** (lab lokal, BUKAN produksi: proxy latensi 60 ms per arah ke Supabase + 20 ms ke web, RTT 120/40 ms;
   HP = CPU 4× lebih lambat, unduh 10 Mbps; median 3×; sebelum = `2fabbcf` (basis cabang), sesudah = `rev-performa`
@@ -278,12 +278,21 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   TTFB ±335 → ±210 ms. Navigasi klien di HP: umpan balik sesudah ketuk ±160–460 → 5–14 ms (menu langsung aktif); cari
   `q=uji` 765 → 345 ms. JS per rute (brotli) turun 37–109 KB (`/t` 399 → 290 KB). DB daftar Pipeline (2.053 lead)
   324–378 → 103–138 ms. Belum diukur di produksi: bandingkan rasa muat di HP sesudah deploy.
-- **Tes gabungan `rev2`** (gabung tanpa konflik teks; satu penyesuaian: tab notifikasi memakai `gantiUrl`):
-  typecheck, lint, vitest (14 berkas, 87 tes), build hijau. e2e terhadap `next start` + Supabase lokal langsung, HP +
-  desktop: 90 lulus, 10 dilewati sengaja (khusus HP/desktop), `realtime.spec.ts` 2 gagal + 4 tidak jalan karena
-  Realtime tidak jalan lokal (`CHANNEL_ERROR`), bukan regresi. `uji/db`: 22 dari 23 berkas hijau (1.219 cek), termasuk
-  01/09/16 (hijau sejak `12a23ea`). `11_x` merah hanya karena kartu sisa `papan-saya.spec.ts` (soft delete, 9 kartu
-  dari putaran e2e sebelumnya) di DB bersama; lulus 74 cek bila kartu itu dibuang dulu dalam transaksi yang di-rollback.
+- **Tes gabungan** (gabung tanpa konflik teks; satu penyesuaian: tab notifikasi memakai `gantiUrl`). Verifikasi akhir
+  sesudah tinjauan (seperti CI): `supabase db reset` (semua migrasi dari nol + seed sintetis) → `uji/db` **23/23 berkas
+  hijau, 1.237 cek** (termasuk 11_x); typecheck, lint, vitest (14 berkas, 89 tes), build produksi hijau; e2e terhadap
+  `next start` + Supabase lokal, HP + desktop: **90 lulus, 10 dilewati sengaja** (khusus HP/desktop); `realtime.spec.ts`
+  lulus 6/6 sesudah stack lokal dijalankan ulang DENGAN Realtime (`supabase start` tanpa `-x realtime`).
+- **Tinjauan akhir (3 peninjau: keamanan, regresi, deploy) → diperbaiki:** (1) cadangan teks-polos markdown
+  (`lib/teks.ts`, kini jalan di server saat muat penuh `/t`) kuadratik — deskripsi ratusan KB bisa membekukan proses Node
+  Hostinger untuk semua pengguna → pola dibuat linear + baris > 2.000 karakter tidak diolah inline (tes waktu di
+  `teks.test.ts`); (2) login sesudah sesi hilang bisa sekilas menampilkan halaman akun lama dari cache router Next
+  (`staleTimes` 30 dtk) → `router.refresh()` saat layar masuk tampil; (3) dua tes `performa.spec.ts` bergantung pada lead
+  sisa di DB lokal (gagal di CI) → kini membuat lead ujinya sendiri; (4) kata cari Pipeline lama bisa "hidup lagi" sesudah
+  menu Pipeline diketuk → hanya ketikan pengguna yang ditulis ke URL (+ tes e2e); (5) header Pipeline owner melebar di HP
+  390 px → tombol membungkus; (6) migrasi `20261014090000_pipeline_daftar_cepat` bertanggal besok → diganti nama
+  `20261013170000_pipeline_daftar_cepat` (belum pernah diterapkan ke produksi). Tidak dikerjakan (catatan): batas panjang
+  deskripsi tugas di fungsi tulis DB (pertahanan berlapis untuk temuan 1).
 
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)
 Prasyarat dari Hannes: project Supabase baru `rhj-tugas` (akun/org baru, Sydney `ap-southeast-2` per keputusan 30/9, Free); env cloud `SUPABASE_ACCESS_TOKEN` (PAT akun baru) + `SUPABASE_PROJECT_REF`; `CLICKUP_API_TOKEN` (sudah ada); sesi baru supaya env terbaca. Semua langkah ke ClickUp **GET saja**. Tidak memakai MCP Supabase (itu ERP).

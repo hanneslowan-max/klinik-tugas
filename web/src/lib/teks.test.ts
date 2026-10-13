@@ -13,6 +13,7 @@ describe("teksPolosMarkdown (cadangan <Markdown> sebelum lib/markdown termuat)",
       "teks dan logo https://x.test/b",
     );
     expect(teksPolosMarkdown('[judul](https://contoh.test "Judul")')).toBe("judul");
+    expect(teksPolosMarkdown("[klik](javascript:alert(1)) ![x](data:x(1))")).toBe("klik x");
   });
 
   it("judul, kutipan, butir, pagar kode, garis", () => {
@@ -24,6 +25,22 @@ describe("teksPolosMarkdown (cadangan <Markdown> sebelum lib/markdown termuat)",
     expect(teksPolosMarkdown("nama_kolom_baru 2 * 3 * 4 = 24")).toBe("nama_kolom_baru 2 * 3 * 4 = 24");
     expect(teksPolosMarkdown("harga \\*bukan miring\\*")).toBe("harga *bukan miring*");
     expect(teksPolosMarkdown("Halo **tebal**\n\n<img src=x onerror=alert(1)>")).toBe("Halo tebal\n\n<img src=x onerror=alert(1)>");
+  });
+
+  it("waktu linear untuk masukan jahat (jalan di server pada muat penuh /t): 300 KB tiap pola < 300 ms", () => {
+    const jahat = [" **x", " __x", " ~~x", " *x", " _x", "[a", "![a](", "[a](b(", "[a]((", "`a", "# a", "> a"];
+    for (const potong of jahat) {
+      for (const md of [potong.repeat(75_000), `${potong.repeat(400)}\n`.repeat(190)]) {
+        const t0 = performance.now();
+        teksPolosMarkdown(md);
+        expect(performance.now() - t0, `pola ${JSON.stringify(potong)}`).toBeLessThan(300);
+      }
+    }
+  });
+
+  it("baris sangat panjang tidak diolah inline (tetap utuh)", () => {
+    const panjang = `**a** ${"x".repeat(2100)}`;
+    expect(teksPolosMarkdown(panjang)).toBe(panjang);
   });
 
   it("kosong / null → string kosong", () => {

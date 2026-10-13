@@ -134,13 +134,22 @@ function KotakCari({ nilaiUrl, tulis }: { nilaiUrl: string; tulis: (q: string) =
   }
   const input = useRef<HTMLInputElement>(null);
   const tunda = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // hanya ketikan PENGGUNA yang boleh ditulis ke URL. Isian yang disamakan dari URL (navigasi, Kembali) tidak pernah
+  // ditulis balik — kalau tidak, kata lama bisa "hidup lagi" 300 ms sesudah menu Pipeline diketuk (update setIsi yang
+  // sama nilainya ditahan React lalu diputar ulang sesudah render transisi navigasi).
+  const diketik = useRef(false);
   const kirim = useEffectEvent(() => {
+    if (!diketik.current) return;
+    diketik.current = false;
     const q = isi.trim();
     if (q === nilaiUrl.trim()) return;
     setJejak((j) => ({ ...j, tertulis: q }));
     tulis(q);
   });
-  const buang = useEffectEvent(() => setIsi(nilaiUrl));
+  const buang = useEffectEvent(() => {
+    diketik.current = false;
+    if (isi !== nilaiUrl) setIsi(nilaiUrl);
+  });
   useEffect(() => {
     const t = setTimeout(() => {
       tunda.current = undefined;
@@ -187,7 +196,10 @@ function KotakCari({ nilaiUrl, tulis }: { nilaiUrl: string; tulis: (q: string) =
       <Input
         ref={input}
         value={isi}
-        onChange={(e) => setIsi(e.target.value)}
+        onChange={(e) => {
+          diketik.current = true;
+          setIsi(e.target.value);
+        }}
         placeholder="Cari perusahaan, PIC, produk, No SP/PO, kode lead"
         className="pl-9"
         aria-label="Cari lead"
@@ -374,7 +386,7 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
             </Link>
           ))}
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {owner ? (
             <Button asChild variant="outline">
               <Link href="/admin/pipeline" data-uji="tautan-akses-pipeline">

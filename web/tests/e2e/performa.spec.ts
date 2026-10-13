@@ -56,6 +56,20 @@ function beriAksesPipeline(member: number, peran: "admin" | "rep" | "baca"): () 
   };
 }
 
+/**
+ * Lead uji milik owner ("PT Sumber Uji Performa": tes mengetik "P" → "PT" → "PT S" → "PT Su"). Seed sintetis tidak punya
+ * data Pipeline sama sekali, jadi tes yang butuh baris lead wajib membuatnya sendiri (CI memakai DB segar).
+ */
+function buatLeadUji(): () => void {
+  const akhir = Math.random().toString(36).slice(2, 10).padEnd(8, "0");
+  sqlLokal(
+    `insert into public.pelanggan (id, nama, kota) values ('pl${akhir}', 'PT Sumber Uji Performa', 'Gresik');` +
+      ` insert into public.lead (id, pelanggan_id, sumber, pemilik, tahap) values ('ld${akhir}', 'pl${akhir}', 'Google Ads', ${AKUN.owner.id}, 'PENAWARAN');` +
+      ` insert into public.lead_item (lead_id, produk, qty) values ('ld${akhir}', 'Roda', 3);`,
+  );
+  return () => sqlLokal(`delete from public.lead where id = 'ld${akhir}'; delete from public.pelanggan where id = 'pl${akhir}';`);
+}
+
 const tautanNav = (page: Page, href: string) =>
   diHp(page) ? page.locator(`nav[data-uji="nav-bawah"] a[href="${href}"]`) : page.locator(`aside a[href="${href}"]`);
 
@@ -202,6 +216,7 @@ test.describe("URL dangkal tanpa RSC (P7)", () => {
 
   test("Pipeline: ketik cari lalu langsung ketuk baris (RSC lambat) → detail tetap terbuka; Kembali memulihkan cari", async ({ page }) => {
     const bersih = beriAksesPipeline(AKUN.owner.id, "admin");
+    const bersihLead = buatLeadUji();
     try {
       await masuk(page, AKUN.owner.email);
       await page.goto("/pipeline");
@@ -236,12 +251,14 @@ test.describe("URL dangkal tanpa RSC (P7)", () => {
       await expect(page).toHaveURL(/\/pipeline\?q=PT\+Su&tab=penawaran&v=papan$/);
       await expect(cari).toHaveValue("PT Su");
     } finally {
+      bersihLead();
       bersih();
     }
   });
 
   test("Pipeline & Cari: ketuk menu aktif = isian ikut URL (kosong), daftar tidak tersaring", async ({ page }) => {
     const bersih = beriAksesPipeline(AKUN.owner.id, "admin");
+    const bersihLead = buatLeadUji();
     try {
       await masuk(page, AKUN.owner.email);
       await page.goto("/pipeline");
@@ -256,6 +273,19 @@ test.describe("URL dangkal tanpa RSC (P7)", () => {
       await expect(cari).toHaveValue("");
       await expect(baris.first()).toBeVisible();
       await page.waitForTimeout(500); // debounce kotak cari tidak menulis kata lama kembali
+      await expect(page).toHaveURL(/\/pipeline$/);
+      await expect(cari).toHaveValue("");
+
+      // kata lama tidak boleh "hidup lagi": ?q=PT → detail → Kembali → langsung ketuk menu Pipeline (< debounce 300 ms)
+      await cari.fill("PT");
+      await expect(page).toHaveURL(/\/pipeline\?q=PT$/);
+      await baris.first().click();
+      await expect(page).toHaveURL(/\/pipeline\/ld/);
+      await page.goBack();
+      await expect(cari).toHaveValue("PT");
+      await tautanNav(page, "/pipeline").click();
+      await expect(page).toHaveURL(/\/pipeline$/);
+      await page.waitForTimeout(700);
       await expect(page).toHaveURL(/\/pipeline$/);
       await expect(cari).toHaveValue("");
 
@@ -274,6 +304,7 @@ test.describe("URL dangkal tanpa RSC (P7)", () => {
       await expect(page.getByRole("combobox", { name: "Space" })).toHaveText("Semua space");
       await expect(page.getByTestId("baris-tugas")).toHaveCount(0);
     } finally {
+      bersihLead();
       bersih();
     }
   });

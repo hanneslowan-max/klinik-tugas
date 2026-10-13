@@ -4,7 +4,10 @@
 // Cache TanStack dibuang saat layar ini tampil DAN sesudah masuk: sesi yang dicabut/kedaluwarsa di tengah jalan membuat
 // proxy mengalihkan navigasi klien ke /masuk di dokumen yang sama (tanpa muat ulang, tanpa useKeluar), sehingga cache
 // masih berisi data akun sebelumnya — dan initialData akun baru (profil, akses Pipeline dari layout) hanya dipakai
-// bila cache kosong.
+// bila cache kosong. Hal yang sama berlaku untuk cache router Next (staleTimes.dynamic 30 dtk menyimpan payload RSC berisi
+// data awal akun lama): cache router dibuang SAAT LAYAR INI TAMPIL (router.refresh menaikkan versi cache), jauh sebelum
+// tombol Masuk ditekan — router.replace sesudah masuk tidak lagi menemukan payload akun lama, tanpa perlu muat ulang
+// dokumen penuh.
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
@@ -29,7 +32,10 @@ export function FormMasuk({ lanjut }: { lanjut: string | null }) {
   const [galat, setGalat] = useState<string | null>(null);
   const [sibuk, setSibuk] = useState(false);
   const [lihat, setLihat] = useState(false);
-  useEffect(() => qc.clear(), [qc]);
+  useEffect(() => {
+    qc.clear();
+    router.refresh();
+  }, [qc, router]);
 
   async function kirim(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();

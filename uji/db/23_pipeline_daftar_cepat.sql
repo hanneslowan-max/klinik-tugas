@@ -1,4 +1,4 @@
--- 23 · Performa daftar Pipeline (20261014090000_pipeline_daftar_cepat): j_pipeline_lead_ringkas_banyak WAJIB berbentuk
+-- 23 · Performa daftar Pipeline (20261013170000_pipeline_daftar_cepat): j_pipeline_lead_ringkas_banyak WAJIB berbentuk
 -- sama dengan j_pipeline_lead_ringkas, dan web_pipeline_daftar versi set-based WAJIB identik (jsonb =) dengan versi
 -- lama (20261013150000) pada volume seperti produksi (±2.000 lead) untuk admin (owner), rep, dan baca — semua tab
 -- utama, pencarian, dan saringan pemilik. Pembantu baru tidak boleh dipanggil role API.

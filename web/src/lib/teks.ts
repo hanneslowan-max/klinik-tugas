@@ -65,27 +65,37 @@ export function warnaAman(w: unknown): string | null {
  * pagar kode, garis ---) dibuang, [teks](url) / ![alt](url) → teks / alt, butir "- " / "* " → "• ". Dipakai <Markdown>
  * selama lib/markdown belum termuat (HTML server muat penuh /t, hidrasi): pembaca tidak melihat sintaks mentah sebelum
  * format diterapkan. Heuristik ringan (fungsi murni, sama di server & klien): bukan pengurai markdown lengkap.
+ *
+ * Dijalankan di SERVER pada muat penuh /t (satu proses Node untuk semua pengguna) → waktu kerjanya wajib linear: isi
+ * penekanan tidak boleh melewati karakter tandanya sendiri ([^*\n] dst.), jadi tiap pembuka hanya memindai sampai tanda
+ * berikutnya (pola .*? dulu kuadratik: 320 KB "  **x" berulang = 18 dtk), dan baris > BATAS_BARIS karakter tidak
+ * diolah inline sama sekali (tetap tampil sebagai teks).
  */
+const BATAS_BARIS = 2000;
+
 export function teksPolosMarkdown(md: string | null | undefined): string {
   if (!md) return "";
   return md
     .split("\n")
     .filter((b) => !/^\s{0,3}(```|~~~)/.test(b) && !/^\s{0,3}([-*_])(\s*\1){2,}\s*$/.test(b))
     .map((b) =>
-      b
+      b.length > BATAS_BARIS
+        ? b
+        : b
         // karakter ber-escape (\*, \_, …) disimpan sementara di area pakai-pribadi supaya tidak dianggap tanda sintaks
         .replace(/\\([\\`*_{}[\]()#+\-.!~|>])/g, (_, c: string) => String.fromCharCode(0xe000 + c.charCodeAt(0)))
         .replace(/^\s{0,3}#{1,6}\s+(.*?)(\s+#+)?\s*$/, "$1")
         .replace(/^(\s{0,3}>\s?)+/, "")
         .replace(/^(\s*)[-*+]\s+/, "$1• ")
-        .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
-        .replace(/\[([^\]]+)\]\([^)\s]*(\s+"[^"]*")?\)/g, "$1")
+        // URL boleh memuat satu tingkat kurung, mis. (javascript:alert(1)); alternatif saling lepas → tetap linear
+        .replace(/!\[([^[\]]*)\]\((?:[^()]|\([^()]*\))*\)/g, "$1")
+        .replace(/\[([^[\]]+)\]\((?:[^()\s]|\([^()\s]*\))*(\s+"[^"]*")?\)/g, "$1")
         .replace(/`([^`]+)`/g, "$1")
-        .replace(/\*\*(?=\S)(.*?\S)\*\*/g, "$1")
-        .replace(/(^|\W)__(?=\S)(.*?\S)__(?!\w)/g, "$1$2")
-        .replace(/~~(?=\S)(.*?\S)~~/g, "$1")
-        .replace(/(^|[^*\w])\*(?=[^\s*])(.*?[^\s*])\*(?![*\w])/g, "$1$2")
-        .replace(/(^|\W)_(?=[^\s_])(.*?[^\s_])_(?!\w)/g, "$1$2")
+        .replace(/\*\*(?=[^\s*])([^*]*?[^\s*])\*\*/g, "$1")
+        .replace(/(^|\W)__(?=[^\s_])([^_]*?[^\s_])__(?!\w)/g, "$1$2")
+        .replace(/~~(?=[^\s~])([^~]*?[^\s~])~~/g, "$1")
+        .replace(/(^|[^*\w])\*(?=[^\s*])([^*]*?[^\s*])\*(?![*\w])/g, "$1$2")
+        .replace(/(^|\W)_(?=[^\s_])([^_]*?[^\s_])_(?!\w)/g, "$1$2")
         .replace(/[\ue000-\ue07f]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xe000)),
     )
     .join("\n");
