@@ -27,7 +27,12 @@ export function MetaTugas({ tugas: t, tampilList = false, tampilStatus = true }:
       <ChipDue tugas={t} />
       <ChipPrioritas prioritas={t.priority} />
       {t.comment_count ? (
-        <Chip nada="garis" title={t.last_comment_at ? `Komentar terakhir ${fmtRelatif(t.last_comment_at, hariIni)}` : undefined}>
+        // waktu relatif bergantung jam saat render: HTML server (data awal) bisa beda beberapa detik dengan hidrasi
+        <Chip
+          nada="garis"
+          title={t.last_comment_at ? `Komentar terakhir ${fmtRelatif(t.last_comment_at, hariIni)}` : undefined}
+          suppressHydrationWarning
+        >
           <MessageSquare aria-hidden />
           {t.comment_count}
           {t.last_comment_at ? ` · ${fmtRelatif(t.last_comment_at, hariIni)}` : ""}

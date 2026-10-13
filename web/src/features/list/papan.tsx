@@ -260,6 +260,7 @@ export function Papan({ data, tampak, tampilSelesai, adaFab }: Props) {
         </p>
       ) : null}
       <DndContext
+        id="papan-list"
         sensors={sensors}
         collisionDetection={deteksi}
         measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}

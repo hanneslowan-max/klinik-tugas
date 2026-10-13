@@ -173,6 +173,7 @@ export function PapanLead({ leads, papan }: Props) {
 
   return (
     <DndContext
+      id="papan-lead"
       sensors={sensors}
       collisionDetection={deteksi}
       onDragStart={mulai}

@@ -3,6 +3,7 @@
 // Tugas Saya: Telat · Hari ini · ≤3 hari kerja · Nanti · Tanpa due (web_tugas_saya). Bisa melihat anggota lain.
 // Dua tampilan (di URL ?v=board): Daftar (grup per tenggat) atau Papan (kolom per tenggat, seret untuk ubah tenggat).
 // ?m (anggota) & ?v dibaca di klien dan diganti dengan history.replaceState (gantiUrl): tanpa permintaan ke server.
+// `awal` = Tugas Saya milik sendiri dari server (hanya muat dokumen penuh, lib/data-awal.ts) → langsung tampil di HTML.
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, List, SquareKanban } from "lucide-react";
 import Link from "next/link";
@@ -19,6 +20,7 @@ import { PapanSaya } from "@/features/tugas-saya/papan-saya";
 import { rpc } from "@/lib/api/rpc";
 import { kunci } from "@/lib/kunci-query";
 import { klienBrowser } from "@/lib/supabase/client";
+import { opsiDataAwal, type DataAwal } from "@/lib/data-awal";
 import { fmtTanggal } from "@/lib/tanggal";
 import { gantiUrl } from "@/lib/url-dangkal";
 import { cn } from "@/lib/utils";
@@ -37,7 +39,7 @@ const TAB = [
   { board: true, label: "Papan", Ikon: SquareKanban, uji: "tab-board" },
 ] as const;
 
-export function LayarSaya() {
+export function LayarSaya({ awal }: { awal?: DataAwal<TugasSaya> }) {
   const { member } = useProfil();
   const idSaya = Number(member.id);
   const sp = useSearchParams();
@@ -58,6 +60,8 @@ export function LayarSaya() {
   const q = useQuery({
     queryKey: kunci.tugasSaya(bukanSaya ? target : null),
     queryFn: () => rpc(klienBrowser(), "web_tugas_saya", bukanSaya ? { p_member: target } : {}),
+    // data server hanya untuk kunci milik sendiri (argumen {} sama dengan ambilTugasSayaAwal)
+    ...opsiDataAwal(awal, !bukanSaya),
   });
 
   const judul = bukanSaya ? `Tugas ${q.data?.member?.username ?? ""}`.trim() : "Tugas Saya";

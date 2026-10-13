@@ -116,7 +116,15 @@ export function PapanSaya({ data }: { data: TugasSaya }) {
   }
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={mulai} onDragEnd={selesai} onDragCancel={() => setAktif(null)}>
+    // id stabil: id aria-describedby dnd-kit sama di HTML server (?v=board dengan data awal) dan saat hidrasi
+    <DndContext
+      id="papan-saya"
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      onDragStart={mulai}
+      onDragEnd={selesai}
+      onDragCancel={() => setAktif(null)}
+    >
       <div className="flex snap-x gap-3 overflow-x-auto overscroll-x-contain pb-2" data-uji="papan-saya">
         {KOLOM.map((k) => (
           <Kolom key={k.kunci} kol={k} tugas={peta[k.kunci]} />
