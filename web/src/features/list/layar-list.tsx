@@ -3,7 +3,6 @@
 // List: Daftar per status + Papan (Board) kanban (web_daftar). Filter & mode di URL (?v=board · a · s · d · selesai=1),
 // diperbarui dengan replaceState (tanpa entri riwayat, tanpa lompat gulir); tab Daftar ↔ Board membawa filter.
 // Board mengambil lebar penuh di desktop; tingginya = sisa layar di atas navigasi bawah HP.
-import { useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -29,13 +28,11 @@ import { DialogBuatTugas } from "@/features/tugas/dialog-buat-tugas";
 import { useUbahTugas } from "@/features/tugas/mutasi";
 import { statusToggle } from "@/features/tugas/util";
 import { GalatApi, pesanGalat } from "@/lib/api/galat";
-import { kunci } from "@/lib/kunci-query";
 import { cn } from "@/lib/utils";
 import type { Tugas } from "@/types/domain";
 
 export function LayarList({ listId }: { listId: string }) {
   const router = useRouter();
-  const qc = useQueryClient();
   const { member, hariIni, libur } = useProfil();
   const q = useSearchParams();
   const mode = bacaMode(q);
@@ -64,6 +61,8 @@ export function LayarList({ listId }: { listId: string }) {
     window.history.replaceState(null, "", urlList(listId, mode, { ...filter, ...ubah }));
   }
 
+  // Tombol tetap nonaktif sampai daftar terbaru tiba: mutateAsync baru selesai (berhasil maupun gagal) SESUDAH
+  // onSettled useUbahTugas memuat ulang daftar yang tampil — tanpa invalidasi kedua (itu web_daftar ke-2, +1 RTT).
   async function ubahSelesai(t: Tugas) {
     if (!list) return;
     try {
@@ -72,8 +71,6 @@ export function LayarList({ listId }: { listId: string }) {
     } catch (e) {
       toast.error(e instanceof GalatApi && e.konflik ? "Tugas sudah diubah orang lain. Daftar dimuat ulang." : pesanGalat(e));
     }
-    // tombol tetap nonaktif sampai daftar terbaru tiba (ikut muat ulang yang dipicu mutasi)
-    await qc.invalidateQueries({ queryKey: kunci.daftar(listId, termasukSelesai), exact: true }, { cancelRefetch: false });
   }
 
   const filterIsi = <FilterListIsi filter={filter} ubah={ubahFilter} statuses={statuses} />;

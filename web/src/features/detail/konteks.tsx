@@ -84,6 +84,14 @@ export function PenyediaDetail({ id, d, refetch, children }: Props) {
     return () => document.removeEventListener("visibilitychange", f);
   }, []);
 
+  // Data detail sesudah mutasi. mutateAsync baru selesai SESUDAH onSettled (segarkanTugas) memuat ulang web_detail,
+  // jadi cache sudah segar: memanggil muat() lagi = web_detail kedua (+1 RTT berurutan). Hanya bila pemuatan ulang
+  // itu gagal (entri masih basi) baru dimuat sekali lagi.
+  const dataSegar = useCallback(async () => {
+    const st = qc.getQueryState<DetailTugas>(kunci.detail(id));
+    return st?.data && !st.isInvalidated ? st.data : await muat();
+  }, [qc, id, muat]);
+
   async function ubah(body: BodyUbahTugas, pesan?: string) {
     try {
       await ubahTugas.mutateAsync({ id, versi: d.task.versi, body });
@@ -92,10 +100,10 @@ export function PenyediaDetail({ id, d, refetch, children }: Props) {
       toast.error(e instanceof GalatApi && e.konflik ? "Tugas sudah diubah orang lain. Data dimuat ulang." : pesanGalat(e), {
         duration: 5000,
       });
-      await muat();
+      await dataSegar();
       return false;
     }
-    const baru = await muat();
+    const baru = await dataSegar();
     if (baru && !baru.task.selesai && baru.peringatan.beban_lebih.length && ("assignees" in body || "due" in body)) {
       toast.warning(
         `Peringatan B5: ${baru.peringatan.beban_lebih.join(", ")} punya lebih dari 7 kartu due pada ${fmtTanggal(baru.task.due_wib, hariIni)}.`,

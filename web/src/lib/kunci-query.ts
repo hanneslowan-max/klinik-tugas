@@ -18,12 +18,16 @@ export const kunci = {
   pipelineSaya: ["pipeline", "saya"] as const,
   pipelineDaftar: (tab: string, pemilik: number | null, q: string) =>
     ["pipeline", "daftar", tab, pemilik ?? "semua", q] as const,
+  /** akar semua varian daftar lead (tab/pemilik/cari) */
+  semuaPipelineDaftar: ["pipeline", "daftar"] as const,
   pipelineLead: (id: string) => ["pipeline", "lead", id] as const,
   pipelineRingkas: (bulan: string, dasar: string) => ["pipeline", "ringkas", bulan, dasar] as const,
+  /** akar semua varian ringkasan bulanan */
+  semuaPipelineRingkas: ["pipeline", "ringkas"] as const,
   /** daftar akses modul Pipeline (layar admin owner) */
   pipelineAkses: ["pipeline", "akses"] as const,
   /** kategori papan pribadi + penempatan lead milik pengguna ini */
   pipelineKategori: ["pipeline", "kategori"] as const,
-  /** akar invalidasi untuk semua data lead/daftar/ringkasan sesudah mutasi */
+  /** akar semua data Pipeline (dipakai bila hak akses berubah; mutasi lead cukup daftar + ringkasan) */
   semuaPipeline: ["pipeline"] as const,
 };
