@@ -26,6 +26,14 @@ const nextConfig = {
   poweredByHeader: false,
   // server dev diakses lewat 127.0.0.1 (tes Playwright)
   allowedDevOrigins: ["127.0.0.1"],
+  experimental: {
+    // Cache router klien untuk halaman dinamis 30 dtk (bawaan 0): kembali ke tab utama yang baru dikunjungi lewat
+    // <Link> tidak perlu round-trip RSC lagi. Aman karena payload page (app) hanya berisi props dari URL; datanya
+    // dikelola TanStack Query di klien. SYARAT: setiap alur yang mengganti identitas pengguna (masuk, keluar,
+    // ganti password) WAJIB memanggil router.refresh() atau muat ulang penuh — itu membuang cache ini.
+    // Sengaja pendek (bukan 180): muat dokumen penuh bisa membawa data awal dari server.
+    staleTimes: { dynamic: 30 },
+  },
   async headers() {
     return [
       { source: "/:path*", headers: headerKeamanan },
