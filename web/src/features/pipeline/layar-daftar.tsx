@@ -8,7 +8,8 @@
 // disaring di klien di atas hasil cari server (saringan-lead).
 // Volume (±2.000 lead): baris dirender bertahap 50-50 (sentinel gulir + tombol cadangan) dengan batas per kunci daftar
 // yang bertahan saat Kembali dari detail; kotak cari terpisah (ketikan tidak merender ulang daftar); baris di-memo.
-// Papan (dnd-kit) dimuat malas: dipramuat saat ?v=papan aktif atau tombol Papan disentuh/difokus.
+// Papan (dnd-kit) dimuat malas: dipramuat saat ?v=papan aktif, saat senggang sesudah daftar tiba, atau tombol Papan
+// disentuh/difokus; gagal memuat → pesan + Coba lagi di tempat papan (muatKomponen).
 import { BarChart3, List, Plus, Search, ShieldCheck, SquareKanban } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -31,7 +32,8 @@ import { PilTahap } from "@/features/pipeline/pil-tahap";
 import { usePipelineDaftar, usePipelineKategori } from "@/features/pipeline/queries";
 import { opsiStatus, SaringanLead, tanggalSah } from "@/features/pipeline/saringan-lead";
 import { useProfil } from "@/features/profil/penyedia-profil";
-import { imporAman, pramuat } from "@/lib/impor-aman";
+import { pramuat, saatSenggang } from "@/lib/impor-aman";
+import { muatKomponen } from "@/lib/muat-komponen";
 import { gantiUrl } from "@/lib/url-dangkal";
 import { cn } from "@/lib/utils";
 import type { LeadRingkas } from "@/types/domain";
@@ -41,7 +43,7 @@ const TAMPILAN = [
   { papan: true, label: "Papan", Ikon: SquareKanban, uji: "tab-papan-lead" },
 ] as const;
 
-const PapanLead = dynamic(() => imporAman(() => import("@/features/pipeline/papan-lead")).then((m) => m.PapanLead), {
+const PapanLead = dynamic(() => muatKomponen(() => import("@/features/pipeline/papan-lead"), (m) => m.PapanLead, "papan"), {
   loading: () => <MemuatDaftar />,
 });
 const pramuatPapan = () => pramuat(() => import("@/features/pipeline/papan-lead"));
@@ -254,10 +256,6 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
   const tab = TAB_DAFTAR.find((t) => t.kunci === sp.get("tab"))?.kunci ?? "semua";
   const papan = sp.get("v") === "papan";
   const modeOrder = tab === "order";
-  // papan aktif → unduh chunk papan sejajar dengan data (bukan sesudah data tiba)
-  useEffect(() => {
-    if (papan) pramuatPapan();
-  }, [papan]);
   // nilai URL yang tidak sah untuk tab ini diabaikan (bukan mengosongkan daftar diam-diam)
   const stUrl = sp.get("st");
   const saringan: NilaiSaringan = {
@@ -295,6 +293,16 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
 
   const daftar = usePipelineDaftar({ tab, pemilik, q });
   const kategori = usePipelineKategori();
+  // papan aktif → unduh chunk papan sejajar dengan data (bukan sesudah data tiba); tampilan Daftar → pramuat saat
+  // senggang sesudah daftar tiba, supaya ketukan Papan pertama tidak menunggu (atau gagal karena sinyal putus) unduhan
+  const adaDaftar = Boolean(daftar.data);
+  useEffect(() => {
+    if (papan) {
+      pramuatPapan();
+      return;
+    }
+    return adaDaftar ? saatSenggang(pramuatPapan) : undefined;
+  }, [papan, adaDaftar]);
   const namaKategori = useMemo(() => new Map(kategori.data?.kategori.map((k) => [k.id, k.nama])), [kategori.data]);
   const kategoriLead = (id: string) => namaKategori.get(kategori.data?.posisi[id] ?? "");
   const { status: stSaring, dari: dariSaring, sampai: sampaiSaring } = saringan;

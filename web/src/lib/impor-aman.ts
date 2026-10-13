@@ -6,6 +6,8 @@
 // Penanda waktu muat ulang (sessionStorage) mencegah loop: gagal lagi dalam JEDA_MUAT_ULANG sesudah muat ulang (atau
 // sessionStorage tak tersedia) → galat dilempar. Penanda kedaluwarsa sendiri, jadi deploy berikutnya di tab yang sama
 // tetap dimuat ulang.
+// Komponen next/dynamic memakai muatKomponen (lib/muat-komponen): galat yang dilempar di sini diubah menjadi komponen
+// pemulih, karena React.lazy menyimpan penolakan loader selamanya.
 
 const PENANDA = "anvil:muat-ulang-chunk";
 const JEDA_MUAT_ULANG = 2 * 60_000;

@@ -3,7 +3,8 @@
 // List: Daftar per status + Papan (Board) kanban (web_daftar). Filter & mode di URL (?v=board · a · s · d · selesai=1),
 // diperbarui dengan replaceState (tanpa entri riwayat, tanpa lompat gulir); tab Daftar ↔ Board membawa filter.
 // Board mengambil lebar penuh di desktop; tingginya = sisa layar di atas navigasi bawah HP. Papan (dnd-kit) dan form
-// Tugas baru (zod + react-hook-form) dimuat malas dengan pramuat (papan aktif / tab disentuh; form saat senggang/FAB).
+// Tugas baru (zod + react-hook-form) dimuat malas dengan pramuat (papan aktif / senggang / tab disentuh; form saat
+// senggang/FAB).
 import { ChevronRight, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -29,6 +30,7 @@ import { DialogBuatTugas, pramuatFormBuatTugas, usePramuatFormBuatTugas } from "
 import { useUbahTugas } from "@/features/tugas/mutasi";
 import { statusToggle } from "@/features/tugas/util";
 import { GalatApi, pesanGalat } from "@/lib/api/galat";
+import { saatSenggang } from "@/lib/impor-aman";
 import { cn } from "@/lib/utils";
 import type { Tugas } from "@/types/domain";
 
@@ -56,10 +58,16 @@ export function LayarList({ listId }: { listId: string }) {
     [data, filter, idSaya, hariIni, libur],
   );
   const adaFab = Boolean(list?.boleh_ubah && !list.archived);
-  // papan aktif → chunk papan diunduh sejajar dengan web_daftar; form Tugas baru dipramuat saat senggang
+  // papan aktif → chunk papan diunduh sejajar dengan web_daftar; tampilan Daftar → papan dipramuat saat senggang sesudah
+  // daftar tiba (ketukan Papan pertama tidak menunggu / gagal karena sinyal putus); form Tugas baru juga saat senggang
+  const adaData = Boolean(data);
   useEffect(() => {
-    if (board) pramuatPapanList();
-  }, [board]);
+    if (board) {
+      pramuatPapanList();
+      return;
+    }
+    return adaData ? saatSenggang(pramuatPapanList) : undefined;
+  }, [board, adaData]);
   usePramuatFormBuatTugas(adaFab);
 
   function ubahFilter(ubah: Partial<FilterList>) {

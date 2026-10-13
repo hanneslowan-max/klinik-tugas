@@ -40,6 +40,14 @@ export function PenyediaProfil({ awal, liburAwal, children }: { awal: Profil; li
   });
   const { data: libur } = useQuery({ queryKey: KUNCI_LIBUR, queryFn: muatLibur, initialData: liburAwal, staleTime: 10 * 60_000 });
 
+  // Identitas berganti tanpa lewat layar masuk (mis. masuk akun lain di tab lain, lalu layout dirender ulang server /
+  // profil disegarkan): cache masih berisi data akun lama → jangan tampilkan apa pun, muat ulang penuh (seperti sesi
+  // habis) supaya seluruh cache terbuang.
+  const akunLain = Boolean(profil.member && awal.member && profil.member.id !== awal.member.id);
+  useEffect(() => {
+    if (akunLain) window.location.reload();
+  }, [akunLain]);
+
   // beri tahu bila mode aplikasi berubah (cermin ↔ utama) saat layar terbuka
   const modeLama = useRef(profil.mode);
   useEffect(() => {
@@ -62,7 +70,7 @@ export function PenyediaProfil({ awal, liburAwal, children }: { awal: Profil; li
     [profil, libur],
   );
 
-  if (!nilai) return null;
+  if (!nilai || akunLain) return null;
   return <Konteks.Provider value={nilai}>{children}</Konteks.Provider>;
 }
 

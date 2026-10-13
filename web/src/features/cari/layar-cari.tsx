@@ -51,12 +51,16 @@ export function LayarCari() {
   const struktur = useStruktur();
   const [teks, setTeks] = useState(q);
   const [pilihSpace, setPilihSpace] = useState(space || SEMUA);
-  // ?q/?space berubah (hasil Cari sendiri, ketuk menu Cari = /cari tanpa remount, Kembali/Maju) → isian ikut URL
-  const [dariUrl, setDariUrl] = useState({ q, space });
-  if (dariUrl.q !== q || dariUrl.space !== space) {
-    setDariUrl({ q, space }); // sesuaikan state saat render, bukan di efek
-    setTeks(q);
-    setPilihSpace(space || SEMUA);
+  // ?q/?space berubah dari LUAR (ketuk menu Cari = /cari tanpa remount, Kembali/Maju) → isian ikut URL. Gema hasil Cari
+  // sendiri dikenali dari `tertulis` (nilai yang terakhir ditulis/diikuti layar ini), jadi ketikan / pilihan space
+  // selagi pencarian menunggu tidak tertimpa saat hasilnya menulis URL.
+  const [jejak, setJejak] = useState({ q, space, tertulis: `${q}\n${space}` });
+  if (jejak.q !== q || jejak.space !== space) {
+    setJejak({ q, space, tertulis: `${q}\n${space}` }); // sesuaikan state saat render, bukan di efek
+    if (`${q}\n${space}` !== jejak.tertulis) {
+      setTeks(q);
+      setPilihSpace(space || SEMUA);
+    }
   }
   const [sibuk, setSibuk] = useState(false);
   const [galatKirim, setGalatKirim] = useState<string | null>(null);
@@ -81,6 +85,7 @@ export function LayarCari() {
     const sp = pilihSpace === SEMUA ? "" : pilihSpace;
     setGalatKirim(null);
     if (!kata) {
+      setJejak((j) => ({ ...j, tertulis: "\n" }));
       gantiUrl("/cari");
       return;
     }
@@ -94,6 +99,7 @@ export function LayarCari() {
       const tujuan = tujuanLangsung(kata, r);
       const u = new URLSearchParams({ q: kata });
       if (sp) u.set("space", sp);
+      setJejak((j) => ({ ...j, tertulis: `${kata}\n${sp}` }));
       if (tujuan) {
         // simpan kata kunci di riwayat dulu (tanpa render ulang) supaya tombol Kembali kembali ke hasil cari
         gantiUrl(`/cari?${u}`);

@@ -2,7 +2,7 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 
-import { pecahUrl } from "@/lib/teks";
+import { pecahUrl, teksPolosMarkdown } from "@/lib/teks";
 import { cn } from "@/lib/utils";
 
 // lib/markdown (markdown-it + DOMPurify, ±53 KB gz) dimuat MALAS: tidak ikut JS awal /t. Disimpan di tingkat modul
@@ -41,8 +41,9 @@ function langgananMarkdown(f: () => void) {
 /**
  * Markdown → HTML yang sudah disaring DOMPurify (html:false di markdown-it). Dirender KLIEN-SAJA: DOMPurify butuh
  * DOM (di server ia tak bisa menyaring). HTML server, hidrasi pertama, dan selama lib/markdown belum termuat = teks
- * polos (node teks React, TANPA innerHTML); sesudahnya = HTML aman. Mount klien saat lib sudah termuat (navigasi)
- * langsung HTML tanpa kedipan.
+ * polos TANPA tanda sintaks (teksPolosMarkdown; node teks React, TANPA innerHTML) — pembaca tidak melihat
+ * "**tebal**" / "[teks](https://…)" mentah pada muat penuh /t; sesudahnya = HTML aman. Mount klien saat lib sudah
+ * termuat (navigasi) langsung HTML tanpa kedipan.
  */
 export function Markdown({ teks, className, ...rest }: { teks: string | null | undefined; className?: string; "data-uji"?: string }) {
   const md = useSyncExternalStore(
@@ -50,16 +51,17 @@ export function Markdown({ teks, className, ...rest }: { teks: string | null | u
     () => modMarkdown,
     () => null,
   );
-  const html = useMemo(() => (md ? md.htmlAman(teks) : ""), [md, teks]);
+  // md ada → HTML aman (DOMPurify); belum → teks polos tanpa tanda sintaks (dirender sebagai node teks)
+  const isi = useMemo(() => (md ? md.htmlAman(teks) : teksPolosMarkdown(teks)), [md, teks]);
   if (!md) {
     return (
       <div className={cn("md break-words whitespace-pre-wrap", className)} data-uji={rest["data-uji"]}>
-        {teks ?? ""}
+        {isi}
       </div>
     );
   }
   // isi sudah disanitasi DOMPurify (lib/markdown.ts)
-  return <div className={cn("md", className)} data-uji={rest["data-uji"]} dangerouslySetInnerHTML={{ __html: html }} />;
+  return <div className={cn("md", className)} data-uji={rest["data-uji"]} dangerouslySetInnerHTML={{ __html: isi }} />;
 }
 
 /** Teks polos dengan URL http(s) menjadi tautan (tanpa innerHTML). */

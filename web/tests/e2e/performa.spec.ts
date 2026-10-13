@@ -299,6 +299,34 @@ test.describe("URL dangkal tanpa RSC (P7)", () => {
     await expect(page).toHaveURL(new RegExp(`${tujuan}$`));
   });
 
+  test("Cari: ketikan & pilihan space selagi pencarian menunggu tidak tertimpa saat hasilnya menulis URL", async ({ page }) => {
+    await masuk(page, AKUN.owner.email);
+    await tautanNav(page, "/cari").click();
+    await expect(page).toHaveURL(/\/cari$/);
+    await page.route(/\/rest\/v1\/rpc\/web_cari/, async (route) => {
+      await new Promise((r) => setTimeout(r, 1500));
+      await route.fallback();
+    });
+    const kata = page.getByLabel("Kata kunci");
+    const space = page.getByRole("combobox", { name: "Space" });
+    await kata.fill("uji");
+    await page.getByTestId("tombol-cari").click();
+    await expect(page.getByTestId("tombol-cari")).toHaveText("Mencari…");
+    await kata.fill("uji ringkasan"); // lanjut mengetik selagi menunggu
+    await space.click();
+    await page.getByRole("option", { name: "Ruang Uji B" }).click();
+    await expect(page).toHaveURL(/\/cari\?q=uji$/);
+    await expect(page.getByTestId("tombol-cari")).toHaveText("Cari");
+    await expect(page.getByTestId("baris-tugas").first()).toBeVisible();
+    await expect(kata).toHaveValue("uji ringkasan");
+    await expect(space).toHaveText("Ruang Uji B");
+    // perubahan URL dari luar tetap diikuti: ketuk menu Cari → isian kosong
+    await tautanNav(page, "/cari").click();
+    await expect(page).toHaveURL(/\/cari$/);
+    await expect(kata).toHaveValue("");
+    await expect(space).toHaveText("Semua space");
+  });
+
   test("muat langsung dengan parameter URL tampil benar", async ({ page }) => {
     await masuk(page, AKUN.owner.email);
     await page.goto(`/saya?m=${AKUN.citra.id}&v=board`);
@@ -311,6 +339,18 @@ test.describe("URL dangkal tanpa RSC (P7)", () => {
     await expect(page.getByTestId("baris-tugas").first()).toBeVisible();
   });
 });
+
+/** Teks kartu akun + menu (sidebar desktop / Lembar Menu HP). */
+async function teksMenuAkun(page: Page) {
+  if (!diHp(page)) return page.locator("aside").innerText();
+  await page.getByTestId("tombol-menu").click();
+  const t = await page.getByRole("dialog").innerText();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toBeHidden();
+  return t;
+}
+
+const idBarisTugas = (page: Page) => page.locator("[data-uji=baris-tugas]").evaluateAll((els) => els.map((e) => e.getAttribute("data-id")));
 
 test("keluar lalu masuk akun lain di tab yang sama: tidak ada data akun lama (P11/P14)", async ({ page }) => {
   const hp = diHp(page);
@@ -328,18 +368,10 @@ test("keluar lalu masuk akun lain di tab yang sama: tidak ada data akun lama (P1
   await page.getByRole("button", { name: "Masuk", exact: true }).click();
   await expect(page).toHaveURL(/\/saya$/);
   await expect(page.getByText(/kartu terbuka/)).toBeVisible();
-  const kartuAkun = async () => {
-    if (!hp) return page.locator("aside").innerText();
-    await page.getByTestId("tombol-menu").click();
-    const t = await page.getByRole("dialog").innerText();
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog")).toBeHidden();
-    return t;
-  };
-  const akun = await kartuAkun();
+  const akun = await teksMenuAkun(page);
   expect(akun).toContain(AKUN.citra.email);
   expect(akun).not.toContain(AKUN.owner.email);
-  const idDiTab = await page.locator("[data-uji=baris-tugas]").evaluateAll((els) => els.map((e) => e.getAttribute("data-id")));
+  const idDiTab = await idBarisTugas(page);
 
   // kunjungan ulang lewat menu dalam 30 dtk (cache router) tetap data citra
   await tautanNav(page, "/cari").click();
@@ -347,13 +379,50 @@ test("keluar lalu masuk akun lain di tab yang sama: tidak ada data akun lama (P1
   await tautanNav(page, "/saya").click();
   await expect(page).toHaveURL(/\/saya$/);
   await expect(page.getByText(/kartu terbuka/)).toBeVisible();
-  const idSesudahNav = await page.locator("[data-uji=baris-tugas]").evaluateAll((els) => els.map((e) => e.getAttribute("data-id")));
+  const idSesudahNav = await idBarisTugas(page);
 
   await page.reload();
   await expect(page.getByText(/kartu terbuka/)).toBeVisible();
-  const idSegar = await page.locator("[data-uji=baris-tugas]").evaluateAll((els) => els.map((e) => e.getAttribute("data-id")));
+  const idSegar = await idBarisTugas(page);
   expect(idDiTab).toEqual(idSegar);
   expect(idSesudahNav).toEqual(idSegar);
+});
+
+test("sesi hilang di tengah jalan (navigasi klien dialihkan ke /masuk), lalu masuk akun lain: tidak ada data akun lama", async ({
+  page,
+  context,
+}) => {
+  await masuk(page, AKUN.owner.email);
+  await expect(page.getByText(/kartu terbuka/)).toBeVisible();
+  expect(await teksMenuAkun(page)).toContain(AKUN.owner.email);
+  const idBudi = await idBarisTugas(page);
+  let muat = 0; // muat dokumen penuh
+  page.on("load", () => muat++);
+
+  // sesi dicabut (signOut global di perangkat lain / token dicabut): cookie hilang, dokumen tetap terbuka →
+  // navigasi klien dialihkan proxy ke /masuk di dokumen yang sama (tanpa useKeluar)
+  await context.clearCookies();
+  await tautanNav(page, "/cari").click();
+  await expect(page).toHaveURL(/\/masuk\?lanjut=%2Fcari$/);
+  await page.locator("#email").fill(AKUN.citra.email);
+  await page.locator("#password").fill(SANDI);
+  await page.getByRole("button", { name: "Masuk", exact: true }).click();
+  await expect(page).toHaveURL(/\/cari$/);
+  expect(muat).toBe(0);
+
+  const akun = await teksMenuAkun(page);
+  expect(akun).toContain(AKUN.citra.email);
+  expect(akun).not.toContain(AKUN.owner.email);
+  await tautanNav(page, "/saya").click();
+  await expect(page).toHaveURL(/\/saya$/);
+  await expect(page.getByText(/kartu terbuka/)).toBeVisible();
+  const idDiTab = await idBarisTugas(page);
+  expect(idDiTab).not.toEqual(idBudi);
+  expect(muat).toBe(0);
+
+  await page.reload();
+  await expect(page.getByText(/kartu terbuka/)).toBeVisible();
+  expect(idDiTab).toEqual(await idBarisTugas(page));
 });
 
 test("detail: dua simpan berturut-turut tanpa konflik palsu, web_detail 1× per simpan; toggle List web_daftar 1× (P13)", async ({ page }) => {
@@ -489,10 +558,16 @@ test.describe("data awal dari server pada muat dokumen penuh (P1)", () => {
     const id = buatKartu("Performa · sanitasi", { markdown: md });
     try {
       await masuk(page, AKUN.owner.email);
-      // HTML server: teks polos (DOMPurify tidak pernah jalan di server), tanpa elemen <img> mentah
+      // HTML server: teks polos (DOMPurify tidak pernah jalan di server), tanpa elemen <img> mentah, dan tanpa tanda
+      // sintaks markdown mentah ("**tebal**", "[biasa](https://…)") selama lib/markdown belum termuat
       const html = await (await page.request.get(`/t/${id}`, { headers: { "sec-fetch-dest": "document" } })).text();
       expect(html).toContain("Performa · sanitasi");
       expect(html).not.toMatch(/<img[^>]*src="?x/i);
+      const deskServer = html.match(/data-uji="desk-render"[^>]*>([^<]*)</)?.[1] ?? "";
+      expect(deskServer).toContain("Halo tebal");
+      expect(deskServer).toContain("biasa");
+      expect(deskServer).not.toContain("**");
+      expect(deskServer).not.toContain("](");
       await page.goto(`/t/${id}`);
       const desk = page.getByTestId("desk-render");
       await expect(desk.locator("strong")).toHaveText("tebal");
@@ -598,11 +673,13 @@ test.describe("version skew (P10)", () => {
     await expect(page.getByTestId("buat-tugas")).toBeVisible();
     expect(ditolak).toBeGreaterThan(0);
 
-    // masih 404 sesudah muat ulang → galat ditampilkan, TIDAK muat ulang lagi
+    // masih 404 sesudah muat ulang → pesan + Coba lagi di dalam lembar (layar list tetap), TIDAK muat ulang lagi
     await page.getByTestId("buat-tugas").click();
-    await expect(page.getByText("Terjadi kesalahan")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("dialog-buat-tugas").getByTestId("gagal-muat-bagian")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Terjadi kesalahan")).toHaveCount(0);
     await page.waitForTimeout(1000);
     expect(muat).toBe(2);
+    await page.keyboard.press("Escape");
 
     // penanda kedaluwarsa (deploy berikutnya, tab yang sama): muat ulang otomatis lagi, bukan layar galat
     await page.evaluate(() => sessionStorage.setItem("anvil:muat-ulang-chunk", String(Date.now() - 3 * 60_000)));
@@ -650,14 +727,68 @@ test.describe("version skew (P10)", () => {
     expect(muat).toBe(1);
     await page.keyboard.press("Escape");
 
-    // putus terus (offline sesaat): galat ditampilkan, TIDAK muat ulang, tanpa penanda
+    // putus terus (offline sesaat): pesan + Coba lagi di dalam lembar (layar list tetap), TIDAK muat ulang, tanpa penanda
     putus = 99;
     await page.reload();
     await expect(page.getByTestId("buat-tugas")).toBeVisible();
     await page.getByTestId("buat-tugas").click();
-    await expect(page.getByText("Terjadi kesalahan")).toBeVisible({ timeout: 15_000 });
+    const gagalForm = page.getByTestId("dialog-buat-tugas").getByTestId("gagal-muat-bagian");
+    await expect(gagalForm).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Terjadi kesalahan")).toHaveCount(0);
     await page.waitForTimeout(1000);
     expect(muat).toBe(2);
     expect(await page.evaluate(() => sessionStorage.getItem("anvil:muat-ulang-chunk"))).toBeNull();
+
+    // jaringan pulih → Coba lagi memuat form tanpa muat ulang halaman; buka lagi → langsung form
+    putus = 0;
+    await gagalForm.getByRole("button", { name: "Coba lagi" }).click();
+    await expect(page.getByLabel("Nama tugas")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await page.getByTestId("buat-tugas").click();
+    await expect(page.getByLabel("Nama tugas")).toBeVisible();
+    expect(muat).toBe(2);
+  });
+
+  test("galat jaringan saat memuat chunk papan list: pesan di tempat papan, Coba lagi memulihkan tanpa muat ulang", async ({ page }) => {
+    test.skip(diHp(page), "cukup di desktop");
+    await masuk(page, AKUN.owner.email);
+    // unduhan chunk Papan list (dikenali dari isinya) diputus selama `putus`; HEAD dijawab 200 (chunk masih ada)
+    let putus = true;
+    let gagal = 0;
+    await page.route(/\/_next\/static\/chunks\/.*\.js$/, async (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      const res = await route.fetch();
+      const isi = await res.text();
+      if (putus && isi.includes("Papan dimuat ulang")) {
+        gagal++;
+        return route.abort("internetdisconnected");
+      }
+      return route.fulfill({ response: res, body: isi });
+    });
+    let muat = 0;
+    page.on("load", () => muat++);
+
+    await page.goto(`/l/${SEED.listApp}`);
+    await expect(page.getByTestId("baris-tugas").first()).toBeVisible();
+    await expect.poll(() => gagal, { timeout: 15_000 }).toBeGreaterThan(0); // pramuat saat senggang gagal (diam-diam)
+    await page.getByTestId("tab-board").click();
+    const gagalPapan = page.getByTestId("gagal-muat-bagian");
+    await expect(gagalPapan).toBeVisible({ timeout: 15_000 });
+    await expect(gagalPapan).toContainText("Gagal memuat papan");
+    // layar list tetap (tab tampilan masih ada), bukan layar galat
+    await expect(page.getByTestId("tab-board")).toBeVisible();
+    await expect(page.getByText("Terjadi kesalahan")).toHaveCount(0);
+
+    putus = false;
+    await gagalPapan.getByRole("button", { name: "Coba lagi" }).click();
+    await expect(page.getByTestId("papan")).toBeVisible();
+    await expect(gagalPapan).toHaveCount(0);
+
+    // pindah layar lalu kembali (tanpa muat ulang): papan langsung tampil
+    await tautanNav(page, "/jelajah").click();
+    await expect(page).toHaveURL(/\/jelajah$/);
+    await page.goBack();
+    await expect(page.getByTestId("papan")).toBeVisible();
+    expect(muat).toBe(1);
   });
 });
