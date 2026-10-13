@@ -457,6 +457,10 @@ test("sesi hilang di tengah jalan (navigasi klien dialihkan ke /masuk), lalu mas
 });
 
 test("detail: dua simpan berturut-turut tanpa konflik palsu, web_detail 1× per simpan; toggle List web_daftar 1× (P13)", async ({ page }) => {
+  // Yang diukur di sini hanya muat ulang dari jalur MUTASI. PenyimakRealtime juga memuat ulang detail/daftar saat
+  // perubahan milik sendiri dipantulkan balik (~400 ms), jadi di stack DENGAN Realtime (CI) hitungannya +1 dan tes
+  // ini merah walau P13 benar. Socket Realtime ditiru tanpa server: terbuka, tetapi tidak pernah mengirim perubahan.
+  await page.routeWebSocket(/\/realtime\/v1\//, () => {});
   const id = buatKartu("Performa · simpan berurutan");
   try {
     await masuk(page, AKUN.owner.email);
