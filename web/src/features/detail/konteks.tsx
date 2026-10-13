@@ -13,15 +13,18 @@ import { aturTahanan } from "@/features/realtime/tahanan";
 import { segarkanTugas, useUbahTugas, type BodyUbahTugas } from "@/features/tugas/mutasi";
 import { GalatApi, pesanGalat } from "@/lib/api/galat";
 import { rpc } from "@/lib/api/rpc";
+import { opsiDataAwal, type DataAwal } from "@/lib/data-awal";
 import { kunci } from "@/lib/kunci-query";
 import { klienBrowser } from "@/lib/supabase/client";
 import { fmtTanggal } from "@/lib/tanggal";
 import type { DetailTugas } from "@/types/domain";
 
-export function useDataDetail(id: string) {
+/** `awal` = web_detail dari server (hanya muat dokumen penuh, lib/data-awal.ts). */
+export function useDataDetail(id: string, awal?: DataAwal<DetailTugas>) {
   return useQuery({
     queryKey: kunci.detail(id),
     queryFn: () => rpc(klienBrowser(), "web_detail", { p_task: id }),
+    ...opsiDataAwal(awal),
     // diganti penyegaran sendiri di PenyediaDetail (menunggu pengguna selesai mengedit)
     refetchOnWindowFocus: false,
   });

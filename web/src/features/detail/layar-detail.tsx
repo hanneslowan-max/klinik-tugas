@@ -21,6 +21,8 @@ import { Subtugas } from "@/features/detail/subtugas";
 import { TabAktivitas, type TabDetail } from "@/features/detail/tab-aktivitas";
 import { BagianLampiran } from "@/features/lampiran/daftar-lampiran";
 import { GalatApi } from "@/lib/api/galat";
+import type { DataAwal } from "@/lib/data-awal";
+import type { DetailTugas } from "@/types/domain";
 
 function MemuatDetail() {
   return (
@@ -53,8 +55,8 @@ function LampiranDetail() {
   return <BagianLampiran taskId={id} lampiran={d.lampiran} bolehUbah={bolehUbah} onBerubah={segarkan} />;
 }
 
-export function LayarDetail({ id, tabAwal }: { id: string; tabAwal: TabDetail }) {
-  const q = useDataDetail(id);
+export function LayarDetail({ id, tabAwal, awal }: { id: string; tabAwal: TabDetail; awal?: DataAwal<DetailTugas> }) {
+  const q = useDataDetail(id, awal);
   const tidakAda = q.error instanceof GalatApi && q.error.tidakAda;
 
   if (!q.data || tidakAda) {

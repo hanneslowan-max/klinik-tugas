@@ -330,3 +330,74 @@ test("akses Pipeline dari server: menu di HTML untuk rep, tidak untuk tanpa akse
     bersih();
   }
 });
+
+test.describe("data awal dari server pada muat dokumen penuh (P1)", () => {
+  const POLA_HIDRASI = /Hydration|hydrat|#418|#425|did not match/i;
+
+  function catatGalat(page: Page) {
+    const galat: string[] = [];
+    page.on("console", (m) => {
+      if ((m.type() === "error" || m.type() === "warning") && POLA_HIDRASI.test(m.text())) galat.push(m.text());
+    });
+    page.on("pageerror", (e) => {
+      if (POLA_HIDRASI.test(e.message)) galat.push(e.message);
+    });
+    return galat;
+  }
+
+  test("HTML /saya memuat nama tugas; permintaan RSC tidak membawa data server", async ({ page }) => {
+    const id = buatKartu("Performa · kartu di HTML");
+    try {
+      await masuk(page, AKUN.owner.email);
+      const dok = await page.request.get("/saya", { headers: { "sec-fetch-dest": "document" } });
+      expect(await dok.text()).toContain("Performa · kartu di HTML");
+      const rsc = await page.request.get("/saya", { headers: { rsc: "1" } });
+      expect(await rsc.text()).not.toContain("Performa · kartu di HTML");
+      // ?m=… (anggota lain) tidak memakai data server
+      const lain = await page.request.get(`/saya?m=${AKUN.citra.id}`, { headers: { "sec-fetch-dest": "document" } });
+      expect(await lain.text()).not.toContain("Performa · kartu di HTML");
+    } finally {
+      hapusKartu(id);
+    }
+  });
+
+  test("nol galat hidrasi pada muat penuh /saya, /saya?v=board, dan /t (komentar < 1 menit)", async ({ page }) => {
+    const id = buatKartu("Performa · hidrasi", { markdown: "Deskripsi **tebal** dan [tautan](https://contoh.test)" });
+    try {
+      sebagai(AKUN.owner.id, `select public.web_komentar('${id}', 'komentar baru saja')`);
+      await masuk(page, AKUN.owner.email);
+      const galat = catatGalat(page);
+      for (const url of ["/saya", "/saya?v=board", `/t/${id}`]) {
+        await page.goto(url);
+        await page.waitForLoadState("networkidle");
+      }
+      await expect(page.getByTestId("isi-komentar").first()).toContainText("komentar baru saja");
+      await expect(page.getByTestId("desk-render").locator("strong")).toHaveText("tebal");
+      expect(galat).toEqual([]);
+    } finally {
+      hapusKartu(id);
+    }
+  });
+
+  test("deskripsi markdown tersaring (onerror/javascript:), tautan target=_blank rel=noopener", async ({ page }) => {
+    const md = "Halo **tebal**\n\n<img src=x onerror=alert(1)>\n\n[jahat](javascript:alert(1)) [biasa](https://contoh.test/a)";
+    const id = buatKartu("Performa · sanitasi", { markdown: md });
+    try {
+      await masuk(page, AKUN.owner.email);
+      // HTML server: teks polos (DOMPurify tidak pernah jalan di server), tanpa elemen <img> mentah
+      const html = await (await page.request.get(`/t/${id}`, { headers: { "sec-fetch-dest": "document" } })).text();
+      expect(html).toContain("Performa · sanitasi");
+      expect(html).not.toMatch(/<img[^>]*src="?x/i);
+      await page.goto(`/t/${id}`);
+      const desk = page.getByTestId("desk-render");
+      await expect(desk.locator("strong")).toHaveText("tebal");
+      await expect(desk.locator("[onerror]")).toHaveCount(0);
+      await expect(desk.locator('a[href^="javascript:"]')).toHaveCount(0);
+      const biasa = desk.locator('a[href="https://contoh.test/a"]');
+      await expect(biasa).toHaveAttribute("target", "_blank");
+      await expect(biasa).toHaveAttribute("rel", "noopener noreferrer");
+    } finally {
+      hapusKartu(id);
+    }
+  });
+});

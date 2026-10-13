@@ -1,14 +1,32 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 
 import { htmlAman } from "@/lib/markdown";
 import { pecahUrl } from "@/lib/teks";
 import { cn } from "@/lib/utils";
 
-/** Markdown → HTML yang sudah disaring DOMPurify (html:false di markdown-it). */
+const tanpaLangganan = () => () => {};
+
+/**
+ * Markdown → HTML yang sudah disaring DOMPurify (html:false di markdown-it). Dirender KLIEN-SAJA: DOMPurify butuh
+ * DOM (di server ia tak bisa menyaring). HTML server & hidrasi pertama = teks polos (node teks React, TANPA
+ * innerHTML), sesudah hidrasi = HTML aman. Mount klien biasa (navigasi) langsung HTML tanpa kedipan.
+ */
 export function Markdown({ teks, className, ...rest }: { teks: string | null | undefined; className?: string; "data-uji"?: string }) {
-  const html = useMemo(() => htmlAman(teks), [teks]);
+  const klien = useSyncExternalStore(
+    tanpaLangganan,
+    () => true,
+    () => false,
+  );
+  const html = useMemo(() => (klien ? htmlAman(teks) : ""), [klien, teks]);
+  if (!klien) {
+    return (
+      <div className={cn("md break-words whitespace-pre-wrap", className)} data-uji={rest["data-uji"]}>
+        {teks ?? ""}
+      </div>
+    );
+  }
   // isi sudah disanitasi DOMPurify (lib/markdown.ts)
   return <div className={cn("md", className)} data-uji={rest["data-uji"]} dangerouslySetInnerHTML={{ __html: html }} />;
 }

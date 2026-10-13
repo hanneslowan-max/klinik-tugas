@@ -84,7 +84,12 @@ function ItemLampiran({ a, bolehHapus, onHapus }: { a: Lampiran; bolehHapus: boo
         <div className="truncate text-sm font-medium" title={judul}>
           {judul}
         </div>
-        {sub ? <div className="text-xs text-muted-foreground">{sub}</div> : null}
+        {/* sub memuat waktu relatif (bergantung jam saat render: HTML server vs hidrasi) */}
+        {sub ? (
+          <div className="text-xs text-muted-foreground" suppressHydrationWarning>
+            {sub}
+          </div>
+        ) : null}
       </div>
       {a.storage_path ? (
         <Button asChild variant="outline" size="sm" className="pointer-coarse:min-w-11">
