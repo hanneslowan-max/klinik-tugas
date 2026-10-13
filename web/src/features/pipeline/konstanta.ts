@@ -3,7 +3,8 @@
 import type { VariantProps } from "class-variance-authority";
 
 import type { chipVariants } from "@/components/umum/chip";
-import type { AlasanBatal, JenisAktivitas, ProdukLead, SatuanItem, SumberLead, TahapLead } from "@/types/domain";
+import { fmtTanggal, selisihHari } from "@/lib/tanggal";
+import type { AlasanBatal, JenisAktivitas, ProdukLead, SatuanItem, StatusBayar, SumberLead, TahapLead } from "@/types/domain";
 
 export const PRODUK: ProdukLead[] = [
   "Roda", "Pallet Mesh", "Airport Trolley", "Shopping Cart",
@@ -36,6 +37,14 @@ export const TAHAP: Record<TahapLead, { label: string; nada: NadaChip }> = {
   DIALIHKAN: { label: "DIALIHKAN", nada: "biasa" },
 };
 
+/** Status pembayaran order (revisi #7). null = order lama yang status bayarnya belum dicatat. */
+export const BAYAR: Record<StatusBayar, { label: string; nada: NadaChip }> = {
+  BELUM: { label: "Belum bayar", nada: "telat" },
+  DP: { label: "DP", nada: "hari-ini" },
+  LUNAS: { label: "Lunas", nada: "sukses" },
+};
+export const BAYAR_BELUM_DICATAT = { label: "Belum dicatat", nada: "biasa" as NadaChip };
+
 /** Tab daftar "Lead saya" (§5). Kunci = nilai `tab` yang diterima web_pipeline_daftar. */
 export const TAB_DAFTAR = [
   { kunci: "semua", label: "Semua" },
@@ -43,23 +52,28 @@ export const TAB_DAFTAR = [
   { kunci: "diam", label: "Diam >7 hari" },
   { kunci: "pm", label: "Pallet Mesh" },
   { kunci: "penawaran", label: "Penawaran" },
+  { kunci: "order", label: "Order" },
 ] as const;
 
 export type KunciTab = (typeof TAB_DAFTAR)[number]["kunci"];
 
 export const ROMAWI = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"] as const;
 
+// Satu formatter untuk semua angka (keluaran identik dengan toLocaleString("id-ID")): toLocaleString membuat
+// formatter baru di setiap panggilan (±4× lebih lambat), terasa saat merender ribuan lead.
+const ANGKA = new Intl.NumberFormat("id-ID");
+
 /** 'Rp1.250.000' atau '—' bila kosong. */
 export function rupiah(n: number | null | undefined): string {
   if (n == null) return "—";
-  return `Rp${Number(n).toLocaleString("id-ID")}`;
+  return `Rp${ANGKA.format(Number(n))}`;
 }
 
 /** Ringkas daftar produk: 'Pallet Mesh · 40 unit' (produk pertama) + '+1' bila lebih. */
 export function ringkasProduk(items: { produk: string; qty: number; satuan: string }[]): string {
   if (!items.length) return "—";
   const [p, ...sisa] = items;
-  const utama = `${p.produk} · ${Number(p.qty).toLocaleString("id-ID")} ${p.satuan}`;
+  const utama = `${p.produk} · ${ANGKA.format(Number(p.qty))} ${p.satuan}`;
   return sisa.length ? `${utama} · +${sisa.length}` : utama;
 }
 
@@ -77,4 +91,11 @@ export function pratinjauNoSp(nomor: string, tanggalSp: string, kode: string | n
     tahun = tanggalSp.slice(0, 4);
   }
   return `${n || "—"}/${kode || "⟨kode SP belum diatur⟩"}/${bulan}/${tahun}`;
+}
+
+/** Status rencana follow-up relatif hari ini (tab "Follow up hari ini", daftar & papan). */
+export function infoFu(fu: string, hariIni: string): { teks: string; mendesak: boolean } {
+  if (fu < hariIni) return { teks: `FU telat ${selisihHari(fu, hariIni)} hr`, mendesak: true };
+  if (fu === hariIni) return { teks: "FU hari ini", mendesak: true };
+  return { teks: `FU ${fmtTanggal(fu, hariIni)}`, mendesak: false };
 }

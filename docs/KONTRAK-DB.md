@@ -62,7 +62,12 @@ Pegangan untuk agen Edge Function (`supabase/functions/api`), web (`web/`), dan 
 **Activity & notifikasi**
 - Selalu dibuat trigger A1, bukan fungsi A2.
 - Sumber: `api` untuk `api_*`, `ui` untuk `web_*`, `impor`/`sinkron` untuk `impor_*`.
-- Notifikasi hanya untuk `ui`/`api`.
+- Notifikasi hanya untuk `ui`/`api`. Kolom `notifications.sumber` (`ui`|`api`, null = baris lama tak terlacak) diisi trigger
+  BEFORE INSERT `notifications_sebelum` dari `sumber_aktif()` (migrasi `20261013160000_notif_pisah_agent`; baris lama diisi
+  mundur dari `activity` transaksi yang sama).
+- Asal notifikasi (revisi #2, satu pintu `notif_dari_agent(sumber, role)`, internal): **agent** bila pemicunya lewat token
+  API (`sumber = 'api'`: Edge `/api`, CLI `tugas.mjs`, routine, importer) **atau** aktornya role `bot`; selain itu **tim**.
+  Token API milik anggota manusia tetap dihitung agent (`lewat_api: true`). Bot tidak bisa login web, jadi tindakan bot selalu `api`.
 
 ## 2. Pembentuk JSON gaya ClickUp v2
 
@@ -413,8 +418,8 @@ Semua memanggil `mulai_web()`: wajib anggota aktif (`PT403 ACCESS_001` bila buka
 | `web_daftar(p_list text, p_include_closed boolean default false)` | `{"list":{id,name,space_id,folder_id,archived,tidak_ditagih,sumber,boleh_ubah,statuses},"tasks":[baris]}`. Tanpa terhapus dan arsip. Urut status → orderindex → terbaru. |
 | `web_detail(p_task text)` | Satu panggilan untuk layar detail. Rincian di bawah tabel. |
 | `web_cari(p_q text, p_space text default null)` | `{"hasil":[baris],"rujukan":{type,id,url}\|null}`, maks 50, termasuk kartu selesai. Pencocokan sama dengan `x_search`. (P6) `rujukan` terisi bila `q` = URL list/folder/space (bentuk §4 `x_resolve`) yang ada dan terlihat; `url` list = `<app>/l/<id>`, folder/space `null`. Layar Cari bisa langsung membuka wadahnya. |
-| `web_notif(p_limit integer default 50)` | `{"belum":6,"items":[{id,jenis,created_at,read_at,comment_id,"task":{id,name,deleted},"actor":{id,username,initials,color},"cuplikan":"120 huruf"}]}`, milik sendiri saja, terbaru dulu, maks 500. Kartu yang tertutup privasi: `task` = `{id,name:"(kartu di space privat)",deleted,tertutup:true}` dan `cuplikan` null (R2). |
-| `web_notif_baca(p_ids bigint[] default null)` | `{"dibaca":n}`. `null` = semua milik sendiri. |
+| `web_notif(p_limit integer default 50, p_dari text default null)` | `{"belum":6,"belum_tim":2,"belum_agent":4,"dari":null,"items":[{id,jenis,created_at,read_at,comment_id,"task":{id,name,deleted},"actor":{id,username,initials,color,role},"cuplikan":"120 huruf","dari":"tim"\|"agent","lewat_api":bool}]}`, milik sendiri saja, terbaru dulu, maks 500. `p_dari` `tim`/`agent` (huruf besar & spasi diabaikan) = hanya kelompok itu, limit dihitung per kelompok; null/kosong = semua (bentuk lama). Nilai lain → `PT400 INPUT_001`. `belum` = TOTAL (angka lonceng) = `belum_tim + belum_agent`, apa pun `p_dari`. Kartu yang tertutup privasi: `task` = `{id,name:"(kartu di space privat)",deleted,tertutup:true}` dan `cuplikan` null (R2). |
+| `web_notif_baca(p_ids bigint[] default null, p_dari text default null)` | `{"dibaca":n}`. `p_ids` null = semua milik sendiri; `p_dari` `tim`/`agent` = hanya kelompok itu (tab aktif); keduanya = irisan. |
 | `web_anggota()` | `[{id,username,nama,email,clickup_email,initials,color,role,aktif,punya_akun,harus_ganti_password,impor_clickup}]` |
 | `web_tenggat(p_tanggal date default null)` | Sama dengan `x_tenggat` (cakupan dari `app_settings`). |
 

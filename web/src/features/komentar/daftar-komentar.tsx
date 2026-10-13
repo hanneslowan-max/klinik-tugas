@@ -134,7 +134,8 @@ export function DaftarKomentar({ taskId, komentar, bolehKomentar, cermin, diSamp
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
             <strong className="text-sm font-semibold text-foreground">{nama}</strong>
-            <time dateTime={c.created_at} title={fmtWaktuPanjang(c.created_at)}>
+            {/* waktu relatif bergantung jam saat render (HTML server vs hidrasi bisa beda beberapa detik) */}
+            <time dateTime={c.created_at} title={fmtWaktuPanjang(c.created_at)} suppressHydrationWarning>
               {fmtRelatif(c.created_at, hariIni)}
             </time>
             {c.edited_at && !c.dihapus ? <span title={`Diubah ${fmtWaktuPanjang(c.edited_at)}`}>(diubah)</span> : null}

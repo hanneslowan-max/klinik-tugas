@@ -170,7 +170,129 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
 - **Perbaikan hasil cek (PR #9):** migrasi `20261012120000_pipeline_ringkas_v2` (win rate kohort umur ≥ 90 hari; omzet per rep via kode SP bila pemilik kosong; siklus tanpa tanggal SP tebakan) **sudah diterapkan ke produksi 12 Okt**; alat impor: SP + nilai → ORDER, `diam_sejak` lead impor = tanggal lead 12:00 WIB.
 - **Data:** 2.008 lead dari sheet s/d 12 Okt diimpor; per bulan Okt 2025–Okt 2026 lead & omzet (dasar tanggal lead) = sheet, selisih 0. 600 lead bertanda PERIKSA (data sheet tak lengkap).
 - **Akses:** Riksa (rep, RSG), Michael Eppy (rep, MCE), Yosie (baca; telepon & PIC disembunyikan). Owner implisit admin.
+- **Revisi #1 (13 Okt, branch `claude/trusting-bell-zz7ocs`): Papan kategori pribadi.** Layar Pipeline punya tombol
+  Daftar | Papan (`?v=papan`). Papan = kolom "Tanpa kategori" + kategori buatan pengguna SENDIRI (tambah, ganti nama,
+  geser kiri/kanan, hapus lewat menu ⋯; maks 30); lead diseret antar kolom seperti Papan Tugas Saya. Pribadi per
+  pengguna (keputusan Hannes): orang lain tidak melihat kategori/penempatan, dan tahap/pemilik/ringkasan lead TIDAK
+  berubah. Papan memuat semua lead sesuai saringan (keputusan Hannes), 30 kartu per kolom + "Tampilkan lagi". Tampilan
+  Daftar menampilkan chip nama kategori. Migrasi `20261013120000_pipeline_kategori` (tabel `pipeline_kategori` +
+  `pipeline_kategori_lead`, fungsi `web_pipeline_kategori` / `_simpan` / `_pindah`). **Terapkan migrasi ke produksi
+  (`bash alat/sql-proyek.sh --migrasi`) SEBELUM merge**: Hostinger langsung men-deploy `main`, dan tanpa migrasi
+  tampilan Papan galat (Daftar tetap jalan, hanya tanpa chip). Tes: `uji/db/19_pipeline_kategori.sql` (50 cek),
+  `web/tests/e2e/pipeline-papan.spec.ts`.
+- **Revisi #3–#7 (13 Okt): tab Order.** Chip "Order" di layar Pipeline (`?tab=order`): rekap (jumlah, nominal,
+  terbayar, sisa tagihan), order dikelompokkan per bulan SP (terbaru dulu, subtotal per bulan), tabel di desktop / kartu di HP,
+  tombol pensil → dialog **Data order** (nominal, nomor urut SP → No SP dibangun ulang dari tanggal SP, **No PO customer**
+  — kolom terpisah dari No SP, keputusan Hannes —, pembayaran **Belum bayar / DP / Lunas** dengan nominal DP & sisa tagihan,
+  tanggal DP/lunas, jejak siapa/kapan), **Unduh CSV** (pemisah `;` + BOM untuk Excel Indonesia). Hak ubah: rep pemilik +
+  admin (= `pipeline_boleh_ubah`); 'baca' melihat saja. Order yang sudah ada sebelum migrasi = status bayar **"Belum dicatat"**
+  (tidak diketahui; tidak dihitung sebagai piutang, bisa disaring & diisi bertahap); lead yang menjadi ORDER sesudahnya otomatis
+  "Belum bayar" (trigger). **Filter** (semua tab, di URL `st`/`dari`/`sampai`): status = status bayar di tab Order / tahap di tab
+  lain; tanggal = tanggal SP di tab Order / tanggal masuk di tab lain, dengan pintasan bulan. **Cari** (server) kini juga
+  mencocokkan PIC (bukan untuk peran 'baca'), produk & spesifikasi, No SP & No PO sebagian. Detail lead ORDER menampilkan No SP,
+  No PO, nominal, pembayaran + tombol Data order. Migrasi `20261013150000_pipeline_order` (kolom lead baru, trigger, redefinisi
+  `j_pipeline_lead` / `j_pipeline_lead_ringkas` / `inti_pipeline_daftar` — field hanya bertambah —, `web_pipeline_order_ubah`).
+  Tes: `uji/db/22_pipeline_order.sql` (52 cek), `web/src/features/pipeline/order.test.ts`, `web/tests/e2e/pipeline-order.spec.ts`.
+  **Terapkan ke produksi bersama migrasi lain, SEBELUM merge.**
+- **Hak Pipeline dirapikan (13 Okt, migrasi `20261013121000_pipeline_hak_ketat`).** Sejak PR #8 tes DB 01/09/16 merah
+  (CI tidak menjalankan `uji/db`, jadi tak terlihat di PR): hak bawaan Supabase memberi service_role hak tulis langsung ke
+  7 tabel + 4 sequence Pipeline, `web_pipeline_*` bisa dipanggil service_role, dan pembantu `pipeline_wr` /
+  `pipeline_akses_saya` bisa dipanggil role API. Sekarang fail-closed: tabel SELECT saja, sequence tertutup,
+  `web_pipeline_*` → authenticated, `x_pipeline_*` → service_role, `boleh_pipeline*` → authenticated (dipakai policy RLS),
+  pembantu lain internal. Tidak ada pemanggil yang bergantung pada hak yang dicabut (web/Edge/CLI hanya lewat fungsi; impor
+  berjalan sebagai postgres). Tes: 01 (+cek sequence service_role), 09 (jumlah `web_*` 47 → 48 sesudah tab Order, `api_/x_/impor_` 35), 16
+  (allowlist + 2 pembantu RLS Pipeline), baru `21_pipeline_hak.sql` (18 cek: hak + semua jalur aplikasi tetap jalan).
+  **Terapkan ke produksi bersama migrasi kategori, SEBELUM merge.** Semua `uji/db` hijau. Catatan: `11_x` merah bila dijalankan
+  sesudah e2e `papan-saya.spec.ts` di DB yang sama (kartu uji yang di-soft-delete menambah hitungan list "Latihan Uji");
+  jalankan `uji/db` sebelum e2e atau sesudah `supabase db reset`.
+- **Performa daftar Pipeline (13 Okt, revisi "loading terasa lambat", migrasi `20261013170000_pipeline_daftar_cepat`).**
+  `inti_pipeline_daftar` kini membangun semua baris dalam satu kueri set-based (`j_pipeline_lead_ringkas_banyak`), bukan
+  `j_pipeline_lead_ringkas` per lead: lokal 2.053 lead 324–378 → 103–138 ms per muat/refetch. Kontrak JSON TIDAK berubah
+  (keluaran lama vs baru identik), jadi bisa dipasang ke produksi sebelum/sesudah deploy web (manual oleh Hannes).
+  **Perawatan: field ringkas lead kini ada di DUA tempat** — `j_pipeline_lead_ringkas` (per lead) dan
+  `j_pipeline_lead_ringkas_banyak` (daftar); menambah/mengubah field = ubah KEDUANYA. Tes `uji/db/23_pipeline_daftar_cepat.sql`
+  (23 cek: bentuk sama untuk setiap lead, keluaran identik admin/rep/baca × tab/cari/pemilik pada ±2.000 lead, hak fungsi).
+  Sisi web (render bertahap 50 baris, kotak cari terpisah) tidak bergantung pada migrasi ini.
 - **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md`.
+
+## Notifikasi "Dari tim" / "Dari agent" (revisi #2, 13 Okt 2026, branch `rev2-notif`)
+
+- **Permintaan Hannes:** pisahkan notifikasi dari claude agent dan dari user. Layar `/notif` punya 2 tab: **Dari tim**
+  (bawaan) dan **Dari agent** (`/notif?dari=agent`). Tiap tab menampilkan angka belum dibaca dan memuat datanya sendiri
+  (100 terbaru per tab), jadi tab tim tidak terdesak oleh notifikasi agent. "Tandai semua dibaca" pindah ke bawah tab
+  dan hanya berlaku untuk tab aktif (judul "Notifikasi" di HP kini tidak lagi terdesak tombol). Lonceng dan badge menu
+  tetap TOTAL semua tab (tidak berubah).
+- **Aturan agent** (satu pintu SQL `notif_dari_agent`): aktor ber-role `bot` ("claude (agent)") ATAU tindakan pemicunya
+  lewat token API (`notifications.sumber = 'api'`: Edge `/api`, CLI, routine, importer) walau tokennya milik anggota
+  manusia. Kasus kedua diberi chip "lewat API". Selain itu masuk tab tim.
+- **Migrasi `20261013160000_notif_pisah_agent` (aditif):** kolom `notifications.sumber` + trigger pengisi + isi mundur dari
+  `activity`; `web_notif(p_limit, p_dari)` dan `web_notif_baca(p_ids, p_dari)`. Parameter baru opsional, JSON hanya
+  bertambah, jadi web lama, `web-lama/` dan uji lama tetap jalan. **Terapkan ke produksi (`bash alat/sql-proyek.sh
+  --migrasi`) SEBELUM merge**: web baru di atas DB lama membuat `/notif` galat (PGRST202); web lama di atas DB baru aman.
+  Sesudah terap, pastikan tepat satu `web_notif(integer,text)` dan satu `web_notif_baca(bigint[],text)`:
+  `select oid::regprocedure from pg_proc where proname in ('web_notif', 'web_notif_baca');`
+- **Konfirmasi data produksi** (baca-saja, SQL editor). Menurut catatan bootstrap (tabel sesi deploy & langkah 8), semua
+  token dibuat untuk bot. Bila ada token aktif milik anggota manusia yang dipakai orangnya sendiri, notifikasinya ikut
+  tab agent; aturan bisa diubah di `notif_dari_agent` tanpa migrasi data.
+  ```sql
+  select m.username, m.role, k.nama, k.scope, k.revoked_at is null as aktif, k.last_used_at
+    from api_tokens k join members m on m.id = k.member_id order by m.role, k.created_at;
+  select a.sumber, m.role, count(*) from activity a left join members m on m.id = a.actor_id
+   where a.sumber in ('ui', 'api') group by 1, 2 order by 1, 2;
+  ```
+- **Tes:** `uji/db/20_notif_pisah.sql` (47 cek), `web/src/features/notif/dari.test.ts`, e2e
+  `web/tests/e2e/notif-pisah.spec.ts` (HP + desktop; penerima uji Dodi supaya tidak mengganggu tes owner/Citra).
+
+## Revisi #2 gabungan (13 Okt 2026, `rev2-notif` + `rev-performa`, sudah di branch `claude/trusting-bell-zz7ocs`)
+
+- **Isi:** notifikasi dipisah "Dari tim" / "Dari agent" (bagian di atas) + **muat halaman lebih cepat** (permintaan
+  Hannes: "loading page di seluruh halaman agak slow"). `rev-performa` berbasis `claude/trusting-bell-zz7ocs`
+  (`2fabbcf`), jadi tab Order + hak Pipeline ketat ikut masuk. Penyebab utama lambat: tiap layar baru menampilkan data
+  sesudah JS selesai dimuat lalu menunggu beberapa putaran klien ke Supabase (Sydney; pengguna di Indonesia).
+- **Perubahan performa (web):** Tugas Saya (`/saya`) dan detail tugas (`/t`) dibaca di server saat muat dokumen penuh
+  (data ikut di HTML); layout `(app)` membaca profil, hari libur, dan akses Pipeline bersamaan; preconnect ke Supabase;
+  umpan balik instan saat tautan diketuk (`useLinkStatus`); tab/filter yang hanya mengubah `?query` tanpa round-trip
+  server (`lib/url-dangkal.ts`, kini juga dipakai tab notifikasi); cache router 30 dtk (`staleTimes.dynamic`) +
+  `gcTime` TanStack 30 mnt; refetch ganda sesudah mutasi dihapus; impor subpath `radix-ui` (barrel dilarang eslint);
+  form buat tugas, papan dnd-kit, dan markdown dimuat saat perlu + pramuat saat idle; gagal muat potongan JS → pesan
+  lokal + "Coba lagi" (`lib/muat-komponen.tsx`), bukan layar galat; daftar Pipeline dirender bertahap 50 baris. Hasil
+  review: cache TanStack dibuang di layar masuk dan bila akun berganti (data akun lama tidak tampil sesudah sesi habis).
+- **Migrasi yang WAJIB diterapkan ke produksi SEBELUM merge ke `main`** (Hostinger langsung men-deploy `main`), urut,
+  lewati yang sudah terpasang: `20261013120000_pipeline_kategori`, `20261013121000_pipeline_hak_ketat`,
+  `20261013150000_pipeline_order`, `20261013160000_notif_pisah_agent` (tanpa ini `/notif` galat PGRST202),
+  `20261013170000_pipeline_daftar_cepat` (kontrak tidak berubah, urutan bebas, tapi ikutkan). Semuanya aditif; web lama
+  tetap jalan di atas DB baru. Cek sesudah terap: kueri `web_notif` / `web_notif_baca` di bagian notifikasi di atas.
+- **Hasil ukur** (lab lokal, BUKAN produksi: proxy latensi 60 ms per arah ke Supabase + 20 ms ke web, RTT 120/40 ms;
+  HP = CPU 4× lebih lambat, unduh 10 Mbps; median 3×; sebelum = `2fabbcf` (basis cabang), sesudah = `rev-performa`
+  P1–P14 sebelum perbaikan review, yang tidak mengubah JS awal rute). Konten nyata tampil, muat penuh cache dingin:
+
+  | halaman | HP sebelum → sesudah | desktop sebelum → sesudah |
+  |---|---|---|
+  | `/saya` | 2.374 → 468 ms | 1.141 → 298 ms |
+  | `/t/<id>` | 2.958 → 1.111 ms | 1.194 → 400 ms |
+  | `/l/<id>` | 2.968 → 2.190 ms | 1.245 → 960 ms |
+  | `/jelajah` | 2.587 → 1.782 ms | 1.043 → 838 ms |
+  | `/pipeline` | 2.747 → 2.354 ms | 1.399 → 944 ms |
+  | `/notif` | 2.263 → 1.848 ms | 1.059 → 849 ms |
+
+  TTFB ±335 → ±210 ms. Navigasi klien di HP: umpan balik sesudah ketuk ±160–460 → 5–14 ms (menu langsung aktif); cari
+  `q=uji` 765 → 345 ms. JS per rute (brotli) turun 37–109 KB (`/t` 399 → 290 KB). DB daftar Pipeline (2.053 lead)
+  324–378 → 103–138 ms. Belum diukur di produksi: bandingkan rasa muat di HP sesudah deploy.
+- **Tes gabungan** (gabung tanpa konflik teks; satu penyesuaian: tab notifikasi memakai `gantiUrl`). Verifikasi akhir
+  sesudah tinjauan (seperti CI): `supabase db reset` (semua migrasi dari nol + seed sintetis) → `uji/db` **23/23 berkas
+  hijau, 1.237 cek** (termasuk 11_x); typecheck, lint, vitest (14 berkas, 89 tes), build produksi hijau; e2e terhadap
+  `next start` + Supabase lokal, HP + desktop: **90 lulus, 10 dilewati sengaja** (khusus HP/desktop); `realtime.spec.ts`
+  lulus 6/6 sesudah stack lokal dijalankan ulang DENGAN Realtime (`supabase start` tanpa `-x realtime`).
+- **Tinjauan akhir (3 peninjau: keamanan, regresi, deploy) → diperbaiki:** (1) cadangan teks-polos markdown
+  (`lib/teks.ts`, kini jalan di server saat muat penuh `/t`) kuadratik — deskripsi ratusan KB bisa membekukan proses Node
+  Hostinger untuk semua pengguna → pola dibuat linear + baris > 2.000 karakter tidak diolah inline (tes waktu di
+  `teks.test.ts`); (2) login sesudah sesi hilang bisa sekilas menampilkan halaman akun lama dari cache router Next
+  (`staleTimes` 30 dtk) → `router.refresh()` saat layar masuk tampil; (3) dua tes `performa.spec.ts` bergantung pada lead
+  sisa di DB lokal (gagal di CI) → kini membuat lead ujinya sendiri; (4) kata cari Pipeline lama bisa "hidup lagi" sesudah
+  menu Pipeline diketuk → hanya ketikan pengguna yang ditulis ke URL (+ tes e2e); (5) header Pipeline owner melebar di HP
+  390 px → tombol membungkus; (6) migrasi `20261014090000_pipeline_daftar_cepat` bertanggal besok → diganti nama
+  `20261013170000_pipeline_daftar_cepat` (belum pernah diterapkan ke produksi). Tidak dikerjakan (catatan): batas panjang
+  deskripsi tugas di fungsi tulis DB (pertahanan berlapis untuk temuan 1).
 
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)
 Prasyarat dari Hannes: project Supabase baru `rhj-tugas` (akun/org baru, Sydney `ap-southeast-2` per keputusan 30/9, Free); env cloud `SUPABASE_ACCESS_TOKEN` (PAT akun baru) + `SUPABASE_PROJECT_REF`; `CLICKUP_API_TOKEN` (sudah ada); sesi baru supaya env terbaca. Semua langkah ke ClickUp **GET saja**. Tidak memakai MCP Supabase (itu ERP).

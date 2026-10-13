@@ -287,18 +287,32 @@ export type HasilCari = {
   rujukan: { type: "list" | "folder" | "space" | "task"; id: string } | null;
 };
 
+/** Asal notifikasi: tim (anggota mengetik di web) | agent (akun bot / lewat token API; aturan SQL notif_dari_agent). */
+export type DariNotif = "tim" | "agent";
+
 export type Notifikasi = {
   id: number;
   jenis: "assign" | "mention" | "komentar";
-  task: { id: string; name: string; deleted: boolean } | null;
-  actor: AnggotaRingkas | null;
+  /** tertutup = kartu di space privat yang tidak bisa dilihat penerima (nama & cuplikan disamarkan) */
+  task: { id: string; name: string; deleted: boolean; tertutup?: boolean } | null;
+  actor: (AnggotaRingkas & { role?: Peran }) | null;
   cuplikan: string | null;
   comment_id: string | null;
   read_at: string | null;
   created_at: string;
+  dari: DariNotif;
+  /** pemicunya lewat token API; true + aktor bukan bot = agent memakai token milik anggota */
+  lewat_api: boolean;
 };
 
-export type DaftarNotif = { belum: number; items: Notifikasi[] };
+/** belum = TOTAL belum dibaca (angka lonceng) = belum_tim + belum_agent; dari = saringan tab (null = semua). */
+export type DaftarNotif = {
+  belum: number;
+  belum_tim: number;
+  belum_agent: number;
+  dari: DariNotif | null;
+  items: Notifikasi[];
+};
 
 export type TokenApi = {
   id: string;
@@ -358,6 +372,9 @@ export type AlasanBatal =
 export type JenisPelanggan = "perusahaan" | "perorangan";
 
 /** Hasil web_pipeline_saya: gerbang menu & layar (§6). kode_sp = kode SP aktor sendiri (pratinjau No SP). */
+/** Status pembayaran order (revisi #7). */
+export type StatusBayar = "BELUM" | "DP" | "LUNAS";
+
 export type PipelineSaya = { peran: PeranPipeline | null; boleh_ringkas: boolean; kode_sp: string | null };
 
 export type ItemLead = {
@@ -396,11 +413,21 @@ export type LeadRingkas = {
   kota: string | null;
   pemilik: IdAnggota | null;
   pemilik_nama: string | null;
+  /** kode SP pemilik (RSG/MCE) — pratinjau No SP di dialog Data order */
+  pemilik_kode_sp: string | null;
   tanggal_masuk: string;
   diam_hari: number;
   fu_berikutnya: string | null;
   nilai_transaksi: number | null;
   no_sp: string | null;
+  tanggal_sp: string | null;
+  /** No PO dari customer (terpisah dari No SP RHJ) */
+  no_po: string | null;
+  /** null = order lama yang status bayarnya belum dicatat (atau lead belum ORDER) */
+  bayar_status: StatusBayar | null;
+  bayar_dp: number | null;
+  tanggal_dp: string | null;
+  tanggal_lunas: string | null;
   periksa: boolean;
   produk: ItemLeadRingkas[];
 };
@@ -424,6 +451,14 @@ export type LeadDetail = {
   no_sp: string | null;
   tanggal_sp: string | null;
   nilai_transaksi: number | null;
+  no_po: string | null;
+  bayar_status: StatusBayar | null;
+  bayar_dp: number | null;
+  tanggal_dp: string | null;
+  tanggal_lunas: string | null;
+  /** siapa & kapan data pembayaran terakhir diubah */
+  bayar_diubah_oleh_nama: string | null;
+  bayar_diubah_pada: string | null;
   alasan_batal: AlasanBatal | null;
   alasan_batal_lain: string | null;
   periksa: boolean;
@@ -502,6 +537,12 @@ export type AnggotaPilihAkses = { id: IdAnggota; username: string; nama: string 
 /** Hasil web_pipeline_akses_daftar: daftar akses saat ini + kandidat anggota. */
 export type DaftarAksesPipeline = { akses: AksesPipelineRow[]; anggota: AnggotaPilihAkses[] };
 
+// -------------------------------------------------------------------- kategori papan pribadi
+/** Satu kolom papan Pipeline buatan pengguna sendiri (pribadi, tidak terlihat pengguna lain). */
+export type KategoriPipeline = { id: string; nama: string; urutan: number };
+/** Hasil web_pipeline_kategori / _simpan: kategori urut + penempatan {lead_id: kategori_id}. Lead tanpa entri = "Tanpa kategori". */
+export type PapanKategori = { kategori: KategoriPipeline[]; posisi: Record<string, string> };
+
 /** Peta nama fungsi web_* → bentuk hasilnya. */
 export type HasilRpc = {
   web_saya: Profil;
@@ -544,9 +585,13 @@ export type HasilRpc = {
   web_pipeline_fu_catat: LeadDetail;
   web_pipeline_tahap: LeadDetail;
   web_pipeline_lead_ubah: LeadDetail;
+  web_pipeline_order_ubah: LeadDetail;
   web_pipeline_pelanggan_cari: PelangganCari[];
   web_pipeline_ringkas: RingkasPipeline;
   web_pipeline_akses_daftar: DaftarAksesPipeline;
   // simpan mengembalikan daftar akses terkini (tanpa nama/role/aktif); layar menyegar lewat _daftar.
   web_pipeline_akses_simpan: Pick<AksesPipelineRow, "member_id" | "username" | "peran" | "kode_sp">[];
+  web_pipeline_kategori: PapanKategori;
+  web_pipeline_kategori_simpan: PapanKategori;
+  web_pipeline_kategori_pindah: { lead_id: string; kategori_id: string | null };
 };

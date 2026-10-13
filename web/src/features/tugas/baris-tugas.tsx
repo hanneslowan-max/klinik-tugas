@@ -4,6 +4,7 @@ import { Check, Lock, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 
+import { IsiTautan } from "@/components/layout/petunjuk-tautan";
 import { AvatarTumpuk } from "@/components/umum/avatar-anggota";
 import { Chip } from "@/components/umum/chip";
 import { ChipDue, ChipPrioritas } from "@/components/umum/chip-tugas";
@@ -26,7 +27,12 @@ export function MetaTugas({ tugas: t, tampilList = false, tampilStatus = true }:
       <ChipDue tugas={t} />
       <ChipPrioritas prioritas={t.priority} />
       {t.comment_count ? (
-        <Chip nada="garis" title={t.last_comment_at ? `Komentar terakhir ${fmtRelatif(t.last_comment_at, hariIni)}` : undefined}>
+        // waktu relatif bergantung jam saat render: HTML server (data awal) bisa beda beberapa detik dengan hidrasi
+        <Chip
+          nada="garis"
+          title={t.last_comment_at ? `Komentar terakhir ${fmtRelatif(t.last_comment_at, hariIni)}` : undefined}
+          suppressHydrationWarning
+        >
           <MessageSquare aria-hidden />
           {t.comment_count}
           {t.last_comment_at ? ` · ${fmtRelatif(t.last_comment_at, hariIni)}` : ""}
@@ -97,12 +103,14 @@ export function BarisTugas({ tugas: t, toggle, ekstra, ...meta }: { tugas: Tugas
           </span>
         </button>
       ) : null}
-      <Link href={`/t/${encodeURIComponent(t.id)}`} className="min-w-0 flex-1 space-y-1.5 outline-none">
-        <div className={cn("text-sm leading-snug font-medium break-words", t.selesai && "line-through decoration-muted-foreground")}>
-          {t.name}
-        </div>
-        <MetaTugas tugas={t} {...meta} />
-        {ekstra?.(t)}
+      <Link href={`/t/${encodeURIComponent(t.id)}`} className="min-w-0 flex-1 outline-none">
+        <IsiTautan className="space-y-1.5">
+          <div className={cn("text-sm leading-snug font-medium break-words", t.selesai && "line-through decoration-muted-foreground")}>
+            {t.name}
+          </div>
+          <MetaTugas tugas={t} {...meta} />
+          {ekstra?.(t)}
+        </IsiTautan>
       </Link>
     </li>
   );

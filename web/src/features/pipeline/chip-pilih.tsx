@@ -19,12 +19,15 @@ export function GrupChip<T extends string>({
   onUbah,
   label,
   ariaInvalid,
+  labelOpsi,
 }: {
   opsi: readonly T[];
   nilai: T | null;
   onUbah: (v: T) => void;
   label: string;
   ariaInvalid?: boolean;
+  /** teks tampilan per opsi (bawaan: nilainya sendiri) */
+  labelOpsi?: (v: T) => string;
 }) {
   return (
     <div
@@ -34,7 +37,7 @@ export function GrupChip<T extends string>({
     >
       {opsi.map((o) => (
         <button key={o} type="button" aria-pressed={nilai === o} className={kelasChip(nilai === o)} onClick={() => onUbah(o)}>
-          {o}
+          {labelOpsi ? labelOpsi(o) : o}
         </button>
       ))}
     </div>

@@ -25,6 +25,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { IsiTautan } from "@/components/layout/petunjuk-tautan";
 import { MetaTugas } from "@/features/tugas/baris-tugas";
 import { useProfil, useTerkunci } from "@/features/profil/penyedia-profil";
 import { aturTahanan } from "@/features/realtime/tahanan";
@@ -115,7 +116,15 @@ export function PapanSaya({ data }: { data: TugasSaya }) {
   }
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={mulai} onDragEnd={selesai} onDragCancel={() => setAktif(null)}>
+    // id stabil: id aria-describedby dnd-kit sama di HTML server (?v=board dengan data awal) dan saat hidrasi
+    <DndContext
+      id="papan-saya"
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      onDragStart={mulai}
+      onDragEnd={selesai}
+      onDragCancel={() => setAktif(null)}
+    >
       <div className="flex snap-x gap-3 overflow-x-auto overscroll-x-contain pb-2" data-uji="papan-saya">
         {KOLOM.map((k) => (
           <Kolom key={k.kunci} kol={k} tugas={peta[k.kunci]} />
@@ -207,7 +216,7 @@ function IsiKartu({
           aria-describedby={petunjukSeret}
           className={cn(kelasNama, "outline-none focus-visible:ring-3 focus-visible:ring-ring/50")}
         >
-          {t.name}
+          <IsiTautan>{t.name}</IsiTautan>
         </Link>
       )}
       <MetaTugas tugas={t} tampilList />
