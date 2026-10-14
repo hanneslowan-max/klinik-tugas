@@ -248,6 +248,11 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   (Hostinger langsung men-deploy `main`; web baru di DB lama → galat "Aksi tahap tidak dikenal: batal_order"). Bila
   `20261014120000` suatu saat diterapkan (ulang) sesudahnya, **terapkan ulang `20261014130000`** (keduanya
   `create or replace inti_pipeline_tahap`; yang terakhir menang).
+- **Papan bisa digeser saat kategorinya banyak (14 Okt, laporan Hannes "kalau buat banyak board ga bisa digeser").** Dulu
+  wadah gulir horizontal setinggi kolom terpanjang ("Tanpa kategori" ±2.000 lead), jadi scrollbar-nya ribuan px di bawah
+  layar dan mouse biasa tidak bisa menggeser papan. Kini di desktop (lg) papan setinggi sisa layar (`--atas-papan`
+  diukur `useGeserPapan`), tiap kolom menggulir sendiri, dan ada tombol geser ◀ ▶ di tepi papan (Shift + roda juga
+  bisa). HP tidak berubah (usap). Tes e2e di `pipeline-papan.spec.ts` (9 kolom). Tanpa migrasi.
 - **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md` — **wajib pakai alat impor versi berpenjaga (14 Okt, sesudah Batal order)**; versi lama mengembalikan order yang dibatalkan di Anvil ke ORDER.
 
 ## Notifikasi "Dari tim" / "Dari agent" (revisi #2, 13 Okt 2026, branch `rev2-notif`)
