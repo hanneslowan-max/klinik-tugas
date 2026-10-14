@@ -213,6 +213,11 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   `j_pipeline_lead_ringkas_banyak` (daftar); menambah/mengubah field = ubah KEDUANYA. Tes `uji/db/23_pipeline_daftar_cepat.sql`
   (23 cek: bentuk sama untuk setiap lead, keluaran identik admin/rep/baca × tab/cari/pemilik pada ±2.000 lead, hak fungsi).
   Sisi web (render bertahap 50 baris, kotak cari terpisah) tidak bergantung pada migrasi ini.
+- **Nilai penawaran wajib (14 Okt, keputusan Hannes, kartu rtz1tqi1vh, migrasi `20261014120000_pipeline_nilai_penawaran_wajib`).**
+  "Kirim penawaran" kini menolak nilai kosong/0 (server `inti_pipeline_tahap` + dialog web). Penawaran ulang tanpa angka
+  baru memakai nilai lama bila > 0. Sumber, qty > 0 per produk, dan alasan Batal sudah wajib sejak modul dibuat; nilai
+  penawaran satu-satunya yang belum (L-01986 tersimpan 0). Tes `uji/db/24_pipeline_nilai_penawaran.sql` (8 cek; juga dijalankan
+  di produksi dalam transaksi yang di-rollback: semua lulus, tanpa sisa). **Terapkan migrasi ke produksi SEBELUM/bersamaan merge.**
 - **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md`.
 
 ## Notifikasi "Dari tim" / "Dari agent" (revisi #2, 13 Okt 2026, branch `rev2-notif`)

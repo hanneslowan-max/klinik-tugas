@@ -1,6 +1,6 @@
 "use client";
 
-// Pindah tahap lead (§5): Kirim penawaran / Order / Batal / Alihkan → web_pipeline_tahap.
+// Pindah tahap lead (§5): Kirim penawaran (nilai wajib > 0, 14 Okt) / Order / Batal / Alihkan → web_pipeline_tahap.
 // Order: nomor urut SP + tanggal SP + nilai; pratinjau No SP + galat server (pola/duplikat/nilai/tanggal) ditampilkan.
 // Batal: alasan (+ alasan lain bila "Lainnya").
 import { useState } from "react";
@@ -71,7 +71,9 @@ function IsiTahap({ lead, aksi, onSelesai }: { lead: LeadDetail; aksi: AksiTahap
     const body: BodyTahap = { lead_id: lead.id, aksi };
 
     if (aksi === "penawaran") {
-      if (nilaiPenawaran.trim()) body.nilai_penawaran = Number(nilaiPenawaran.replace(/\D/g, ""));
+      const np = Number(nilaiPenawaran.replace(/\D/g, ""));
+      if (!np || np <= 0) return setGalat("Nilai penawaran wajib diisi (> 0): total rupiah di penawaran.");
+      body.nilai_penawaran = np;
     } else if (aksi === "order") {
       if (!nomor.replace(/\D/g, "")) return setGalat("Isi nomor urut SP.");
       if (!tanggalSp) return setGalat("Isi tanggal SP.");
@@ -106,11 +108,11 @@ function IsiTahap({ lead, aksi, onSelesai }: { lead: LeadDetail; aksi: AksiTahap
       {aksi === "penawaran" ? (
         <div className="space-y-1.5">
           <Label htmlFor="th-np">
-            Nilai penawaran (Rp) <span className="font-normal text-muted-foreground">(opsional)</span>
+            Nilai penawaran (Rp)
           </Label>
           <Input id="th-np" inputMode="numeric" value={nilaiPenawaran} onChange={(e) => setNilaiPenawaran(e.target.value)} />
           {nilaiPenawaran.replace(/\D/g, "") ? <p className="text-xs font-medium tabular-nums">{rupiah(Number(nilaiPenawaran.replace(/\D/g, "")))}</p> : null}
-          <p className="text-xs text-muted-foreground">Tahap pindah ke PENAWARAN. Tanggal penawaran dicatat otomatis.</p>
+          <p className="text-xs text-muted-foreground">Wajib: total rupiah di penawaran (dipakai untuk jadwal follow up). Tahap pindah ke PENAWARAN, tanggal penawaran dicatat otomatis.</p>
         </div>
       ) : null}
 
