@@ -235,11 +235,12 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   fungsi/endpoint baru; baris dikunci `FOR UPDATE`, jadi tidak bisa saling menyalip dengan Data order).
   **Penjaga server baru:** lead ORDER tidak bisa lagi dipindah lewat aksi penawaran/order/batal/alihkan (PT409 — dulu bisa
   lewat RPC tanpa alasan walau UI tak punya tombolnya); alasan "Order dibatalkan" ditolak di aksi Batal biasa (PT400);
-  aksi `order` (mis. order ulang lead yang dibatalkan lewat API) mengosongkan alasan batal lama; `web_pipeline_order_ubah`
-  pada order yang dibatalkan → PT409. **Alat impor:** impor ulang (hari pindah) melewati utuh lead yang ordernya
+  **order yang dibatalkan final** (aksi tahap apa pun → PT409, sesuai dialog "tidak bisa diurungkan"; customer order lagi
+  = lead baru), jadi status bayar/No PO lama tak terbawa dan alasan tertulis tak terhapus; aksi `order` pada lead BATAL
+  biasa (lewat API) mengosongkan alasan batal lama; `web_pipeline_order_ubah` pada order yang dibatalkan → PT409. **Alat impor:** impor ulang (hari pindah) melewati utuh lead yang ordernya
   dibatalkan di Anvil (penjaga di tiap blok SQL, konstanta `ALASAN_BATAL_ORDER` di `alat/impor-pipeline.mjs`), supaya
   tidak kembali ORDER karena sheet masih menulis "Order"; diuji `uji/pipeline/jalankan.mjs` (108 cek) + sekali di DB lokal
-  dalam transaksi yang di-rollback. Tes: `uji/db/25_pipeline_batal_order.sql` (77 cek),
+  dalam transaksi yang di-rollback. Tes: `uji/db/25_pipeline_batal_order.sql` (78 cek),
   `web/tests/e2e/pipeline-batal-order.spec.ts` (6 tes × HP/desktop), unit `web/src/features/pipeline/batal-order.test.ts` +
   `order.test.ts` (24 tes). Verifikasi 14 Okt dari `supabase db reset`: `uji/db` **25/25 berkas, 1.322 cek**; vitest 15
   berkas/99 tes; typecheck, lint, build produksi hijau; e2e penuh `next start` + Supabase lokal: **112 lulus, 14 dilewati

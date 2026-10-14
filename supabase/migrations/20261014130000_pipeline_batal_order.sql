@@ -10,7 +10,9 @@
 --   * jejak: lead_riwayat_tahap ORDER→BATAL (trigger: siapa + kapan) + lead_aktivitas 'Catatan' berisi alasan;
 --     rencana FU (fu_berikutnya) dikosongkan.
 -- Penjaga baru: lead ORDER tidak bisa lagi dipindah lewat aksi penawaran/order/batal/alihkan (PT409) — sebelumnya bisa
--- lewat RPC tanpa alasan walau UI tidak menyediakan tombolnya. Aksi 'order' mengosongkan alasan batal lama.
+-- lewat RPC tanpa alasan walau UI tidak menyediakan tombolnya. Order yang DIBATALKAN final: aksi tahap apa pun → PT409
+-- (status bayar/No PO lama tidak terbawa ke "order ulang", alasan tertulis tidak terhapus, penjaga impor ulang tetap
+-- berlaku; customer yang order lagi = lead baru). Aksi 'order' pada lead BATAL biasa (lewat API) mengosongkan alasan lama.
 --
 -- BERBASIS versi inti_pipeline_tahap di 20261014120000_pipeline_nilai_penawaran_wajib (PR #12, nilai penawaran wajib);
 -- cabang penawaran/order/alihkan lainnya identik. Bila 20261014120000 diterapkan SESUDAH berkas ini, terapkan ulang
@@ -38,6 +40,11 @@ begin
   -- Lead ORDER hanya keluar lewat 'batal_order' (alasan tertulis wajib); data order diubah lewat web_pipeline_order_ubah.
   if v_lead.tahap = 'ORDER' and v_aksi in ('penawaran', 'order', 'batal', 'alihkan') then
     perform public.lempar('PT409', 'Lead sudah ORDER: pakai "Batalkan order" (alasan wajib ditulis) atau "Data order"', 'KONFLIK_001');
+  end if;
+  -- Order yang sudah dibatalkan FINAL (dialog: "tidak bisa diurungkan"): tanpa ini "order ulang" lewat RPC membawa status
+  -- bayar/No PO order lama, dan penawaran/batal/alihkan menghapus alasan tertulis + mematikan penjaga alat impor.
+  if v_lead.tahap = 'BATAL' and v_lead.alasan_batal = 'Order dibatalkan' and v_aksi in ('penawaran', 'order', 'batal', 'alihkan') then
+    perform public.lempar('PT409', 'Order ini sudah dibatalkan dan tidak bisa dipindah tahap lagi (customer order lagi = lead baru)', 'KONFLIK_001');
   end if;
 
   if v_aksi = 'penawaran' then
@@ -70,7 +77,7 @@ begin
     if exists (select 1 from public.lead where no_sp = v_sp and id <> v_lead.id) then
       perform public.lempar('PT409', format('No SP sudah dipakai lead lain: %s', v_sp), 'KONFLIK_001');
     end if;
-    -- alasan batal lama (mis. order yang dulu dibatalkan lalu diorder ulang lewat API) tidak boleh tertinggal
+    -- alasan batal lama (lead BATAL biasa yang diorder ulang lewat API) tidak boleh tertinggal
     update public.lead set tahap = 'ORDER', pemilik = v_pemilik, no_sp = v_sp,
       tanggal_sp = v_tgl_sp, nilai_transaksi = v_nilai, alasan_batal = null, alasan_batal_lain = null where id = v_lead.id;
 

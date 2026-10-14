@@ -3,7 +3,7 @@
 // Batalkan order (14 Okt 2026: "customer bisa membatalkan setelah terjadi order") → web_pipeline_tahap aksi 'batal_order'.
 // Alasan TERTULIS wajib (5–500 karakter sesudah dirapikan, sama dengan server). Lead pindah ke BATAL (alasan "Order
 // dibatalkan"); No SP, nominal & pembayaran tetap tersimpan sebagai riwayat. Hak (rep pemilik / admin) ditegakkan server.
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { KotakPesan } from "@/components/umum/kotak-pesan";
@@ -31,12 +31,24 @@ function IsiBatalOrder({ lead, onSelesai }: { lead: LeadDetail; onSelesai: () =>
   const [alasan, setAlasan] = useState("");
   const [galat, setGalat] = useState<string | null>(null);
   const [alasanSalah, setAlasanSalah] = useState(false);
+  const refAlasan = useRef<HTMLTextAreaElement>(null);
+  const refGalat = useRef<HTMLDivElement>(null);
+
+  // dialog ini tinggi (peringatan + ringkasan + textarea): galat (elemen terakhir sebelum KakiLembar yang lengket) bisa
+  // tertutup kaki di HP 390×844 / laptop pendek. "nearest" tidak menggulir (galat dianggap sudah di dalam area gulir) →
+  // "end" + scroll-mb (≥ tinggi kaki) = gulir sampai galat utuh di atas kaki.
+  useEffect(() => {
+    if (galat) refGalat.current?.scrollIntoView({ block: "end" });
+  }, [galat]);
 
   const kirim = async () => {
     setGalat(null);
     const g = galatAlasanOrder(alasan);
     setAlasanSalah(Boolean(g));
-    if (g) return setGalat(g);
+    if (g) {
+      refAlasan.current?.focus({ preventScroll: true });
+      return setGalat(g);
+    }
     try {
       await simpan.mutateAsync({ lead_id: lead.id, aksi: "batal_order", alasan: rapikanAlasanOrder(alasan) });
       toast.success(`Order dibatalkan: ${lead.kode}`);
@@ -83,6 +95,7 @@ function IsiBatalOrder({ lead, onSelesai }: { lead: LeadDetail; onSelesai: () =>
       <div className="space-y-1.5">
         <Label htmlFor="bo-alasan">Alasan pembatalan</Label>
         <Textarea
+          ref={refAlasan}
           id="bo-alasan"
           rows={4}
           required
@@ -97,19 +110,24 @@ function IsiBatalOrder({ lead, onSelesai }: { lead: LeadDetail; onSelesai: () =>
             }
           }}
           aria-invalid={alasanSalah || undefined}
-          aria-describedby="bo-alasan-bantu"
+          aria-describedby={galat ? "bo-alasan-bantu bo-alasan-galat" : "bo-alasan-bantu"}
           placeholder="Contoh: customer membatalkan karena proyek ditunda"
           data-uji="input-alasan-batal-order"
         />
         <div id="bo-alasan-bantu" className="flex justify-between gap-3 text-xs text-muted-foreground">
           <span>Wajib, minimal {ALASAN_ORDER_MIN} karakter. Tercatat di riwayat lead beserta nama Anda.</span>
           <span className="shrink-0 tabular-nums" data-uji="hitung-alasan">
-            {alasan.length}/{ALASAN_ORDER_MAKS}
+            {/* dihitung seperti aturannya (sesudah dirapikan, per karakter) — "abcd " = 4, bukan 5 */}
+            {Array.from(rapikanAlasanOrder(alasan)).length}/{ALASAN_ORDER_MAKS}
           </span>
         </div>
       </div>
 
-      {galat ? <KotakPesan nada="galat">{galat}</KotakPesan> : null}
+      {galat ? (
+        <KotakPesan ref={refGalat} id="bo-alasan-galat" nada="galat" className="scroll-mb-24">
+          {galat}
+        </KotakPesan>
+      ) : null}
 
       <KakiLembar>
         <Button type="button" variant="outline" onClick={onSelesai}>

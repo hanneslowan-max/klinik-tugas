@@ -229,23 +229,23 @@ select uji.sama((uji.ambil('s1') ->> 'batal_jun')::int, 4, 'Ringkasan bulan lead
 select uji.cek((uji.ambil('s1') ->> 'wr_order')::int = -4 and (uji.ambil('s1') ->> 'wr_batal')::int = 4,
   'win-rate: pindah dari menang (ORDER) ke kalah/tak jadi');
 
--- ------------------------------------------------------------ order ulang (API) lead yang dibatalkan: alasan lama dikosongkan
-select uji.jadi('44444444-4444-4444-8444-444444444444');
-select uji.simpan('ro', public.web_pipeline_tahap(
-  '{"lead_id":"ldujibo2","aksi":"order","no_sp":"9902/MCE/X/2026","tanggal_sp":"2026-10-06","nilai_transaksi":"7500000"}'));
-select uji.cek(uji.ambil('ro') ->> 'tahap' = 'ORDER' and uji.ambil('ro') ->> 'alasan_batal' is null and uji.ambil('ro') ->> 'alasan_batal_lain' is null,
-  'order ulang lead yang dibatalkan: alasan batal lama dikosongkan');
-select uji.sama(uji.ambil('ro') ->> 'no_sp', '9902/MCE/X/2026', 'order ulang boleh memakai No SP miliknya sendiri');
+-- ------------------------------------------------------------ order yang dibatalkan FINAL: tidak bisa dipindah tahap lagi
+-- (tanpa ini "order ulang" lewat RPC membawa status bayar/No PO lama, dan penawaran/batal/alihkan menghapus alasan tertulis)
+select uji.simpan('n2', jsonb_build_object('riwayat', (select count(*) from public.lead_riwayat_tahap where lead_id = 'ldujibo2')));
+select uji.jadi('44444444-4444-4444-8444-444444444444');   -- eka: rep pemilik ldujibo2
+select uji.galat($q$select public.web_pipeline_tahap('{"lead_id":"ldujibo2","aksi":"order","no_sp":"9902/MCE/X/2026","tanggal_sp":"2026-10-06","nilai_transaksi":"7500000"}')$q$,
+  'PT409', 'order dibatalkan final: order ulang ditolak', 'sudah dibatalkan', 'KONFLIK_001');
+select uji.galat($q$select public.web_pipeline_tahap('{"lead_id":"ldujibo2","aksi":"penawaran","nilai_penawaran":"1000"}')$q$,
+  'PT409', 'order dibatalkan final: penawaran ditolak', 'sudah dibatalkan', 'KONFLIK_001');
+select uji.galat($q$select public.web_pipeline_tahap('{"lead_id":"ldujibo2","aksi":"batal","alasan_batal":"Harga"}')$q$,
+  'PT409', 'order dibatalkan final: batal biasa (menimpa alasan) ditolak', 'sudah dibatalkan', 'KONFLIK_001');
+select uji.galat($q$select public.web_pipeline_tahap('{"lead_id":"ldujibo2","aksi":"alihkan","dialihkan_ke":"Cabang Surabaya"}')$q$,
+  'PT409', 'order dibatalkan final: alihkan ditolak', 'sudah dibatalkan', 'KONFLIK_001');
 reset role;
-select uji.sama((select format('%s→%s oleh %s', dari, ke, oleh) from public.lead_riwayat_tahap where lead_id = 'ldujibo2' order by id desc limit 1),
-  'BATAL→ORDER oleh 900000000001', 'jejak: riwayat BATAL → ORDER oleh eka');
-select uji.jadi('11111111-1111-4111-8111-111111111111');
-select uji.sama(pg_temp.daftar('order'), array['ldujibo2'], 'tab Order: order ulang kembali tampil');
-select uji.simpan('rk2', pg_temp.rk());
-reset role;
-select uji.simpan('s2', pg_temp.selisih(uji.ambil('rk1'), uji.ambil('rk2')));
-select uji.cek((uji.ambil('s2') ->> 'order_dibatalkan')::int = -1 and (uji.ambil('s2') ->> 'order_okt')::int = 1
-  and (uji.ambil('s2') ->> 'omzet_okt')::bigint = 7500000, 'Ringkasan: order ulang keluar dari "Order dibatalkan", masuk lagi ke order & omzet');
+select uji.cek((select tahap = 'BATAL' and alasan_batal = 'Order dibatalkan' and alasan_batal_lain is not null and bayar_status = 'LUNAS'
+    and nilai_transaksi = 7000000 from public.lead where id = 'ldujibo2')
+  and (select count(*) from public.lead_riwayat_tahap where lead_id = 'ldujibo2') = (uji.ambil('n2') ->> 'riwayat')::bigint,
+  'order dibatalkan tetap utuh sesudah percobaan pindah tahap (tanpa riwayat baru)');
 
 -- ------------------------------------------------------------ batal biasa (regresi + kategori khusus)
 select uji.jadi('22222222-2222-4222-8222-222222222222');
@@ -264,6 +264,11 @@ select uji.sama(public.web_pipeline_tahap('{"lead_id":"ldujibo6","aksi":"batal",
   ->> 'alasan_batal_lain', 'Pindah ke supplier lokal', 'regresi: "Lainnya" + teks tetap jalan');
 select uji.galat(pg_temp.batal('ldujibo5', 'Customer batal'), 'PT409', 'batal order pada lead BATAL biasa ditolak',
   'hanya untuk lead berstatus ORDER', 'KONFLIK_001');
+-- lead BATAL biasa (bukan order yang dibatalkan) yang diorder lewat API: alasan batal lama dikosongkan
+select uji.simpan('ro', public.web_pipeline_tahap(
+  '{"lead_id":"ldujibo6","aksi":"order","nomor":"9906","tanggal_sp":"2026-10-10","nilai_transaksi":"4500000"}'));
+select uji.cek(uji.ambil('ro') ->> 'tahap' = 'ORDER' and uji.ambil('ro') ->> 'alasan_batal' is null and uji.ambil('ro') ->> 'alasan_batal_lain' is null
+  and uji.ambil('ro') ->> 'no_sp' = '9906/RSG/X/2026', 'lead BATAL biasa diorder (API): alasan batal lama dikosongkan');
 reset role;
 
 -- ------------------------------------------------------------ CHECK kategori alasan batal (langsung ke tabel, sebagai postgres)

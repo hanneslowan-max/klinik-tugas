@@ -83,6 +83,9 @@ export function useTahap() {
   return useMutation({
     mutationFn: (body: BodyTahap) => rpc(klienBrowser(), "web_pipeline_tahap", { p: body as unknown as Json }),
     onSuccess: (lead) => segarkanPipeline(qc, lead),
+    // ditolak (mis. PT409: tahap sudah berubah di perangkat lain) → muat ulang detail, supaya tombol yang disebut pesan
+    // galat ("Batalkan order"/"Data order") benar-benar tampil
+    onError: (_e, body) => qc.invalidateQueries({ queryKey: kunci.pipelineLead(body.lead_id) }),
   });
 }
 
