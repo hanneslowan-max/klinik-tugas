@@ -64,7 +64,8 @@ export function useFuCatat() {
 
 export type BodyTahap = {
   lead_id: string;
-  aksi: "penawaran" | "order" | "batal" | "alihkan";
+  /** batal_order = order dibatalkan customer (lead ORDER → BATAL; data order tetap tersimpan), wajib `alasan` */
+  aksi: "penawaran" | "order" | "batal" | "alihkan" | "batal_order";
   nilai_penawaran?: number | null;
   nomor?: string;
   no_sp?: string;
@@ -73,6 +74,8 @@ export type BodyTahap = {
   alasan_batal?: string;
   alasan_batal_lain?: string | null;
   dialihkan_ke?: string;
+  /** alasan pembatalan order (teks bebas 5–500 karakter sesudah dirapikan) — hanya untuk aksi batal_order */
+  alasan?: string;
 };
 
 export function useTahap() {

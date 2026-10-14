@@ -9,7 +9,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   bacaArgumen, uraiTabel, bacaRecord, telpNorm, romawi, parseTanggal, parseNilai, parseSP,
-  klasifikasiTahap, petakanProduk, serialTanggal, olah, hitungLaporan, buatSQL, buatSQLPecah, jalankanImpor,
+  klasifikasiTahap, petakanProduk, serialTanggal, olah, hitungLaporan, buatSQL, buatSQLPecah, jalankanImpor, ALASAN_BATAL_ORDER,
 } from "../../alat/impor-pipeline.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -172,6 +172,18 @@ cek("tahap ORDER tidak dipaksa ada SP (r5 no_sp disimpan apa adanya)", sql1.incl
 cek("insert lead memakai upsert (if v_lead is null ... else update)", sql1.includes("if v_lead is null then") && sql1.includes("update public.lead set"), "upsert");
 cek("baris PERIKSA ditandai komentar di SQL", /-- r4 \[PERIKSA\]/.test(sql1) && /-- r2(?!\d)(?! \[PERIKSA\])/.test(sql1), "komentar periksa");
 cek("do block dollar-quote aman ($rhjimpor$)", sql1.includes("do $rhjimpor$"), "tag");
+{
+  // penjaga batal order (migrasi 20261014130000): impor ulang tidak boleh mengembalikan order yang dibatalkan di Anvil ke ORDER
+  const penjaga = "  if v_lead is not null and exists (select 1 from public.lead where id = v_lead and tahap = 'BATAL' and alasan_batal = 'Order dibatalkan') then return; end if;";
+  const nBlok = (sql1.match(/^do \$/gm) || []).length;
+  cek("ALASAN_BATAL_ORDER = 'Order dibatalkan' (ejaan = CHECK lead_alasan_batal_check)", ALASAN_BATAL_ORDER === "Order dibatalkan", ALASAN_BATAL_ORDER);
+  cek("penjaga batal order ada di SETIAP blok lead", sql1.split(penjaga).length - 1 === nBlok && nBlok === 14, { penjaga: sql1.split(penjaga).length - 1, nBlok });
+  cek("penjaga tepat sesudah cari lead by ref_sheet (sebelum pelanggan/kontak/lead disentuh)", sql1.includes(`from public.lead where ref_sheet = 'r4' limit 1;\n${penjaga}\n`), "urutan penjaga");
+  // (teks periksa_sebab BATAL memuat kata "alasan_batal" → cek penugasan kolom / daftar kolom insert, bukan sekadar kata)
+  const tanpaPenjaga = sql1.split("\n").filter((b) => b !== penjaga).join("\n");
+  const tulisAlasan = /\balasan_batal(_lain)?\s*=/.test(tanpaPenjaga) || /insert into public\.lead \([^)]*alasan_batal/.test(tanpaPenjaga);
+  cek("impor tidak pernah menulis alasan_batal (hanya dibaca penjaga)", !tulisAlasan, "alasan_batal ditulis");
+}
 
 // ---------------------------------------------------------------- SQL pecah (robust untuk 1.981 baris)
 bagian("SQL: pecah berkas (tiap pecahan idempoten)");

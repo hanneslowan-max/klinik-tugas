@@ -190,7 +190,8 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   "Belum bayar" (trigger). **Filter** (semua tab, di URL `st`/`dari`/`sampai`): status = status bayar di tab Order / tahap di tab
   lain; tanggal = tanggal SP di tab Order / tanggal masuk di tab lain, dengan pintasan bulan. **Cari** (server) kini juga
   mencocokkan PIC (bukan untuk peran 'baca'), produk & spesifikasi, No SP & No PO sebagian. Detail lead ORDER menampilkan No SP,
-  No PO, nominal, pembayaran + tombol Data order. Migrasi `20261013150000_pipeline_order` (kolom lead baru, trigger, redefinisi
+  No PO, nominal, pembayaran + tombol Data order; order yang dibatalkan (BATAL "Order dibatalkan", lihat Batal order di bawah)
+  tetap menampilkannya, hanya-baca. Migrasi `20261013150000_pipeline_order` (kolom lead baru, trigger, redefinisi
   `j_pipeline_lead` / `j_pipeline_lead_ringkas` / `inti_pipeline_daftar` — field hanya bertambah —, `web_pipeline_order_ubah`).
   Tes: `uji/db/22_pipeline_order.sql` (52 cek), `web/src/features/pipeline/order.test.ts`, `web/tests/e2e/pipeline-order.spec.ts`.
   **Terapkan ke produksi bersama migrasi lain, SEBELUM merge.**
@@ -218,7 +219,35 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   baru memakai nilai lama bila > 0. Sumber, qty > 0 per produk, dan alasan Batal sudah wajib sejak modul dibuat; nilai
   penawaran satu-satunya yang belum (L-01986 tersimpan 0). Tes `uji/db/24_pipeline_nilai_penawaran.sql` (8 cek; juga dijalankan
   di produksi dalam transaksi yang di-rollback: semua lulus, tanpa sisa). **Terapkan migrasi ke produksi SEBELUM/bersamaan merge.**
-- **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md`.
+  `uji/db/21_pipeline_hak.sql` ikut disesuaikan (jalur "Kirim penawaran" di tes hak kini mengirim nilai).
+- **Batal order (14 Okt, revisi Hannes, migrasi `20261014130000_pipeline_batal_order`).** "Customer bisa membatalkan
+  setelah terjadi order": detail lead **ORDER** kini punya tombol **Batalkan order** → dialog dengan alasan **tertulis**
+  wajib (teks bebas 5–500 karakter sesudah dirapikan; form & server sama). Hak: admin/owner + rep **pemilik** lead (lebih
+  ketat dari Data order); order tanpa pemilik → hanya admin (rep Klaim dulu); 'baca' tanpa tombol (server PT403). Efek
+  (keputusan Hannes): lead pindah ke **BATAL** dengan `alasan_batal` **"Order dibatalkan"** (kategori baru, hanya lewat
+  tombol ini; CHECK `lead_alasan_batal_check` diganti superset) + teks alasan di `alasan_batal_lain`. Data order (No SP,
+  tanggal SP, nominal, No PO, pembayaran) **tidak dihapus**: tetap tampil di detail lead sebagai riwayat (hanya-baca;
+  pembayaran ditampilkan netral, pengembalian dana diurus di luar Anvil) dan **No SP tetap terpakai** (unik, tidak bisa
+  dipakai lead lain). Lead keluar dari tab Order dan dari order/omzet Ringkasan, masuk hitungan batal (`per_alasan_batal`
+  "Order dibatalkan", kolom batal per bulan) dan dihitung kalah di win-rate kohort (menang = tahap ORDER) — Ringkasan
+  tidak perlu diubah. Jejak: `lead_riwayat_tahap` ORDER→BATAL (trigger: siapa + kapan) + aktivitas **Catatan** "Order
+  dibatalkan. Alasan: …" atas nama pelaku; rencana FU (`fu_berikutnya`) dikosongkan. Jalur: `web_pipeline_tahap` `{lead_id, aksi: 'batal_order', alasan}` (tanpa
+  fungsi/endpoint baru; baris dikunci `FOR UPDATE`, jadi tidak bisa saling menyalip dengan Data order).
+  **Penjaga server baru:** lead ORDER tidak bisa lagi dipindah lewat aksi penawaran/order/batal/alihkan (PT409 — dulu bisa
+  lewat RPC tanpa alasan walau UI tak punya tombolnya); alasan "Order dibatalkan" ditolak di aksi Batal biasa (PT400);
+  aksi `order` (mis. order ulang lead yang dibatalkan lewat API) mengosongkan alasan batal lama; `web_pipeline_order_ubah`
+  pada order yang dibatalkan → PT409. **Alat impor:** impor ulang (hari pindah) melewati utuh lead yang ordernya
+  dibatalkan di Anvil (penjaga di tiap blok SQL, konstanta `ALASAN_BATAL_ORDER` di `alat/impor-pipeline.mjs`), supaya
+  tidak kembali ORDER karena sheet masih menulis "Order"; diuji `uji/pipeline/jalankan.mjs` (108 cek) + sekali di DB lokal
+  dalam transaksi yang di-rollback. Tes: `uji/db/25_pipeline_batal_order.sql` (77 cek),
+  `web/tests/e2e/pipeline-batal-order.spec.ts` (6 tes × HP/desktop), unit `web/src/features/pipeline/batal-order.test.ts` +
+  `order.test.ts` (24 tes). Verifikasi 14 Okt dari `supabase db reset`: `uji/db` **25/25 berkas, 1.322 cek**; vitest 15
+  berkas/99 tes; typecheck, lint, build produksi hijau; e2e penuh `next start` + Supabase lokal: **112 lulus, 14 dilewati
+  sengaja**. **Terapkan ke produksi `20261014120000` (PR #12) LALU `20261014130000`, SEBELUM merge**
+  (Hostinger langsung men-deploy `main`; web baru di DB lama → galat "Aksi tahap tidak dikenal: batal_order"). Bila
+  `20261014120000` suatu saat diterapkan (ulang) sesudahnya, **terapkan ulang `20261014130000`** (keduanya
+  `create or replace inti_pipeline_tahap`; yang terakhir menang).
+- **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md` — **wajib pakai alat impor versi berpenjaga (14 Okt, sesudah Batal order)**; versi lama mengembalikan order yang dibatalkan di Anvil ke ORDER.
 
 ## Notifikasi "Dari tim" / "Dari agent" (revisi #2, 13 Okt 2026, branch `rev2-notif`)
 

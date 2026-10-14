@@ -1,5 +1,6 @@
 // Konstanta & pembantu modul Pipeline. Nilai (produk/sumber/tahap/alasan) PERSIS dengan CHECK di migrasi
-// 20261011120000 — jangan ubah ejaan tanpa mengubah migrasi.
+// 20261011120000 (alasan "Order dibatalkan": 20261014130000) — jangan ubah ejaan tanpa mengubah migrasi.
+// Batalkan order (20261014130000): alasan tertulis wajib 5–500 karakter; dirapikan PERSIS seperti server.
 import type { VariantProps } from "class-variance-authority";
 
 import type { chipVariants } from "@/components/umum/chip";
@@ -21,10 +22,32 @@ export const SATUAN: SatuanItem[] = ["unit", "set", "pcs"];
 /** Jenis follow-up yang bisa dipilih rep (tanpa "Catatan impor" yang khusus impor). */
 export const JENIS_FU: JenisAktivitas[] = ["Telepon", "WA", "Email", "Visit", "Kirim penawaran", "Catatan"];
 
+/** Pilihan dialog Batal biasa (lead BARU/PENAWARAN). TANPA "Order dibatalkan": server menolaknya di aksi 'batal'. */
 export const ALASAN_BATAL: AlasanBatal[] = [
   "Harga", "Stok/waktu kirim", "Spesifikasi tidak cocok", "Tidak ada respon",
   "Beli di tempat lain", "Proyek batal/ditunda", "Lainnya",
 ];
+
+/** Kategori alasan_batal yang diisi server saat order dibatalkan (aksi 'batal_order'); teksnya di alasan_batal_lain. */
+export const ALASAN_BATAL_ORDER = "Order dibatalkan" satisfies AlasanBatal;
+export const ALASAN_ORDER_MIN = 5;
+export const ALASAN_ORDER_MAKS = 500;
+
+/**
+ * Rapikan alasan pembatalan order PERSIS seperti server: CRLF → LF, lalu buang spasi/tab/baris baru di awal & akhir
+ * (btrim(..., E' \t\r\n') — bukan String.trim, yang juga membuang spasi Unicode lain).
+ */
+export function rapikanAlasanOrder(teks: string | null | undefined): string {
+  return (teks ?? "").replace(/\r\n/g, "\n").replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, "");
+}
+
+/** Galat alasan pembatalan order (pesan sama dengan server), atau null bila sah. Panjang = jumlah karakter (char_length). */
+export function galatAlasanOrder(teks: string | null | undefined): string | null {
+  const n = Array.from(rapikanAlasanOrder(teks)).length;
+  if (n < ALASAN_ORDER_MIN) return `Alasan pembatalan wajib ditulis (minimal ${ALASAN_ORDER_MIN} karakter).`;
+  if (n > ALASAN_ORDER_MAKS) return `Alasan pembatalan maksimal ${ALASAN_ORDER_MAKS} karakter.`;
+  return null;
+}
 
 type NadaChip = NonNullable<VariantProps<typeof chipVariants>["nada"]>;
 

@@ -366,9 +366,10 @@ export type ProdukLead =
   | "Lemari Arsip" | "Material Handling" | "Locker" | "Lainnya";
 export type SatuanItem = "unit" | "set" | "pcs";
 export type JenisAktivitas = "Telepon" | "WA" | "Email" | "Visit" | "Kirim penawaran" | "Catatan" | "Catatan impor";
+/** "Order dibatalkan" khusus aksi batal_order (order yang dibatalkan customer, 20261014130000) — bukan pilihan Batal biasa. */
 export type AlasanBatal =
   | "Harga" | "Stok/waktu kirim" | "Spesifikasi tidak cocok" | "Tidak ada respon"
-  | "Beli di tempat lain" | "Proyek batal/ditunda" | "Lainnya";
+  | "Beli di tempat lain" | "Proyek batal/ditunda" | "Lainnya" | "Order dibatalkan";
 export type JenisPelanggan = "perusahaan" | "perorangan";
 
 /** Hasil web_pipeline_saya: gerbang menu & layar (§6). kode_sp = kode SP aktor sendiri (pratinjau No SP). */
@@ -460,6 +461,7 @@ export type LeadDetail = {
   bayar_diubah_oleh_nama: string | null;
   bayar_diubah_pada: string | null;
   alasan_batal: AlasanBatal | null;
+  /** teks alasan "Lainnya", atau alasan tertulis saat order dibatalkan (alasan_batal = "Order dibatalkan") */
   alasan_batal_lain: string | null;
   periksa: boolean;
   periksa_sebab: string | null;

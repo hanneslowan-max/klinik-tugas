@@ -7,7 +7,8 @@
 --     (kategori baru, khusus aksi ini), alasan_batal_lain = teks;
 --   * data order (no_sp, tanggal_sp, nilai_transaksi, no_po, bayar_*) TIDAK disentuh → tetap tampil sebagai riwayat;
 --     No SP tetap terpakai (dokumen sudah terbit). Keluar dari tab Order & omzet, masuk hitungan batal (ringkas_v2);
---   * jejak: lead_riwayat_tahap ORDER→BATAL (trigger: siapa + kapan) + lead_aktivitas 'Catatan' berisi alasan.
+--   * jejak: lead_riwayat_tahap ORDER→BATAL (trigger: siapa + kapan) + lead_aktivitas 'Catatan' berisi alasan;
+--     rencana FU (fu_berikutnya) dikosongkan.
 -- Penjaga baru: lead ORDER tidak bisa lagi dipindah lewat aksi penawaran/order/batal/alihkan (PT409) — sebelumnya bisa
 -- lewat RPC tanpa alasan walau UI tidak menyediakan tombolnya. Aksi 'order' mengosongkan alasan batal lama.
 --
@@ -104,9 +105,10 @@ begin
     update public.lead set tahap = 'BATAL', alasan_batal = 'Order dibatalkan', alasan_batal_lain = v_alasan
      where id = v_lead.id;
     -- Jejak permanen alasan + pelaku + waktu (lead_riwayat_tahap ORDER→BATAL dicatat trigger, tanpa alasan).
-    -- rencana_berikutnya diteruskan: trigger pipeline_aktivitas_sesudah menyalinnya ke lead.fu_berikutnya.
+    -- rencana_berikutnya NULL → trigger pipeline_aktivitas_sesudah mengosongkan lead.fu_berikutnya: order batal tidak
+    -- di-follow-up lagi (dan riwayat tidak menampilkan "Rencana berikutnya" di bawah catatan pembatalan).
     insert into public.lead_aktivitas (lead_id, oleh, jenis, hasil, rencana_berikutnya)
-      values (v_lead.id, public.aktor(), 'Catatan', 'Order dibatalkan. Alasan: ' || v_alasan, v_lead.fu_berikutnya);
+      values (v_lead.id, public.aktor(), 'Catatan', 'Order dibatalkan. Alasan: ' || v_alasan, null);
 
   elsif v_aksi = 'alihkan' then
     if nullif(p->>'dialihkan_ke', '') is null then perform public.lempar('PT400', 'Tujuan pengalihan wajib diisi', 'INPUT_001'); end if;

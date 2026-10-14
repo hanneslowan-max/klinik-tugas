@@ -37,5 +37,18 @@ Saat cutover cukup set `TUGAS_BACKEND=tugas`. Dengan cara ini 6 prompt routine d
 - Teks "ClickUp" di knowledge lain, 5 agent, dan 5 skill PIC.
 - Header "ARSIP – ClickUp" di `routines/rhj-*` legacy.
 
+## Pipeline: order bisa dibatalkan (14 Okt 2026, migrasi `20261014130000_pipeline_batal_order`)
+Berlaku untuk routine yang membaca Pipeline Anvil (`pipeline list|get|summary`, API `/x/pipeline/*`): Analisa Pipeline,
+Arahan Pipeline, cross-check pipeline di Agen Data Harian, dan acuan `routines/cloud/PIPELINE-SUMBER.md` +
+`deliverables/pipeline-anvil/HARI-PINDAH.md`. Daftar saja; dikerjakan di sesi CMO dengan ACC Hannes.
+
+| # | Perubahan | Kenapa |
+|---|---|---|
+| 1 | Kenali kategori batal baru **"Order dibatalkan"** (di `per_alasan_batal` Ringkasan dan `alasan_batal` di `pipeline get`; baris `pipeline list --tab batal` memuat lead itu beserta data ordernya, tapi tanpa alasan → ambil lewat `pipeline get`). Teks alasan dari customer/rep ada di `alasan_batal_lain`; jejak pelaku + waktu di aktivitas "Catatan" "Order dibatalkan. Alasan: …" dan riwayat tahap ORDER→BATAL. | Kategori ini hanya lahir dari tombol **Batalkan order** (order yang sudah jadi lalu dibatalkan customer), bukan dari Batal biasa. Laporkan terpisah dari lead yang kalah sebelum order. |
+| 2 | Tentukan order **hanya dari `tahap = 'ORDER'`**, jangan dari adanya `no_sp` / `tanggal_sp` / `nilai_transaksi` / `no_po` / `bayar_*`. | Order yang dibatalkan **menyimpan** semua data ordernya (riwayat; No SP tetap terpakai). Menjumlah omzet dari baris ber-No SP atau bernilai = dobel hitung order batal. Ringkasan Anvil sudah benar (hanya tahap ORDER). |
+| 3 | Order/omzet bulan yang **sudah lewat bisa turun belakangan** (pembatalan memindahkan lead ORDER → BATAL kapan saja). Bandingkan dengan laporan/baseline lama sebagai "berubah karena pembatalan", bukan galat data; sebut lead "Order dibatalkan" yang menjelaskan selisihnya. | Ringkasan dihitung ulang dari status kini; tidak ada angka bulan yang dibekukan. |
+| 4 | Win-rate kohort: order yang dibatalkan dihitung **kalah** (menang = tahap ORDER). Jumlah batal per bulan ikut naik. | Definisi win-rate tetap (dikunci 22 Sep); tidak perlu ubah rumus, cukup sadar angka bisa bergeser. |
+| 5 | Selama sheet masih dipakai paralel: sheet tidak tahu pembatalan di Anvil → order/omzet Anvil bisa **lebih kecil** dari sheet, sengaja. Impor ulang di hari pindah melewati lead itu (`docs/IMPOR-PIPELINE.md`). | Cocok-silang "Anvil = sheet" (selisih 0) tidak lagi mutlak sesudah ada pembatalan; selisih = daftar "Order dibatalkan". |
+
 ## Tidak perlu diubah
 Memori historis (append-only), deliverables lama, dan `probe/`. ID lama tetap bisa dibuka (`/t/<id>`) dan dicari, termasuk tempelan URL `app.clickup.com/t/…`.
