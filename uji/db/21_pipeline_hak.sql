@@ -38,7 +38,7 @@ select uji.simpan('baru', public.web_pipeline_lead_buat('{"sumber":"Google Ads",
 select uji.cek((uji.ambil('baru') ->> 'kode') ~ '^L-[0-9]{5,}$', 'rep: web_pipeline_lead_buat jalan (kode dari lead_kode_seq)');
 select uji.cek(jsonb_array_length(public.web_pipeline_fu_catat(jsonb_build_object('lead_id', uji.ambil('baru') ->> 'id', 'jenis', 'Telepon', 'hasil', 'uji')) -> 'aktivitas') >= 1,
   'rep: web_pipeline_fu_catat jalan');
-select uji.sama(public.web_pipeline_tahap(jsonb_build_object('lead_id', uji.ambil('baru') ->> 'id', 'aksi', 'penawaran')) ->> 'tahap', 'PENAWARAN',
+select uji.sama(public.web_pipeline_tahap(jsonb_build_object('lead_id', uji.ambil('baru') ->> 'id', 'aksi', 'penawaran', 'nilai_penawaran', 1000000)) ->> 'tahap', 'PENAWARAN',
   'rep: web_pipeline_tahap jalan (riwayat tahap via trigger)');
 reset role;
 -- baca (dodi): data mentah tetap tertutup oleh RLS
