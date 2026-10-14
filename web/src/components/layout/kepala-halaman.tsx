@@ -1,12 +1,13 @@
 "use client";
 
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, PanelLeftOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 
 import { LencanaMode } from "@/components/layout/lencana-mode";
 import { Lonceng } from "@/components/layout/lonceng";
 import { adaRiwayatDalam } from "@/components/layout/riwayat";
+import { fokusSesudahRender, PINTASAN_SIDEBAR, useSidebar } from "@/components/layout/sidebar";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -19,9 +20,10 @@ type Props = {
   className?: string;
 };
 
-/** Header halaman (lengket di atas): kembali, judul, lencana mode, lonceng, aksi opsional. */
+/** Header halaman (lengket di atas): [tampilkan sidebar], kembali, judul, lencana mode, lonceng, aksi opsional. */
 export function KepalaHalaman({ judul, judulDokumen, kembali, aksi, className }: Props) {
   const router = useRouter();
+  const sidebar = useSidebar();
   const teksJudul = judulDokumen ?? (typeof judul === "string" ? judul : undefined);
 
   useEffect(() => {
@@ -36,6 +38,22 @@ export function KepalaHalaman({ judul, judulDokumen, kembali, aksi, className }:
         className,
       )}
     >
+      {!sidebar.terbuka ? (
+        // desktop saja: di HP memang tidak ada sidebar (navigasi bawah)
+        <button
+          type="button"
+          aria-label="Tampilkan sidebar"
+          title={`Tampilkan sidebar (${PINTASAN_SIDEBAR})`}
+          onClick={() => {
+            sidebar.alih();
+            fokusSesudahRender("sembunyikan-sidebar");
+          }}
+          className="hidden size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 lg:inline-flex"
+          data-uji="tampilkan-sidebar"
+        >
+          <PanelLeftOpen className="size-5" aria-hidden />
+        </button>
+      ) : null}
       {kembali ? (
         <button
           type="button"

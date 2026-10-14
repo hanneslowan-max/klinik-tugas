@@ -1,8 +1,8 @@
 "use client";
 
 // Kerangka layar yang butuh login. HP: konten + navigasi bawah (Saya · Jelajah · Cari · Menu).
-// Desktop (≥ lg): sidebar kiri (navigasi + akun) + konten.
-import { KeyRound, LogOut, Menu } from "lucide-react";
+// Desktop (≥ lg): sidebar kiri (navigasi + akun) + konten; sidebar bisa disembunyikan (layout/sidebar.tsx).
+import { KeyRound, LogOut, Menu, PanelLeftClose } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
@@ -10,6 +10,7 @@ import { useState, type ReactNode } from "react";
 import { NAV_LAIN, NAV_UTAMA, type ItemNav } from "@/components/layout/navigasi";
 import { PetunjukTautan, useTautanMenunggu } from "@/components/layout/petunjuk-tautan";
 import { usePelacakRiwayat } from "@/components/layout/riwayat";
+import { fokusSesudahRender, PenyediaSidebar, PINTASAN_SIDEBAR, useSidebar } from "@/components/layout/sidebar";
 import { AvatarAnggota } from "@/components/umum/avatar-anggota";
 import { Chip } from "@/components/umum/chip";
 import { Lembar } from "@/components/umum/lembar";
@@ -98,41 +99,74 @@ function IsiTautanMenu({ item, angka }: { item: ItemNav; angka?: number }) {
 function Sidebar({ path, navUtama }: { path: string; navUtama: ItemNav[] }) {
   const { owner, profil } = useProfil();
   const keluar = useKeluar();
+  const { terbuka, alih } = useSidebar();
   return (
-    <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r bg-sidebar lg:flex" aria-label="Navigasi utama">
-      <div className="flex h-14 items-center gap-2.5 px-5">
-        {/* eslint-disable-next-line @next/next/no-img-element -- ikon SVG kecil statis */}
-        <img src="/icon.svg" alt="" className="size-7 rounded-md" />
-        <div className="leading-tight">
-          <div className="text-sm font-bold">Anvil</div>
-          <div className="text-[11px] text-muted-foreground">PT Roda Hammerindo Jaya</div>
-        </div>
-      </div>
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
-        {navUtama.map((item) => (
-          <TautanSidebar key={item.href} item={item} path={path} />
-        ))}
-        <div className="my-3 border-t" />
-        {NAV_LAIN.filter((i) => !i.ownerSaja || owner).map((item) => (
-          <TautanSidebar key={item.href} item={item} path={path} angka={item.href === "/notif" ? profil.notif_belum : undefined} />
-        ))}
-      </nav>
-      <div className="space-y-3 border-t p-4">
-        <KartuAkun />
-        <div className="grid grid-cols-2 gap-1">
-          <Link href="/ganti-password" className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md text-xs font-medium whitespace-nowrap hover:bg-muted">
-            <KeyRound className="size-3.5" aria-hidden />
-            Password
-          </Link>
+    // Tersembunyi = lebar 0 (animasi lebar; isi tetap 16rem supaya tidak terjepit) + inert (tidak bisa difokus/dibaca) +
+    // isi invisible SESUDAH animasi menutup (transisi visibility: tetap terlihat selama lebar menyusut).
+    <aside
+      className={cn(
+        "sticky top-0 hidden h-dvh shrink-0 overflow-hidden bg-sidebar transition-[width] duration-200 ease-out motion-reduce:transition-none lg:block",
+        terbuka ? "w-64 border-r" : "w-0",
+      )}
+      aria-label="Navigasi utama"
+      inert={!terbuka}
+      data-uji="sidebar"
+      data-terbuka={terbuka}
+    >
+      <div
+        className={cn(
+          "flex h-full w-64 flex-col",
+          // transisi HANYA saat menutup: saat membuka harus langsung terlihat (fokus dipindah ke tombol di dalamnya)
+          !terbuka && "invisible transition-[visibility] duration-200 motion-reduce:transition-none",
+        )}
+      >
+        <div className="flex h-14 items-center gap-2.5 pr-2 pl-5">
+          {/* eslint-disable-next-line @next/next/no-img-element -- ikon SVG kecil statis */}
+          <img src="/icon.svg" alt="" className="size-7 rounded-md" />
+          <div className="min-w-0 flex-1 leading-tight">
+            <div className="text-sm font-bold">Anvil</div>
+            <div className="truncate text-[11px] text-muted-foreground">PT Roda Hammerindo Jaya</div>
+          </div>
           <button
             type="button"
-            onClick={() => keluar()}
-            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md text-xs font-medium text-telat hover:bg-telat-lembut"
-            data-uji="keluar"
+            onClick={() => {
+              alih();
+              fokusSesudahRender("tampilkan-sidebar");
+            }}
+            aria-label="Sembunyikan sidebar"
+            title={`Sembunyikan sidebar (${PINTASAN_SIDEBAR})`}
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+            data-uji="sembunyikan-sidebar"
           >
-            <LogOut className="size-3.5" aria-hidden />
-            Keluar
+            <PanelLeftClose className="size-4.5" aria-hidden />
           </button>
+        </div>
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
+          {navUtama.map((item) => (
+            <TautanSidebar key={item.href} item={item} path={path} />
+          ))}
+          <div className="my-3 border-t" />
+          {NAV_LAIN.filter((i) => !i.ownerSaja || owner).map((item) => (
+            <TautanSidebar key={item.href} item={item} path={path} angka={item.href === "/notif" ? profil.notif_belum : undefined} />
+          ))}
+        </nav>
+        <div className="space-y-3 border-t p-4">
+          <KartuAkun />
+          <div className="grid grid-cols-2 gap-1">
+            <Link href="/ganti-password" className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md text-xs font-medium whitespace-nowrap hover:bg-muted">
+              <KeyRound className="size-3.5" aria-hidden />
+              Password
+            </Link>
+            <button
+              type="button"
+              onClick={() => keluar()}
+              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md text-xs font-medium text-telat hover:bg-telat-lembut"
+              data-uji="keluar"
+            >
+              <LogOut className="size-3.5" aria-hidden />
+              Keluar
+            </button>
+          </div>
         </div>
       </div>
     </aside>
@@ -219,7 +253,16 @@ function NavBawah({ path, navUtama }: { path: string; navUtama: ItemNav[] }) {
   );
 }
 
-export function KerangkaApp({ children, pipelineAwal }: { children: ReactNode; pipelineAwal?: PipelineSaya }) {
+export function KerangkaApp({
+  children,
+  pipelineAwal,
+  sidebarAwal = true,
+}: {
+  children: ReactNode;
+  pipelineAwal?: PipelineSaya;
+  /** sidebar desktop terbuka? (pilihan pengguna dari cookie, dibaca layout server) */
+  sidebarAwal?: boolean;
+}) {
   const path = usePathname();
   usePelacakRiwayat();
   // Gerbang menu Pipeline (§6): sembunyikan dari anggota tanpa akses modul. Halaman tetap digerbangi GerbangPipeline + RLS server.
@@ -228,18 +271,20 @@ export function KerangkaApp({ children, pipelineAwal }: { children: ReactNode; p
   const aksesPipeline = usePipelineSaya(pipelineAwal);
   const navUtama = NAV_UTAMA.filter((i) => !i.pipelineSaja || !!aksesPipeline.data?.peran);
   return (
-    <div className="flex min-h-dvh">
-      <a href="#isi" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded focus:bg-background focus:p-2">
-        Lompat ke isi
-      </a>
-      <Sidebar path={path} navUtama={navUtama} />
-      <div className="flex min-w-0 flex-1 flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">
-        <main id="isi" className="flex min-w-0 flex-1 flex-col" tabIndex={-1}>
-          {children}
-        </main>
+    <PenyediaSidebar awal={sidebarAwal}>
+      <div className="flex min-h-dvh">
+        <a href="#isi" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded focus:bg-background focus:p-2">
+          Lompat ke isi
+        </a>
+        <Sidebar path={path} navUtama={navUtama} />
+        <div className="flex min-w-0 flex-1 flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">
+          <main id="isi" className="flex min-w-0 flex-1 flex-col" tabIndex={-1}>
+            {children}
+          </main>
+        </div>
+        <NavBawah path={path} navUtama={navUtama} />
+        <PenyimakRealtime />
       </div>
-      <NavBawah path={path} navUtama={navUtama} />
-      <PenyimakRealtime />
-    </div>
+    </PenyediaSidebar>
   );
 }
