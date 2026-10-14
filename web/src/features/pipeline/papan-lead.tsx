@@ -7,6 +7,9 @@
 // Pola seret sama dengan Papan Tugas Saya: HP tekan-tahan ±300 ms lalu geser (geser cepat = menggulir), desktop seret
 // mouse, keyboard spasi pada nama lead lalu panah kiri/kanan. Tiap kolom memuat 30 kartu dulu ("Tampilkan lagi")
 // supaya ±2000 lead tetap ringan; kartu yang baru dipindah tampil paling atas di kolom tujuannya.
+// Desktop (lg, 14 Okt: "kalau buat banyak board ga bisa digeser"): papan setinggi sisa layar dan tiap kolom menggulir
+// sendiri, jadi scrollbar horizontal selalu terlihat di bawah layar (dulu ada di dasar kolom terpanjang, ribuan px ke
+// bawah); plus tombol geser ◀ ▶ di tepi papan untuk mouse tanpa roda horizontal (Shift + roda juga bisa). HP tetap.
 import {
   DndContext,
   DragOverlay,
@@ -27,9 +30,9 @@ import {
   type UniqueIdentifier,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowLeft, ArrowRight, Check, MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { toast } from "sonner";
 
 import { IsiTautan } from "@/components/layout/petunjuk-tautan";
@@ -105,6 +108,8 @@ type Props = {
 export function PapanLead({ leads, papan }: Props) {
   const pindah = useKategoriPindah();
   const [aktif, setAktif] = useState<LeadRingkas | null>(null);
+  const refGulir = useRef<HTMLDivElement>(null);
+  const geser = useGeserPapan(refGulir);
   // lead yang baru dipindah (terbaru dulu): tampil paling atas di kolom tujuannya selama halaman terbuka
   const [baru, setBaru] = useState<string[]>([]);
 
@@ -181,21 +186,31 @@ export function PapanLead({ leads, papan }: Props) {
       onDragCancel={() => setAktif(null)}
       accessibility={{ announcements: pengumuman, screenReaderInstructions: INSTRUKSI }}
     >
-      <div
-        // relative: elemen sr-only (absolute) di kolom luar layar ikut terpotong wadah gulir, tidak melebarkan halaman HP
-        className={cn("relative flex gap-3 overflow-x-auto overscroll-x-contain pb-2", aktif ? "snap-none" : "snap-x")}
-        data-uji="papan-lead"
-      >
-        {kolom.map((k, i) => (
-          <KolomLead
-            key={k.kunci}
-            kolom={k}
-            leads={isi.get(k.kunci) ?? []}
-            urutanKategori={papan.kategori.map((x) => x.id)}
-            indeks={i - 1}
-          />
-        ))}
-        <TambahKategori penuh={papan.kategori.length >= MAKS_KATEGORI} />
+      <div className="relative">
+        <div
+          ref={refGulir}
+          // relative: elemen sr-only (absolute) di kolom luar layar ikut terpotong wadah gulir, tidak melebarkan halaman HP.
+          // lg: setinggi sisa layar (--atas-papan = posisi atas papan di dokumen, diukur useGeserPapan), min 16rem.
+          className={cn(
+            "relative flex gap-3 overflow-x-auto overscroll-x-contain pb-2 lg:h-[max(16rem,calc(100dvh_-_var(--atas-papan,14rem)_-_1.75rem))]",
+            aktif ? "snap-none" : "snap-x",
+          )}
+          data-uji="papan-lead"
+        >
+          {kolom.map((k, i) => (
+            <KolomLead
+              key={k.kunci}
+              kolom={k}
+              leads={isi.get(k.kunci) ?? []}
+              urutanKategori={papan.kategori.map((x) => x.id)}
+              indeks={i - 1}
+            />
+          ))}
+          <TambahKategori penuh={papan.kategori.length >= MAKS_KATEGORI} />
+        </div>
+        {/* disembunyikan saat menyeret: tepi papan dipakai gulir otomatis dnd-kit */}
+        <TombolGeser arah="kiri" tampil={geser.bisaKiri && !aktif} onKlik={() => geser.geser(-1)} />
+        <TombolGeser arah="kanan" tampil={geser.bisaKanan && !aktif} onKlik={() => geser.geser(1)} />
       </div>
       <DragOverlay>
         {aktif ? (
@@ -232,7 +247,7 @@ function KolomLead({ kolom, leads, urutanKategori, indeks }: PropsKolom) {
       data-kolom={kolom.kunci}
       aria-label={`Kategori ${kolom.nama}`}
       className={cn(
-        "flex w-[17rem] shrink-0 snap-start flex-col rounded-xl border bg-muted/30 md:w-72",
+        "flex w-[17rem] shrink-0 snap-start flex-col rounded-xl border bg-muted/30 md:w-72 lg:min-h-0",
         isOver && "ring-2 ring-primary/50",
       )}
     >
@@ -244,7 +259,11 @@ function KolomLead({ kolom, leads, urutanKategori, indeks }: PropsKolom) {
       ) : (
         <KepalaKategori kolom={kolom} jumlah={leads.length} urutanKategori={urutanKategori} indeks={indeks} />
       )}
-      <ul className="flex min-h-16 flex-1 flex-col gap-2 px-2 pb-2" data-uji="isi-kolom-kategori">
+      {/* lg: kolom menggulir sendiri (papan setinggi layar) */}
+      <ul
+        className="flex min-h-16 flex-1 flex-col gap-2 px-2 pb-2 lg:min-h-0 lg:overflow-y-auto lg:overscroll-y-contain"
+        data-uji="isi-kolom-kategori"
+      >
         {leads.slice(0, batas).map((l) => (
           <KartuLead key={l.id} lead={l} />
         ))}
@@ -263,6 +282,68 @@ function KolomLead({ kolom, leads, urutanKategori, indeks }: PropsKolom) {
         </button>
       ) : null}
     </section>
+  );
+}
+
+/** Desktop: tinggi papan = sisa layar (CSS var --atas-papan) + status bisa digeser kiri/kanan untuk TombolGeser. */
+function useGeserPapan(ref: RefObject<HTMLDivElement | null>) {
+  const [bisa, setBisa] = useState({ kiri: false, kanan: false });
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const cekGeser = () => {
+      const kiri = el.scrollLeft > 1;
+      const kanan = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+      setBisa((b) => (b.kiri === kiri && b.kanan === kanan ? b : { kiri, kanan }));
+    };
+    const ukur = () => {
+      // posisi di DOKUMEN (bukan layar): papan pas sampai bawah layar saat halaman di posisi atas
+      el.style.setProperty("--atas-papan", `${Math.round(el.getBoundingClientRect().top + window.scrollY)}px`);
+      cekGeser();
+    };
+    ukur();
+    const ro = new ResizeObserver(ukur);
+    ro.observe(el); // lebar berubah: sidebar disembunyikan, kolom ditambah/dihapus
+    ro.observe(document.body); // isi di atas papan berubah tinggi: Filter dibuka, chip membungkus
+    el.addEventListener("scroll", cekGeser, { passive: true });
+    window.addEventListener("resize", ukur);
+    return () => {
+      ro.disconnect();
+      el.removeEventListener("scroll", cekGeser);
+      window.removeEventListener("resize", ukur);
+    };
+  }, [ref]);
+
+  const geser = (arah: -1 | 1) => {
+    const el = ref.current;
+    if (!el) return;
+    const halus = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // ± selebar layar papan dikurangi satu kolom (kolom terakhir tetap terlihat sebagai patokan); snap-x merapikan
+    el.scrollBy({ left: arah * Math.max(300, el.clientWidth - 300), behavior: halus ? "smooth" : "auto" });
+  };
+
+  return { bisaKiri: bisa.kiri, bisaKanan: bisa.kanan, geser };
+}
+
+/** Tombol geser papan (desktop saja; HP cukup usap). Hanya tampil bila masih ada kolom di arah itu. */
+function TombolGeser({ arah, tampil, onKlik }: { arah: "kiri" | "kanan"; tampil: boolean; onKlik: () => void }) {
+  if (!tampil) return null;
+  const Ikon = arah === "kiri" ? ChevronLeft : ChevronRight;
+  return (
+    <button
+      type="button"
+      onClick={onKlik}
+      aria-label={`Geser papan ke ${arah}`}
+      title={`Geser papan ke ${arah} (atau Shift + roda mouse)`}
+      className={cn(
+        "absolute top-1/2 z-20 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full border bg-background/95 text-foreground shadow-md hover:bg-muted lg:flex",
+        arah === "kiri" ? "left-1" : "right-1",
+      )}
+      data-uji={`geser-papan-${arah}`}
+    >
+      <Ikon className="size-5" aria-hidden />
+    </button>
   );
 }
 

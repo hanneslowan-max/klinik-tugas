@@ -57,6 +57,22 @@ describe("kelompokOrder", () => {
   it("tanpa order → kosong", () => {
     expect(kelompokOrder([lead("L-1", { tahap: "BARU" })])).toMatchObject({ jumlah: 0, nilai: 0, grup: [] });
   });
+
+  it("order yang dibatalkan (BATAL, data order tetap tersimpan) tidak ikut grup, total, maupun bulan", () => {
+    const dibatalkan = lead("L-00020", {
+      tahap: "BATAL", no_sp: "20/RSG/VIII/2026", tanggal_sp: "2026-08-14", nilai_transaksi: 9_000_000, bayar_status: "DP",
+      bayar_dp: 3_000_000, tanggal_dp: "2026-08-15",
+    });
+    const lunasBatal = lead("L-00021", { tahap: "BATAL", tanggal_sp: "2026-10-02", nilai_transaksi: 4_000_000, bayar_status: "LUNAS" });
+    const tetap = lead("L-00022", { tanggal_sp: "2026-10-03", nilai_transaksi: 1_500_000, bayar_status: "BELUM" });
+    const r = kelompokOrder([dibatalkan, lunasBatal, tetap]);
+    expect(r).toMatchObject({ jumlah: 1, nilai: 1_500_000, terbayar: 0, sisa: 1_500_000 });
+    expect(r.grup.map((g) => g.kunci)).toEqual(["2026-10"]);
+    expect(r.grup[0].items.map((l) => l.kode)).toEqual(["L-00022"]);
+    expect(bulanTersedia([dibatalkan, lunasBatal, tetap])).toEqual(["2026-10"]);
+    expect(kelompokOrder([dibatalkan, lunasBatal])).toMatchObject({ jumlah: 0, nilai: 0, terbayar: 0, sisa: 0, grup: [] });
+    expect(bulanTersedia([dibatalkan])).toEqual([]);
+  });
 });
 
 describe("saringLead", () => {

@@ -16,6 +16,8 @@
 //   node tools/tugas.mjs tenggat [--tanggal YYYY-MM-DD] [--folder id]    angka B10/B5 (telat, hari ini, ≤3 HK, H-1, beban)
 //   node tools/tugas.mjs comment <task_id> --reply-to <comment_id> --text "..." | --file <path> [--dry-run]   balasan thread
 //   node tools/tugas.mjs pipeline list [--tab diam|pm|penawaran|order|batal|periksa] [--pemilik id] [--q ...]   lead pipeline (READ-ONLY)
+//                                                                     --tab batal ikut memuat order yang dibatalkan (data order tetap
+//                                                                     terisi; order = tahap ORDER saja); alasannya lewat pipeline get
 //   node tools/tugas.mjs pipeline get <lead_id>                        detail lead
 //   node tools/tugas.mjs pipeline summary [--dasar sp|lead] [--bulan YYYY-MM]   ringkasan §4 (omzet, win-rate, siklus)
 //   node tools/tugas.mjs pipeline fu-set --leads "ld1,ld2=YYYY-MM-DD"   tandai lead utk follow-up (tab "Follow up hari ini"); scope tulis

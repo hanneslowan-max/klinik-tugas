@@ -14,7 +14,8 @@ parsial `lead_no_sp_uniq`, trigger pengisi kode/riwayat/diam/cari).
 - **Idempoten & boleh diulang.** Kunci baris = `ref_sheet` (`r<no. baris sheet>`). Jalankan ulang → data akhir sama:
   lead dicari dulu dari `ref_sheet` lalu di-*update* (bukan dobel); pelanggan di-dedup per nama; kontak di-dedup per
   telepon; `lead_item` & `lead_aktivitas` "Catatan impor" dihapus-lalu-diisi. Generator deterministik (tanpa acak) →
-  dua kali jalan menghasilkan SQL identik byte-per-byte.
+  dua kali jalan menghasilkan SQL identik byte-per-byte. Pengecualian: lead yang ordernya **dibatalkan di Anvil** tidak
+  disentuh sama sekali (lihat "Order yang dibatalkan di Anvil dilewati").
 - **Tidak memaksa enum.** Nilai yang tak cocok enum (produk/sumber/tahap) **tidak** dipaksa; baris ditandai
   `periksa=true` + `periksa_sebab` agar manusia membereskan. Baris bertanda `periksa` **dikecualikan** dari indeks unik
   parsial `lead_no_sp_uniq` (sesuai komentar migrasi), jadi SP historis yang kotor/dobel tetap bisa masuk.
@@ -67,13 +68,32 @@ lead itu sudah punya aktivitas nyata di Anvil (FU yang dicatat rep sesudah impor
 Aktivitas "Catatan impor" juga diberi waktu tanggal lead 12:00 WIB. Jam 12:00 dipakai supaya `::date` tidak bergeser
 sehari karena zona waktu server (UTC). Sebelum aturan ini semua lead impor tercatat "diam 0 hari" dan tab Diam kosong.
 
+### Order yang dibatalkan di Anvil dilewati (14 Okt, migrasi `20261014130000_pipeline_batal_order`)
+
+Sejak tombol **Batalkan order** ada, order bisa dibatalkan di Anvil: lead pindah ke BATAL dengan `alasan_batal`
+**"Order dibatalkan"** + alasan tertulis, data order tetap tersimpan. Sheet tidak tahu pembatalan itu dan masih menulis
+"Order". Karena itu tiap blok SQL impor punya **penjaga** tepat sesudah lead dicari dari `ref_sheet`: bila lead itu
+sudah ada dan berstatus BATAL + "Order dibatalkan", blok **dilewati utuh** (`return;` — pelanggan, kontak, lead, item,
+Catatan impor tidak disentuh). Tanpa penjaga, impor ulang mengembalikan lead ke ORDER dan pembatalan + alasannya hilang.
+
+- **Akibat yang disengaja:** sesudah impor ulang, order/omzet di Ringkasan Anvil bisa **lebih kecil** dari sheet (dan
+  dari tabel "Basis bulanan" laporan impor, yang dihitung dari isi sheet). Selisih itu = order yang dibatalkan di
+  Anvil; jelaskan dengan daftar lead `alasan_batal = 'Order dibatalkan'`, bukan dengan mengubah data.
+- **Alat impor tidak pernah menulis `alasan_batal`/`alasan_batal_lain`** (sheet tak punya kolomnya): baris Batal dari
+  sheet masuk tanpa alasan + PERIKSA, dan kategori "Order dibatalkan" hanya bisa lahir dari tombol Batalkan order.
+- **Pakai versi alat sesudah 14 Okt** untuk impor ulang di hari pindah; berkas `.impor.sql` yang dibuat versi lama tidak
+  punya penjaga ini → buat ulang. Cek cepat: header SQL memuat baris "dilewati utuh: tidak dikembalikan ke ORDER".
+- Hitung lead yang akan/telah dilewati (angka saja):
+  `select count(*) from public.lead where ref_sheet is not null and tahap = 'BATAL' and alasan_batal = 'Order dibatalkan';`
+
 ### Data yang tidak ada di sheet (diisi default, dicatat)
 
 - **`sumber`** (wajib NOT NULL, sheet tak punya) → `--sumber-default` (default **Lainnya**).
 - **`qty`** (wajib `>0`, sheet tak punya) → `--qty-default` (default **1**). Item **Pallet Mesh** ditandai PERIKSA
   (qty PM dipakai win-rate <20u vs ≥20u, harus diisi ulang dari teks).
 - **`tanggal_sp`** untuk ORDER tak diketahui → diisi `tanggal_masuk` + baris ditandai PERIKSA (verifikasi).
-- **`alasan_batal`** tak ada di sheet → baris BATAL ditandai PERIKSA.
+- **`alasan_batal`** tak ada di sheet → baris BATAL ditandai PERIKSA. Alat impor tidak pernah menulis kolom ini
+  (lihat "Order yang dibatalkan di Anvil dilewati").
 
 ## Pemakaian
 
@@ -142,7 +162,10 @@ node uji/pipeline/jalankan.mjs        # self-test murni Node (tanpa DB); fixture
 ```
 
 Menguji parser CSV (kutip/koma/baris-baru), klasifikasi tahap & produk, pembersih tanggal/nilai/SP/telepon, deteksi
-PERIKSA, hitungan laporan + selisih, dan generator SQL (idempoten/deterministik, escaping, pecah berkas).
+PERIKSA, hitungan laporan + selisih, dan generator SQL (idempoten/deterministik, escaping, pecah berkas, penjaga order
+yang dibatalkan di tiap blok tepat sesudah cari `ref_sheet`, tidak ada penulisan `alasan_batal`). Penjaga juga dicoba
+sekali (14 Okt) di DB lokal dalam transaksi yang di-rollback: impor → batalkan order → impor ulang = lead tetap BATAL
+"Order dibatalkan" (isi & jumlah item/aktivitas/riwayat tidak berubah), lead lain tetap diperbarui.
 
 > **Catatan Docker:** idempotensi terhadap DB nyata (cari-by-`ref_sheet`, dedup, hapus-lalu-isi anak) diverifikasi
 > secara statik di self-test (pola SQL) karena stack Supabase lokal tak tersedia. Saat stack lokal/uji ada, jalankan

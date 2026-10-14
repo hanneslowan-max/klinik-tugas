@@ -157,3 +157,33 @@ test("kategori pribadi: pengguna lain tidak melihat kategori citra", async ({ pa
   await expect(page.getByText("Rahasia Citra")).toHaveCount(0);
   await expect(page.locator('[data-uji="kolom-kategori"]')).toHaveCount(1);
 });
+
+test("banyak kategori: papan bisa digeser (desktop: setinggi layar, tombol ◀ ▶, kolom menggulir sendiri)", async ({ page }) => {
+  sqlLokal(
+    `insert into public.pipeline_kategori (member_id, nama, urutan) select ${AKUN.citra.id}, 'Kolom ' || g, g from generate_series(1, 8) g;`,
+  );
+  await masuk(page, AKUN.citra.email);
+  await page.goto("/pipeline?v=papan");
+  const papan = page.getByTestId("papan-lead");
+  await expect(page.locator('[data-uji="kolom-kategori"]')).toHaveCount(9);
+  const kiri = page.getByTestId("geser-papan-kiri");
+  const kanan = page.getByTestId("geser-papan-kanan");
+  if (diHp(page)) {
+    // HP: usap, tanpa tombol; tinggi papan tetap mengikuti isi
+    await expect(kanan).toBeHidden();
+    await expect(kiri).toBeHidden();
+    return;
+  }
+  // scrollbar horizontal (dasar papan) terlihat di layar, bukan di dasar kolom terpanjang
+  const kotak = await papan.boundingBox();
+  expect((kotak?.y ?? 0) + (kotak?.height ?? 0)).toBeLessThanOrEqual(page.viewportSize()?.height ?? 0);
+  expect(await papan.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+  expect(await page.locator('[data-uji="isi-kolom-kategori"]').first().evaluate((ul) => getComputedStyle(ul).overflowY)).toBe("auto");
+  await expect(kiri).toHaveCount(0);
+  await kanan.click();
+  await expect.poll(() => papan.evaluate((el) => el.scrollLeft)).toBeGreaterThan(200);
+  await expect(kiri).toBeVisible();
+  await kiri.click();
+  await expect.poll(() => papan.evaluate((el) => el.scrollLeft)).toBeLessThan(5);
+  await expect(kiri).toHaveCount(0);
+});

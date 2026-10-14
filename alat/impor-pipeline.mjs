@@ -15,7 +15,8 @@
 //
 // Idempoten: jalankan 2x → SQL identik (deterministik; tanpa acak) & aman diterapkan ulang (cari-dulu / hapus-lalu-isi
 // pada anak). Nilai tak cocok enum TIDAK dipaksa → ditandai periksa. Baris tinjau → periksa=true + periksa_sebab (agar
-// lolos indeks unik parsial lead_no_sp_uniq yang mengecualikan baris periksa).
+// lolos indeks unik parsial lead_no_sp_uniq yang mengecualikan baris periksa). Lead yang ordernya DIBATALKAN di Anvil
+// (BATAL + alasan_batal "Order dibatalkan") dilewati utuh saat impor ulang → total Anvil bisa < sheet, sengaja.
 //
 //   node alat/impor-pipeline.mjs <berkas>                     → <berkas>.impor.sql + .laporan.md + .periksa.csv
 //   node alat/impor-pipeline.mjs <berkas> --sql out.sql --laporan out.md --periksa out.csv
@@ -37,6 +38,9 @@ import { pathToFileURL } from "node:url";
 export const PRODUK_SAH = ["Roda", "Pallet Mesh", "Airport Trolley", "Shopping Cart", "Lemari Arsip", "Material Handling", "Locker", "Lainnya"];
 export const SUMBER_SAH = ["Google Ads", "Meta Ads", "Website organik", "WA langsung", "Telepon", "Referral", "Repeat order", "Lainnya"];
 export const TAHAP_SAH = ["BARU", "PENAWARAN", "ORDER", "BATAL", "DIALIHKAN"];
+// alasan_batal khusus tombol "Batalkan order" (migrasi 20261014130000_pipeline_batal_order). Lead BATAL dengan alasan ini =
+// order yang DIBATALKAN di Anvil → impor ulang melewatinya (sheet masih menulis "Order"; tanpa penjaga lead kembali ORDER).
+export const ALASAN_BATAL_ORDER = "Order dibatalkan";
 export const ROMAWI = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
 export const POLA_SP = /^\d+\/(RSG|MCE)\/(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII)\/20\d\d$/;
 // nama perusahaan "kosong" menurut Ringkasan sheet (dikecualikan dari hitung unik) → jenis perorangan, tidak di-dedup
@@ -485,6 +489,7 @@ export function laporanMarkdown(lap, hasil, sumberNama) {
     l.push(`| ${b} | ${x.leads} | ${x.order} | ${rupiah(x.omzet)} |`);
   }
   l.push("");
+  l.push(`_Angka di atas = isi sheet. Lead yang ordernya dibatalkan di Anvil (alasan "${ALASAN_BATAL_ORDER}") dilewati SQL, jadi order/omzet Ringkasan Anvil sesudah impor bisa lebih kecil dari sheet (sengaja)._`, "");
   if (lap.selisih) {
     l.push(`## Selisih vs Ringkasan Bulanan sheet`, "");
     l.push(`Status: **${lap.selisih.lulus ? "LULUS (selisih 0 semua)" : "ADA SELISIH — jelaskan baris per baris sebelum kunci sheet (§7)"}**`, "");
@@ -534,6 +539,9 @@ function blokLead(lead) {
   L.push(`  v_pel text; v_kontak text; v_lead text; v_pel_lama text; v_kontak_lama text; v_pemilik bigint; v_telp text;`);
   L.push(`begin`);
   L.push(`  select id, pelanggan_id, kontak_id into v_lead, v_pel_lama, v_kontak_lama from public.lead where ref_sheet = ${qstrWajib(lead.ref_sheet)} limit 1;`);
+  // penjaga: order yang dibatalkan di Anvil ("Batalkan order", alasan tertulis) TIDAK disentuh sama sekali (pelanggan,
+  // kontak, lead, item, catatan) → pembatalan + alasannya tidak hilang & lead tidak kembali ORDER/omzet.
+  L.push(`  if v_lead is not null and exists (select 1 from public.lead where id = v_lead and tahap = 'BATAL' and alasan_batal = ${qstrWajib(ALASAN_BATAL_ORDER)}) then return; end if;`);
   // pelanggan
   if (p.dedup) {
     L.push(`  select id into v_pel from public.pelanggan where lower(btrim(nama)) = lower(${qstrWajib(p.nama)}) limit 1;`);
@@ -595,6 +603,7 @@ export function buatSQL(hasil, opsi, sumberNama, leads = hasil.leads, info = "")
   kepala.push(`-- Impor Pipeline (§7) — DIHASILKAN oleh alat/impor-pipeline.mjs. JANGAN commit (berisi data pelanggan).`);
   kepala.push(`-- Sumber: ${path.basename(sumberNama)}${info ? ` ${info}` : ""} · lead: ${leads.length} · periksa: ${periksaN}`);
   kepala.push(`-- Terapkan: bash alat/sql-proyek.sh <berkas .impor.sql>   (idempoten; aman diulang — kunci ref_sheet)`);
+  kepala.push(`-- Lead yang ordernya DIBATALKAN di Anvil (BATAL + alasan_batal '${ALASAN_BATAL_ORDER}') dilewati utuh: tidak dikembalikan ke ORDER.`);
   kepala.push(`-- Konteks aktor impor (dibuat_oleh/riwayat). Sumber 'impor'. Tanpa ini, dibuat_oleh = null (FK nullable, tetap jalan).`);
   kepala.push(`set statement_timeout = 0;`);
   kepala.push(`select set_config('app.sumber', 'impor', false);`);
