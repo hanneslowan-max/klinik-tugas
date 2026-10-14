@@ -135,7 +135,7 @@ function Sidebar({ path, navUtama }: { path: string; navUtama: ItemNav[] }) {
             }}
             aria-label="Sembunyikan sidebar"
             title={`Sembunyikan sidebar (${PINTASAN_SIDEBAR})`}
-            className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
             data-uji="sembunyikan-sidebar"
           >
             <PanelLeftClose className="size-4.5" aria-hidden />

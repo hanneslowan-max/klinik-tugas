@@ -48,7 +48,7 @@ export function KepalaHalaman({ judul, judulDokumen, kembali, aksi, className }:
             sidebar.alih();
             fokusSesudahRender("sembunyikan-sidebar");
           }}
-          className="hidden size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 lg:inline-flex"
+          className="hidden size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground lg:inline-flex"
           data-uji="tampilkan-sidebar"
         >
           <PanelLeftOpen className="size-5" aria-hidden />
