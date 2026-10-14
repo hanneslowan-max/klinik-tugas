@@ -2,10 +2,11 @@
 // password sementara. Profil, hari libur, dan akses Pipeline dimuat di server lalu diteruskan ke klien. Ketiganya
 // dibaca BERSAMAAN (bukan berurutan): HTML baru terkirim sesudah layout selesai, jadi tiap panggilan berurutan ke
 // Supabase menambah satu round-trip pada setiap muat penuh.
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { KerangkaApp } from "@/components/layout/kerangka-app";
+import { KUKI_SIDEBAR, sidebarTerbukaDariKuki } from "@/components/layout/sidebar-kuki";
 import { AkunBelumAktif } from "@/features/auth/akun-belum-aktif";
 import { ambilPipelineSaya } from "@/features/pipeline/server";
 import { PenyediaProfil } from "@/features/profil/penyedia-profil";
@@ -43,9 +44,13 @@ export default async function LayoutApp({ children }: LayoutProps<"/">) {
   if (profil.member.harus_ganti_password) redirect(`/ganti-password?lanjut=${lanjut}`);
 
   const [libur, pipelineAwal] = await Promise.all([janjiLibur, janjiPipeline]);
+  // sidebar desktop disembunyikan? (pilihan pengguna di cookie) — dirender benar sejak HTML pertama, tanpa kedip
+  const sidebarAwal = sidebarTerbukaDariKuki((await cookies()).get(KUKI_SIDEBAR)?.value);
   return (
     <PenyediaProfil awal={profil} liburAwal={libur}>
-      <KerangkaApp pipelineAwal={pipelineAwal}>{children}</KerangkaApp>
+      <KerangkaApp pipelineAwal={pipelineAwal} sidebarAwal={sidebarAwal}>
+        {children}
+      </KerangkaApp>
     </PenyediaProfil>
   );
 }

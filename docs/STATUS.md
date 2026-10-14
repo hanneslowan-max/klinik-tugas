@@ -294,6 +294,26 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   `20261013170000_pipeline_daftar_cepat` (belum pernah diterapkan ke produksi). Tidak dikerjakan (catatan): batas panjang
   deskripsi tugas di fungsi tulis DB (pertahanan berlapis untuk temuan 1).
 
+## Sidebar desktop bisa disembunyikan (14 Okt 2026, sesudah deploy `main` b522a1a)
+
+- **Isi:** permintaan Hannes "sidebar bisa di-hide di tampilan desktop". Tombol di kepala sidebar (sembunyikan), tombol
+  di header halaman saat tersembunyi (tampilkan), atau `Ctrl/⌘ + \`. Konten melebar/terpusat ulang. Pilihan disimpan di
+  cookie `anvil_sidebar` (1 tahun, per perangkat/peramban) dan dibaca layout `(app)` di server → HTML pertama sudah benar,
+  tanpa kedip. Tersembunyi = lebar 0 + `inert` + isi `invisible` sesudah animasi. HP tidak berubah (navigasi bawah).
+  Halaman galat `(app)` kini ikut punya header (tombol tampilkan + lonceng tetap ada). Tanpa migrasi DB.
+- **Berkas:** `web/src/components/layout/sidebar.tsx` (konteks + pintasan + cookie), `sidebar-kuki.ts` (konstanta untuk
+  server), `kerangka-app.tsx`, `kepala-halaman.tsx`, `app/(app)/layout.tsx`, `app/(app)/error.tsx`.
+- **Tinjauan PR (3 peninjau + verifikasi skeptis) → diperbaiki:** (1) Kembali / Batal (< 30 dtk) dari Ganti password
+  memasang ulang penyedia dengan payload layout lama dari cache router → sidebar berbalik dan cookie tertimpa → kini
+  cookie = sumber kebenaran di klien (`useSyncExternalStore`, `awal` hanya untuk hidrasi) dan cookie hanya ditulis saat
+  pengguna mengalihkan; (2) pintasan menjatuhkan fokus ke `<body>` bila fokus di sidebar / tombol tampilkan → dipindah ke
+  tombol pasangan; (3) pintasan di bawah lg diam-diam mengubah pilihan → diabaikan; (4) cincin fokus tombol baru
+  disamakan dengan tombol header lain (outline bawaan).
+- **Tes:** `web/tests/e2e/sidebar.spec.ts` (desktop: sembunyikan/tampilkan, fokus pindah, cookie, HTML server, muat
+  ulang, pintasan + fokus + layar < lg, Kembali/Batal dari Ganti password; HP: tidak ada tombol). Dua tes baru terbukti
+  GAGAL terhadap kode sebelum perbaikan. Typecheck, lint, vitest 89, build produksi hijau; e2e penuh terhadap
+  `next start` + Supabase lokal: **100 lulus, 14 dilewati sengaja**.
+
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)
 Prasyarat dari Hannes: project Supabase baru `rhj-tugas` (akun/org baru, Sydney `ap-southeast-2` per keputusan 30/9, Free); env cloud `SUPABASE_ACCESS_TOKEN` (PAT akun baru) + `SUPABASE_PROJECT_REF`; `CLICKUP_API_TOKEN` (sudah ada); sesi baru supaya env terbaca. Semua langkah ke ClickUp **GET saja**. Tidak memakai MCP Supabase (itu ERP).
 
