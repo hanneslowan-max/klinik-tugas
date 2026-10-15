@@ -253,6 +253,23 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   layar dan mouse biasa tidak bisa menggeser papan. Kini di desktop (lg) papan setinggi sisa layar (`--atas-papan`
   diukur `useGeserPapan`), tiap kolom menggulir sendiri, dan ada tombol geser ◀ ▶ di tepi papan (Shift + roda juga
   bisa). HP tidak berubah (usap). Tes e2e di `pipeline-papan.spec.ts` (9 kolom). Tanpa migrasi.
+- **Peringatan lead dobel per nomor WA (15 Okt, IMP-CMO-261015-1, ACC Hannes, branch `claude/anvil-cek-duplikat-wa`,
+  migrasi `20261015120000_pipeline_cek_duplikat_wa`).** 50 dari 170 lead Okt bernama pelanggan "-", jadi kunci dobel =
+  nomor. Form Lead baru memanggil `web_pipeline_cek_duplikat(p_telepon)` (inti `inti_pipeline_cek_duplikat`; normalisasi
+  `pipeline_telp_norm`, nomor < 8 digit diabaikan; maks 5 lead terbaru + total) saat kolom Telepon / WA ditinggalkan dan
+  sebelum simpan → peringatan "Nomor ini sudah ada di lead: <kode> (<tahap>, PIC <sales>) — cek dulu, jangan dobel".
+  BUKAN blokir: bila baru ketahuan saat Simpan, ditahan sekali; tekan lagi tersimpan. Hak = `web_pipeline_pelanggan_cari`
+  (admin/owner/bot + rep; 'baca' & tanpa akses PT403). Nomor tidak bisa diubah sesudah lead dibuat (dialog Ubah tanpa
+  kolom telepon), jadi tidak ada cek di sana. Ikut di PR yang sama: **teks bantu di bawah Sumber** (Lead baru & Ubah):
+  "Tanya pelanggan: dapat kontak kami dari mana? …" — data 15 Okt: 46 dari 48 lead sejak 13/10 "WA langsung", 0 "Google
+  Ads"; daftar nilai Sumber, CHECK DB, dan data lama TIDAK diubah. Tes: `uji/db/26_pipeline_cek_duplikat.sql` (36 cek;
+  09: `web_*` 48 → 49), `web/src/features/pipeline/duplikat.test.ts`, `web/tests/e2e/pipeline-cek-duplikat.spec.ts`.
+  **Migrasi BELUM diterapkan ke produksi; terapkan SEBELUM merge** (merge = deploy; web baru di DB lama → cek dobel
+  diam-diam gagal, form tetap jalan). Temuan sampingan (belum diperbaiki): `inti_pipeline_lead_buat` /
+  `inti_pipeline_pelanggan_cari` / `pipeline_boleh_ubah` memakai `peran not in ('admin','rep')` — peran NULL (anggota
+  tanpa akses Pipeline) lolos, jadi lewat RPC langsung bisa membuat lead, mencari pelanggan, dan mencatat FU di lead
+  tanpa pemilik (terbukti di DB lokal; UI menyembunyikan menu, jadi hanya lewat RPC). Fungsi baru ini sudah memakai
+  `coalesce(peran, '')`.
 - **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md` — **wajib pakai alat impor versi berpenjaga (14 Okt, sesudah Batal order)**; versi lama mengembalikan order yang dibatalkan di Anvil ke ORDER.
 
 ## Notifikasi "Dari tim" / "Dari agent" (revisi #2, 13 Okt 2026, branch `rev2-notif`)

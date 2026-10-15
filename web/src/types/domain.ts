@@ -487,6 +487,24 @@ export type PelangganCari = {
   kontak: { id: string; nama: string | null; telepon: string | null }[];
 };
 
+/** Satu lead lain dengan nomor WA/telepon yang sama (web_pipeline_cek_duplikat). */
+export type LeadDuplikat = {
+  id: string;
+  kode: string;
+  pelanggan: string;
+  tahap: TahapLead;
+  pemilik: IdAnggota | null;
+  /** sales pemilik lead (username Anvil) */
+  pemilik_nama: string | null;
+  /** nama PIC di pihak pelanggan (kontak) */
+  kontak_nama: string | null;
+  tanggal_masuk: string;
+  dibuat_pada: string;
+};
+
+/** Hasil web_pipeline_cek_duplikat: maks 5 lead terbaru + total. Nomor < 8 digit diabaikan (telepon null, items kosong). */
+export type CekDuplikatTelepon = { telepon: string | null; total: number; items: LeadDuplikat[] };
+
 /** win-rate kecil = public.pipeline_wr. */
 export type WinRate = { order: number; batal: number; matang: number; rate: number | null };
 
@@ -589,6 +607,7 @@ export type HasilRpc = {
   web_pipeline_lead_ubah: LeadDetail;
   web_pipeline_order_ubah: LeadDetail;
   web_pipeline_pelanggan_cari: PelangganCari[];
+  web_pipeline_cek_duplikat: CekDuplikatTelepon;
   web_pipeline_ringkas: RingkasPipeline;
   web_pipeline_akses_daftar: DaftarAksesPipeline;
   // simpan mengembalikan daftar akses terkini (tanpa nama/role/aktif); layar menyegar lewat _daftar.

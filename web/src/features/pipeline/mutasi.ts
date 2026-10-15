@@ -9,7 +9,7 @@ import { rpc } from "@/lib/api/rpc";
 import { kunci } from "@/lib/kunci-query";
 import { klienBrowser } from "@/lib/supabase/client";
 import type { Json } from "@/types/database";
-import type { LeadDetail, PapanKategori, PelangganCari, ProdukLead, SatuanItem, StatusBayar, SumberLead } from "@/types/domain";
+import type { CekDuplikatTelepon, LeadDetail, PapanKategori, PelangganCari, ProdukLead, SatuanItem, StatusBayar, SumberLead } from "@/types/domain";
 
 /**
  * Sesudah mutasi lead: hasil mutasi = lead terkini → cache detail (tanpa web_pipeline_lead kedua), lalu muat ulang
@@ -131,6 +131,14 @@ export function useOrderUbah() {
 /** Pencarian pelanggan (dedup saat input lead baru). Dipanggil imperatif (debounce di komponen). */
 export function cariPelanggan(q: string): Promise<PelangganCari[]> {
   return rpc(klienBrowser(), "web_pipeline_pelanggan_cari", { p_q: q });
+}
+
+/**
+ * Lead lain dengan nomor WA/telepon yang sama (peringatan dobel, bukan blokir; IMP-CMO-261015-1). Maks 5 terbaru +
+ * total. Dipanggil imperatif saat kolom telepon ditinggalkan & sebelum simpan.
+ */
+export function cekDuplikatTelepon(telepon: string): Promise<CekDuplikatTelepon> {
+  return rpc(klienBrowser(), "web_pipeline_cek_duplikat", { p_telepon: telepon });
 }
 
 // -------------------------------------------------------------------- kategori papan pribadi
