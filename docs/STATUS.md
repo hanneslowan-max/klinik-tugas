@@ -292,9 +292,15 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
     `pelanggan_dobel_abaikan`, 7 fungsi `web_pipeline_pelanggan*`. Saran "nama mirip" membandingkan pasangan yang 2 huruf
     awal / 3 huruf akhir kuncinya sama (produksi: 30 dari 30 pasangan perbandingan penuh). Kinerja lokal (1.900 pelanggan,
     2.060 lead): daftar ±110–120 ms, detail ±16 ms, cari ±4 ms, saran gabung (admin) ±0,5 dtk, daftar lead tetap ±90 ms.
-  - Tes: `uji/db/26_pipeline_pelanggan.sql` (125 cek), 09 (jumlah `web_*` 48 → 55), `uji/pipeline/jalankan.mjs` (111 cek),
+  - **Perbaikan hak (migrasi `20261017130000_pipeline_pelanggan_hak`):** `inti_pipeline_pelanggan_cari` & `_ubah` memakai
+    `peran not in ('admin','rep')`, sehingga anggota TANPA akses Pipeline (peran NULL) lolos: lewat RPC langsung bisa
+    mencari pelanggan + kontak (nama PIC, nomor HP). `_ubah` kebetulan tetap gagal (detail di akhir fungsi menolak →
+    rollback). Kini `coalesce(peran, '')` → PT403. Ditemukan sesudah `20261017120000` diterapkan; perbaikan diterapkan ke
+    produksi 17 Okt. Pola yang sama di fungsi lama (`inti_pipeline_lead_buat`, `pipeline_boleh_ubah`; dicatat PR #14)
+    belum diubah.
+  - Tes: `uji/db/26_pipeline_pelanggan.sql` (134 cek, termasuk 9 cek anggota tanpa akses), 09 (jumlah `web_*` 48 → 55), `uji/pipeline/jalankan.mjs` (111 cek),
     unit `web/src/features/pipeline/pelanggan.test.ts`, e2e `web/tests/e2e/pipeline-pelanggan.spec.ts` (8 tes × HP/desktop).
-    Verifikasi 17 Okt dari `supabase db reset`: `uji/db` **26/26 berkas, 1.448 cek**; vitest 104 tes; typecheck, lint, build
+    Verifikasi 17 Okt dari `supabase db reset`: `uji/db` **26/26 berkas, 1.457 cek**; vitest 104 tes; typecheck, lint, build
     produksi hijau; e2e penuh `next start` + Supabase lokal: **130 lulus, 14 dilewati sengaja**.
   - **Urutan produksi:** terapkan migrasi `20261017120000` **SEBELUM merge** (web baru di DB lama → layar Pelanggan galat
     "fungsi tidak ditemukan"); lalu, dengan izin Hannes, jalankan gabung otomatis:

@@ -232,6 +232,26 @@ select uji.jadi_service();
 select uji.galat($q$select public.web_pipeline_pelanggan_daftar('{}')$q$, '42501', 'service_role: web_pipeline_pelanggan_daftar ditolak');
 reset role;
 
+-- ------------------------------------------------------------ anggota TANPA akses Pipeline (peran NULL): semua ditolak
+-- (20261017130000: dulu `peran not in (…)` meloloskan NULL di ubah & cari)
+delete from public.pipeline_akses where member_id = 900000000001;
+select uji.jadi('44444444-4444-4444-8444-444444444444');
+select uji.galat($q$select public.web_pipeline_pelanggan_ubah('{"pelanggan_id":"plujipg13","nama":"Diubah tanpa akses"}')$q$, 'PT403',
+  'tanpa akses: ubah pelanggan ditolak', 'akses tulis', 'ACCESS_001');
+select uji.galat($q$select public.web_pipeline_pelanggan_cari('berkah')$q$, 'PT403', 'tanpa akses: cari pelanggan ditolak', 'akses tulis', 'ACCESS_001');
+select uji.galat($q$select public.web_pipeline_pelanggan_cari('0812-1111-2222')$q$, 'PT403', 'tanpa akses: cari lewat nomor HP ditolak',
+  'akses tulis', 'ACCESS_001');
+select uji.galat($q$select public.web_pipeline_pelanggan_daftar('{}')$q$, 'PT403', 'tanpa akses: daftar ditolak', 'akses Pipeline', 'ACCESS_001');
+select uji.galat($q$select public.web_pipeline_pelanggan('plujipg01')$q$, 'PT403', 'tanpa akses: detail ditolak', 'akses Pipeline', 'ACCESS_001');
+select uji.galat($q$select public.web_pipeline_pelanggan_dobel()$q$, 'PT403', 'tanpa akses: saran dobel ditolak', 'Hanya admin', 'ACCESS_001');
+select uji.galat($q$select public.web_pipeline_pelanggan_gabung('{"ke_id":"plujipg06","dari_ids":["plujipg07"]}')$q$, 'PT403',
+  'tanpa akses: gabung ditolak', 'Hanya admin', 'ACCESS_001');
+select uji.galat($q$select public.web_pipeline_pelanggan_dobel_abaikan('{"alasan":"mirip","ids":["plujipg06","plujipg07"]}')$q$, 'PT403',
+  'tanpa akses: bukan dobel ditolak', 'Hanya admin', 'ACCESS_001');
+reset role;
+select uji.sama((select nama from public.pelanggan where id = 'plujipg13'), 'PT Rantai Uji Tiga', 'tanpa akses: nama pelanggan tidak berubah');
+insert into public.pipeline_akses (member_id, peran, kode_sp) values (900000000001, 'rep', 'MCE');
+
 -- ------------------------------------------------------------ cari pelanggan (form Lead baru)
 select uji.jadi('22222222-2222-4222-8222-222222222222');
 select uji.simpan('c1', public.web_pipeline_pelanggan_cari('PT Berkah Nidatama'));
