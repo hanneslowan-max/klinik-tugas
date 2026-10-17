@@ -18,12 +18,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { GrupChip, GrupChipGanda } from "@/features/pipeline/chip-pilih";
 import { kalimatDuplikat, normalTelepon } from "@/features/pipeline/duplikat";
-import { BANTU_SUMBER, PRODUK, SATUAN, SUMBER } from "@/features/pipeline/konstanta";
+import { BANTU_SUMBER, namaPelanggan, PRODUK, SATUAN, SUMBER } from "@/features/pipeline/konstanta";
 import { cariPelanggan, cekDuplikatTelepon, useLeadBaru, type BodyLeadBaru, type ItemMasuk } from "@/features/pipeline/mutasi";
 import { pesanGalat } from "@/lib/api/galat";
 import { fmtTanggal } from "@/lib/tanggal";
 import { cn } from "@/lib/utils";
 import type { CekDuplikatTelepon, PelangganCari, ProdukLead, SatuanItem, SumberLead } from "@/types/domain";
+
+/** Nama tampilan saran: nama pengisi ("-", "Perorangan") diganti nama PIC pertama. */
+const namaSaran = (p: PelangganCari) => namaPelanggan({ nama: p.nama, semu: p.semu, pic: p.kontak.find((k) => k.nama)?.nama });
+
+/** Jejak pelanggan lama: '2 order · terakhir 12 Mar 2026' / '1 lead' (supaya rep tahu ini repeat order). */
+function jejakSaran(p: PelangganCari): string {
+  if (p.jml_order > 0) return `${p.jml_order} order${p.order_terakhir ? ` · terakhir ${fmtTanggal(p.order_terakhir)}` : ""}`;
+  return p.jml_lead > 0 ? `${p.jml_lead} lead` : "";
+}
 
 type DetailItem = { qty: string; satuan: SatuanItem };
 
@@ -37,6 +46,7 @@ function FormLeadBaru({ buka, ubahBuka }: { buka: boolean; ubahBuka: (b: boolean
 
   const [nama, setNama] = useState("");
   const [pelangganId, setPelangganId] = useState<string | null>(null);
+  const [jejakLama, setJejakLama] = useState("");
   const [pic, setPic] = useState("");
   const [kota, setKota] = useState("");
   const [telepon, setTelepon] = useState("");
@@ -58,7 +68,7 @@ function FormLeadBaru({ buka, ubahBuka }: { buka: boolean; ubahBuka: (b: boolean
   // ter-mount utk kaki & animasi, jadi buka berikutnya tetap bersih.
   const tutup = (b: boolean) => {
     if (!b) {
-      setNama(""); setPelangganId(null); setPic(""); setKota(""); setTelepon("");
+      setNama(""); setPelangganId(null); setJejakLama(""); setPic(""); setKota(""); setTelepon("");
       setProduk([]); setDetail({}); setKebutuhan(""); setSumber(null);
       setSaran([]); setPeringatanTelp([]); setGalat(null); setGalatField({});
       setDobel(null); setTahanDobel(false);
@@ -112,7 +122,8 @@ function FormLeadBaru({ buka, ubahBuka }: { buka: boolean; ubahBuka: (b: boolean
 
   function pilihPelanggan(p: PelangganCari) {
     setPelangganId(p.id);
-    setNama(p.nama);
+    setNama(namaSaran(p));
+    setJejakLama(jejakSaran(p));
     if (p.kota) setKota(p.kota);
     const k = p.kontak[0];
     if (k) {
@@ -129,6 +140,7 @@ function FormLeadBaru({ buka, ubahBuka }: { buka: boolean; ubahBuka: (b: boolean
 
   function lepasPelanggan() {
     setPelangganId(null);
+    setJejakLama("");
   }
 
   function alihProduk(baru: ProdukLead[]) {
@@ -223,7 +235,9 @@ function FormLeadBaru({ buka, ubahBuka }: { buka: boolean; ubahBuka: (b: boolean
         {pelangganId ? (
           <div className="flex items-center gap-2 rounded-lg border bg-muted px-3 py-2 text-sm">
             <span className="min-w-0 flex-1 truncate font-medium">{nama}</span>
-            <span className="text-xs text-muted-foreground">pelanggan lama</span>
+            <span className="text-right text-xs text-muted-foreground" data-uji="lb-pelanggan-lama">
+              pelanggan lama{jejakLama ? ` · ${jejakLama}` : ""}
+            </span>
             <Button type="button" variant="ghost" size="sm" onClick={lepasPelanggan}>
               Ganti
             </Button>
@@ -248,8 +262,15 @@ function FormLeadBaru({ buka, ubahBuka }: { buka: boolean; ubahBuka: (b: boolean
                       onClick={() => pilihPelanggan(p)}
                       className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
                     >
-                      <span className="min-w-0 flex-1 truncate">{p.nama}</span>
-                      {p.kota ? <span className="shrink-0 text-xs text-muted-foreground">{p.kota}</span> : null}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate">{namaSaran(p)}</span>
+                        {jejakSaran(p) ? (
+                          <span className={cn("block text-xs", p.jml_order > 0 ? "text-sukses" : "text-muted-foreground")}>
+                            {jejakSaran(p)}
+                          </span>
+                        ) : null}
+                      </span>
+                      {p.kota ? <span className="max-w-[40%] shrink-0 truncate text-xs text-muted-foreground">{p.kota}</span> : null}
                     </button>
                   </li>
                 ))}
@@ -307,7 +328,8 @@ function FormLeadBaru({ buka, ubahBuka }: { buka: boolean; ubahBuka: (b: boolean
             Nomor ini mungkin milik pelanggan lama:{" "}
             {peringatanTelp.slice(0, 3).map((p, i) => (
               <button key={p.id} type="button" onClick={() => pilihPelanggan(p)} className="underline">
-                {p.nama}
+                {namaSaran(p)}
+                {p.jml_order > 0 ? ` (${p.jml_order} order)` : ""}
                 {i < Math.min(peringatanTelp.length, 3) - 1 ? ", " : ""}
               </button>
             ))}

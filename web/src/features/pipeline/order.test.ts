@@ -11,7 +11,7 @@ function lead(kode: string, sebagian: Partial<LeadRingkas>): LeadRingkas {
     id: `ld${kode}`, kode, tahap: "ORDER", sumber: "Google Ads", pelanggan: `PT ${kode}`, kota: null, pemilik: null,
     pemilik_nama: null, pemilik_kode_sp: null, tanggal_masuk: "2026-01-01", diam_hari: 0, fu_berikutnya: null, nilai_transaksi: null, no_sp: null,
     tanggal_sp: null, no_po: null, bayar_status: "BELUM", bayar_dp: null, tanggal_dp: null, tanggal_lunas: null,
-    periksa: false, produk: [], ...sebagian,
+    periksa: false, pelanggan_id: `pl${kode}`, order_sebelumnya: 0, produk: [], ...sebagian,
   };
 }
 

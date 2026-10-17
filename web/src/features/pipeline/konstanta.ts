@@ -5,7 +5,18 @@ import type { VariantProps } from "class-variance-authority";
 
 import type { chipVariants } from "@/components/umum/chip";
 import { fmtTanggal, selisihHari } from "@/lib/tanggal";
-import type { AlasanBatal, JenisAktivitas, ProdukLead, SatuanItem, StatusBayar, SumberLead, TahapLead } from "@/types/domain";
+import type {
+  AlasanBatal,
+  AlasanDobel,
+  JenisAktivitas,
+  ProdukLead,
+  SaringPelanggan,
+  SatuanItem,
+  StatusBayar,
+  SumberLead,
+  TahapLead,
+  UrutPelanggan,
+} from "@/types/domain";
 
 export const PRODUK: ProdukLead[] = [
   "Roda", "Pallet Mesh", "Airport Trolley", "Shopping Cart",
@@ -128,4 +139,39 @@ export function infoFu(fu: string, hariIni: string): { teks: string; mendesak: b
   if (fu < hariIni) return { teks: `FU telat ${selisihHari(fu, hariIni)} hr`, mendesak: true };
   if (fu === hariIni) return { teks: "FU hari ini", mendesak: true };
   return { teks: `FU ${fmtTanggal(fu, hariIni)}`, mendesak: false };
+}
+
+// -------------------------------------------------------------------- database pelanggan (20261017120000)
+/**
+ * Nama tampilan pelanggan. Nama pengisi dari sheet ("-", "Perorangan", "Pribadi", …; `semu` dari server) diganti nama
+ * PIC; tanpa PIC (atau disembunyikan untuk peran baca) → "Perorangan".
+ */
+export function namaPelanggan(p: { nama: string; semu?: boolean; pic?: string | null }): string {
+  if (!p.semu) return p.nama;
+  return p.pic?.trim() || "Perorangan";
+}
+
+export const SARING_PELANGGAN: { kunci: SaringPelanggan; label: string }[] = [
+  { kunci: "semua", label: "Semua" },
+  { kunci: "repeat", label: "Repeat order" },
+  { kunci: "order", label: "Pernah order" },
+  { kunci: "aktif", label: "Ada lead aktif" },
+];
+
+export const URUT_PELANGGAN: { kunci: UrutPelanggan; label: string }[] = [
+  { kunci: "terakhir", label: "Aktivitas terakhir" },
+  { kunci: "order", label: "Order terbanyak" },
+  { kunci: "nilai", label: "Nilai order terbesar" },
+  { kunci: "nama", label: "Nama (A–Z)" },
+];
+
+export const ALASAN_DOBEL: Record<AlasanDobel, string> = {
+  nama: "Nama sama",
+  telepon: "Nomor HP sama",
+  mirip: "Nama mirip",
+};
+
+/** Tanggal "kejadian" lead di log pelanggan: tanggal SP untuk order (atau order dibatalkan), selain itu tanggal masuk. */
+export function tanggalLog(l: { tanggal_masuk: string; tanggal_sp: string | null; no_sp: string | null }): string {
+  return l.no_sp && l.tanggal_sp ? l.tanggal_sp : l.tanggal_masuk;
 }

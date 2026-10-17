@@ -162,6 +162,17 @@ cek("set_config app.actor_id ada", sql1.includes("select set_config('app.actor_i
 cek("set_config app.sumber impor ada", sql1.includes("select set_config('app.sumber', 'impor', false)"));
 cek("kunci ref_sheet dipakai (cari lead dulu)", sql1.includes("from public.lead where ref_sheet = 'r4' limit 1"), "r4 lookup");
 cek("pelanggan dedup by lower(nama) (cari dulu, baru insert)", sql1.includes("where lower(btrim(nama)) = lower('PT Sinar Uji')"));
+// database pelanggan (20261017120000): impor ulang tidak boleh membatalkan gabung/ubah nama pelanggan di Anvil
+cek("pelanggan juga dicari lewat kunci nama (PT./CV/tanda baca beda)",
+  sql1.includes("where kunci = public.pipeline_nama_kunci('PT Sinar Uji') order by id limit 1"));
+cek("nama pelanggan yang sudah digabung → tujuan gabung (pipeline_pelanggan_akhir)",
+  sql1.includes("select public.pipeline_pelanggan_akhir(g.dari_id) into v_pel from public.pelanggan_gabung g where g.dibatalkan_pada is null and public.pipeline_nama_kunci(g.dari ->> 'nama') = public.pipeline_nama_kunci('PT Sinar Uji')"));
+{
+  const blokSinar = sql1.split(/^do \$/m).find((b) => b.includes("lower('PT Sinar Uji')")) ?? "";
+  const urut = ["lower(btrim(nama)) = lower('PT Sinar Uji')", "where kunci = public.pipeline_nama_kunci(", "public.pelanggan_gabung g", "v_pel := v_pel_lama", "insert into public.pelanggan"]
+    .map((t) => blokSinar.indexOf(t));
+  cek("urutan cari pelanggan: nama → kunci → gabung → lead lama → buat baru", urut.every((x, i) => x >= 0 && (i === 0 || x > urut[i - 1])), urut);
+}
 cek("kontak dedup by telepon (pakai pipeline_telp_norm)", sql1.includes("public.pipeline_telp_norm("));
 cek("lead_item hapus-lalu-isi (idempoten)", sql1.includes("delete from public.lead_item where lead_id = v_lead;"));
 cek("lead_aktivitas Catatan impor hapus-lalu-isi", sql1.includes("delete from public.lead_aktivitas where lead_id = v_lead and jenis = 'Catatan impor';"));

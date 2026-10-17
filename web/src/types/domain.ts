@@ -430,6 +430,9 @@ export type LeadRingkas = {
   tanggal_dp: string | null;
   tanggal_lunas: string | null;
   periksa: boolean;
+  pelanggan_id: string;
+  /** jumlah lead LAIN pelanggan yang sama yang sudah ORDER dan masuk lebih dulu (> 0 = repeat, 20261017120000) */
+  order_sebelumnya: number;
   produk: ItemLeadRingkas[];
 };
 
@@ -484,6 +487,11 @@ export type PelangganCari = {
   nama: string;
   kota: string | null;
   jenis: JenisPelanggan;
+  /** nama pengisi ("-", "Perorangan", …) — tampilkan nama PIC */
+  semu: boolean;
+  jml_lead: number;
+  jml_order: number;
+  order_terakhir: string | null;
   kontak: { id: string; nama: string | null; telepon: string | null }[];
 };
 
@@ -504,6 +512,80 @@ export type LeadDuplikat = {
 
 /** Hasil web_pipeline_cek_duplikat: maks 5 lead terbaru + total. Nomor < 8 digit diabaikan (telepon null, items kosong). */
 export type CekDuplikatTelepon = { telepon: string | null; total: number; items: LeadDuplikat[] };
+
+// -------------------------------------------------------------------- database pelanggan (20261017120000)
+/** Kartu pelanggan (daftar, saran) = public.j_pipeline_pelanggan_ringkas. pic null untuk peran 'baca'. */
+export type PelangganRingkas = {
+  id: string;
+  nama: string;
+  semu: boolean;
+  jenis: JenisPelanggan;
+  kota: string | null;
+  pic: string | null;
+  jml_lead: number;
+  jml_order: number;
+  jml_batal: number;
+  jml_aktif: number;
+  nilai_order: number;
+  lead_pertama: string | null;
+  lead_terakhir: string | null;
+  /** tanggal order = tanggal SP (atau tanggal masuk bila SP kosong) */
+  order_pertama: string | null;
+  order_terakhir: string | null;
+  produk: ProdukLead[];
+};
+
+export type DaftarPelanggan = { total: number; items: PelangganRingkas[] };
+export type SaringPelanggan = "semua" | "order" | "repeat" | "aktif";
+export type UrutPelanggan = "terakhir" | "order" | "nilai" | "nama";
+export type AlasanDobel = "nama" | "telepon" | "mirip";
+
+export type GabungPelanggan = {
+  id: number;
+  dari_id: string;
+  dari_nama: string;
+  jml_lead: number;
+  jml_kontak: number;
+  cara: "manual" | "otomatis";
+  alasan: AlasanDobel | null;
+  oleh_nama: string | null;
+  waktu: string;
+  dibatalkan_pada: string | null;
+  dibatalkan_oleh_nama: string | null;
+};
+
+/** Hasil web_pipeline_pelanggan. Kontak kosong + kontak_disembunyikan untuk peran 'baca' (§6). */
+export type PelangganDetail = {
+  pelanggan: { id: string; nama: string; semu: boolean; jenis: JenisPelanggan; kota: string | null; catatan: string | null; pic: string | null };
+  kontak: { id: string; nama: string | null; telepon: string | null; jabatan: string | null; jml_lead: number }[];
+  kontak_disembunyikan: boolean;
+  ringkas: {
+    jml_lead: number;
+    jml_order: number;
+    jml_batal: number;
+    jml_aktif: number;
+    nilai_order: number;
+    lead_pertama: string | null;
+    lead_terakhir: string | null;
+    order_pertama: string | null;
+    order_terakhir: string | null;
+    produk: ProdukLead[];
+    /** rata-rata jarak antar order (hari), null bila < 2 order */
+    jeda_order_hari: number | null;
+  };
+  /** semua lead pelanggan ini, terbaru dulu */
+  leads: LeadRingkas[];
+  gabung: GabungPelanggan[];
+  /** saran pelanggan yang mungkin sama (admin saja) */
+  mungkin_sama: (PelangganRingkas & { alasan: AlasanDobel })[];
+  boleh_ubah: boolean;
+  boleh_gabung: boolean;
+};
+/** Tautan lama ke pelanggan yang sudah digabung → id tujuannya. */
+export type PelangganDigabung = { digabung_ke: string };
+
+export type KelompokDobel = { kunci: string; alasan: AlasanDobel; anggota: (PelangganRingkas & { telepon: string[] })[] };
+export type DaftarDobel = { total: number; kelompok: KelompokDobel[] };
 
 /** win-rate kecil = public.pipeline_wr. */
 export type WinRate = { order: number; batal: number; matang: number; rate: number | null };
@@ -608,6 +690,13 @@ export type HasilRpc = {
   web_pipeline_order_ubah: LeadDetail;
   web_pipeline_pelanggan_cari: PelangganCari[];
   web_pipeline_cek_duplikat: CekDuplikatTelepon;
+  web_pipeline_pelanggan_daftar: DaftarPelanggan;
+  web_pipeline_pelanggan: PelangganDetail | PelangganDigabung;
+  web_pipeline_pelanggan_ubah: PelangganDetail;
+  web_pipeline_pelanggan_gabung: PelangganDetail;
+  web_pipeline_pelanggan_gabung_batal: PelangganDetail;
+  web_pipeline_pelanggan_dobel: DaftarDobel;
+  web_pipeline_pelanggan_dobel_abaikan: DaftarDobel;
   web_pipeline_ringkas: RingkasPipeline;
   web_pipeline_akses_daftar: DaftarAksesPipeline;
   // simpan mengembalikan daftar akses terkini (tanpa nama/role/aktif); layar menyegar lewat _daftar.

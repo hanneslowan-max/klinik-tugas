@@ -20,7 +20,16 @@ parsial `lead_no_sp_uniq`, trigger pengisi kode/riwayat/diam/cari).
   `periksa=true` + `periksa_sebab` agar manusia membereskan. Baris bertanda `periksa` **dikecualikan** dari indeks unik
   parsial `lead_no_sp_uniq` (sesuai komentar migrasi), jadi SP historis yang kotor/dobel tetap bisa masuk.
 - **Tanpa fungsi SQL baru.** SQL yang dihasilkan langsung memakai tabel + fungsi yang sudah ada
-  (`public.pipeline_telp_norm`). Tidak perlu migrasi tambahan.
+  (`public.pipeline_telp_norm`; sejak 17 Okt juga `pipeline_nama_kunci` / `pipeline_pelanggan_akhir` / tabel
+  `pelanggan_gabung` dari migrasi `20261017120000_pipeline_pelanggan` — **migrasi itu wajib sudah terpasang**).
+- **Gabung & ubah nama pelanggan di Anvil dihormati (17 Okt, database pelanggan).** Pelanggan sheet (bukan perorangan)
+  dicari berurutan: (1) nama persis (case-insensitive), (2) kunci nama sama — tanpa PT/CV/UD/PD/TB/Tbk, tanda baca &
+  spasi, aturan yang sama dengan gabung otomatis —, (3) nama pelanggan yang sudah **digabung** di Anvil → pelanggan
+  tujuannya (`pelanggan_gabung`, mengikuti rantai gabung), (4) untuk lead yang sudah ada: tetap di pelanggannya sekarang,
+  (5) baru dibuat bila semua gagal. Tanpa ini impor ulang di hari pindah membuat lagi pelanggan yang sudah digabung dan
+  memindah lead-nya kembali (dibuktikan di DB lokal 17 Okt: alat lama 3 pelanggan dibuat ulang + 3 lead pindah, alat baru
+  0 + 0). Akibatnya nama perusahaan yang dikoreksi di sheet tidak lagi memindah lead lama ke pelanggan baru — ubah
+  namanya di Anvil (Pelanggan → Ubah data pelanggan).
 - **Privasi.** stdout hanya ANGKA. Berkas `.impor.sql`, `.laporan.md`, `.periksa.csv` memuat nama/telepon pelanggan →
   **JANGAN commit**. Fixture uji 100% sintetis.
 

@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { rpc } from "@/lib/api/rpc";
 import { kunci } from "@/lib/kunci-query";
 import { klienBrowser } from "@/lib/supabase/client";
-import type { PipelineSaya } from "@/types/domain";
+import type { PipelineSaya, SaringPelanggan, UrutPelanggan } from "@/types/domain";
 
 /**
  * Akses modul untuk pengguna ini (gerbang menu & layar, §6). `awal` = hasil server dari layout (app) (KerangkaApp
@@ -65,5 +65,35 @@ export function usePipelineKategori() {
   return useQuery({
     queryKey: kunci.pipelineKategori,
     queryFn: () => rpc(klienBrowser(), "web_pipeline_kategori"),
+  });
+}
+
+// -------------------------------------------------------------------- database pelanggan (20261017120000)
+/** Daftar pelanggan + statistik lead/order. Data lama dipakai selama mengetik cari / ganti saringan. */
+export function usePelangganDaftar(arg: { q: string; saring: SaringPelanggan; urut: UrutPelanggan }) {
+  return useQuery({
+    queryKey: kunci.pipelinePelangganDaftar(arg.q, arg.saring, arg.urut),
+    queryFn: () =>
+      rpc(klienBrowser(), "web_pipeline_pelanggan_daftar", {
+        p: { q: arg.q || undefined, saring: arg.saring, urut: arg.urut },
+      }),
+    placeholderData: (lama) => lama,
+    ...opsiGcDaftar(arg.q),
+  });
+}
+
+/** Detail satu pelanggan: kontak, ringkasan, log lead/order, riwayat gabung (atau {digabung_ke} untuk tautan lama). */
+export function usePelanggan(id: string) {
+  return useQuery({
+    queryKey: kunci.pipelinePelanggan(id),
+    queryFn: () => rpc(klienBrowser(), "web_pipeline_pelanggan", { p_id: id }),
+  });
+}
+
+/** Saran pelanggan dobel (admin saja). */
+export function usePelangganDobel() {
+  return useQuery({
+    queryKey: kunci.pipelinePelangganDobel,
+    queryFn: () => rpc(klienBrowser(), "web_pipeline_pelanggan_dobel"),
   });
 }

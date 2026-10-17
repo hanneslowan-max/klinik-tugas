@@ -9,7 +9,19 @@ import { rpc } from "@/lib/api/rpc";
 import { kunci } from "@/lib/kunci-query";
 import { klienBrowser } from "@/lib/supabase/client";
 import type { Json } from "@/types/database";
-import type { CekDuplikatTelepon, LeadDetail, PapanKategori, PelangganCari, ProdukLead, SatuanItem, StatusBayar, SumberLead } from "@/types/domain";
+import type {
+  AlasanDobel,
+  CekDuplikatTelepon,
+  JenisPelanggan,
+  LeadDetail,
+  PapanKategori,
+  PelangganCari,
+  PelangganDetail,
+  ProdukLead,
+  SatuanItem,
+  StatusBayar,
+  SumberLead,
+} from "@/types/domain";
 
 /**
  * Sesudah mutasi lead: hasil mutasi = lead terkini → cache detail (tanpa web_pipeline_lead kedua), lalu muat ulang
@@ -20,6 +32,22 @@ function segarkanPipeline(qc: QueryClient, lead?: LeadDetail) {
   if (lead) qc.setQueryData(kunci.pipelineLead(lead.id), lead);
   return Promise.all([
     qc.invalidateQueries({ queryKey: kunci.semuaPipelineDaftar }),
+    qc.invalidateQueries({ queryKey: kunci.semuaPipelineRingkas }),
+    // statistik & log pelanggan ikut berubah (lead baru, order, batal)
+    qc.invalidateQueries({ queryKey: kunci.semuaPipelinePelanggan }),
+  ]);
+}
+
+/**
+ * Sesudah pelanggan diubah/digabung/dibatalkan gabungnya: nama & pengelompokan pelanggan tampil di daftar lead,
+ * detail lead, ringkasan (pelanggan baru), dan semua layar pelanggan.
+ */
+function segarkanPelanggan(qc: QueryClient, detail?: PelangganDetail) {
+  if (detail) qc.setQueryData(kunci.pipelinePelanggan(detail.pelanggan.id), detail);
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: kunci.semuaPipelinePelanggan }),
+    qc.invalidateQueries({ queryKey: kunci.semuaPipelineDaftar }),
+    qc.invalidateQueries({ queryKey: kunci.semuaPipelineLead }),
     qc.invalidateQueries({ queryKey: kunci.semuaPipelineRingkas }),
   ]);
 }
@@ -139,6 +167,58 @@ export function cariPelanggan(q: string): Promise<PelangganCari[]> {
  */
 export function cekDuplikatTelepon(telepon: string): Promise<CekDuplikatTelepon> {
   return rpc(klienBrowser(), "web_pipeline_cek_duplikat", { p_telepon: telepon });
+}
+
+// -------------------------------------------------------------------- database pelanggan (20261017120000)
+export type BodyPelangganUbah = {
+  pelanggan_id: string;
+  nama?: string;
+  kota?: string | null;
+  jenis?: JenisPelanggan;
+  catatan?: string | null;
+};
+
+/** Ubah nama/kota/jenis/catatan pelanggan (admin & rep). Hanya kunci yang dikirim yang berubah. */
+export function usePelangganUbah() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: BodyPelangganUbah) => rpc(klienBrowser(), "web_pipeline_pelanggan_ubah", { p: body as unknown as Json }),
+    onSuccess: (detail) => segarkanPelanggan(qc, detail),
+  });
+}
+
+export type BodyGabung = { ke_id: string; dari_ids: string[]; nama?: string; alasan?: AlasanDobel };
+
+/** Gabungkan pelanggan dobel ke satu pelanggan (admin). Lead & kontak dipindah; bisa dibatalkan. */
+export function usePelangganGabung() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: BodyGabung) => rpc(klienBrowser(), "web_pipeline_pelanggan_gabung", { p: body as unknown as Json }),
+    onSuccess: (detail) => segarkanPelanggan(qc, detail),
+  });
+}
+
+/** Batalkan satu penggabungan (admin): pelanggan asal pulih dengan lead & kontaknya. */
+export function usePelangganGabungBatal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (gabungId: number) =>
+      rpc(klienBrowser(), "web_pipeline_pelanggan_gabung_batal", { p: { gabung_id: gabungId } }),
+    onSuccess: (detail) => segarkanPelanggan(qc, detail),
+  });
+}
+
+/** Tandai saran dobel sebagai "bukan dobel" (admin). Hasil = saran terkini. */
+export function usePelangganBukanDobel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { alasan: AlasanDobel; ids: string[] }) =>
+      rpc(klienBrowser(), "web_pipeline_pelanggan_dobel_abaikan", { p: body as unknown as Json }),
+    onSuccess: (dobel) => {
+      qc.setQueryData(kunci.pipelinePelangganDobel, dobel);
+      return qc.invalidateQueries({ queryKey: [...kunci.semuaPipelinePelanggan, "detail"] });
+    },
+  });
 }
 
 // -------------------------------------------------------------------- kategori papan pribadi

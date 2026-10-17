@@ -47,6 +47,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { ChipRepeat } from "@/features/pipeline/chip-repeat";
 import { infoFu, ringkasProduk, rupiah } from "@/features/pipeline/konstanta";
 import { useKategoriPindah, useKategoriSimpan } from "@/features/pipeline/mutasi";
 import { PilTahap } from "@/features/pipeline/pil-tahap";
@@ -622,6 +623,7 @@ function IsiKartu({
         <span>{l.kode}</span>
         <span className="min-w-0 truncate">{l.pemilik_nama ?? "tanpa pemilik"}</span>
         {l.periksa ? <Chip nada="hari-ini">periksa</Chip> : null}
+        <ChipRepeat n={l.order_sebelumnya} />
         {l.tahap === "ORDER" ? <span className="font-medium text-foreground tabular-nums">{rupiah(l.nilai_transaksi)}</span> : null}
         {fu ? <span className={cn("whitespace-nowrap", fu.mendesak && "font-semibold text-telat")}>{fu.teks}</span> : null}
         {buka ? <span className={cn("tabular-nums", panas && "font-semibold text-telat")}>diam {l.diam_hari} hr</span> : null}
