@@ -1,9 +1,12 @@
 "use client";
 
 // Detail lead (§5): info kv, tombol aksi (Catat FU / Penawaran / Order / Batal / Alihkan / Klaim / Data order /
-// Batalkan order / Ubah), dan log gabungan aktivitas + riwayat tahap. 'baca' (Yosie) melihat tanpa telepon/PIC & tanpa
-// tombol tulis (§6). Order yang dibatalkan (BATAL, alasan "Order dibatalkan") tetap menampilkan data ordernya (riwayat).
+// Batalkan order / Ubah), riwayat pelanggan (order & lead lain pelanggan yang sama → repeat order, tautan ke log
+// lengkap di /pipeline/pelanggan/[id]), dan log gabungan aktivitas + riwayat tahap. 'baca' (Yosie) melihat tanpa
+// telepon/PIC & tanpa tombol tulis (§6). Order yang dibatalkan (BATAL, alasan "Order dibatalkan") tetap menampilkan data
+// ordernya (riwayat).
 import { ArrowRightLeft, FileText, Hand, Pencil, PhoneCall, ReceiptText, ShoppingCart, XCircle } from "lucide-react";
+import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -22,6 +25,7 @@ import { DialogUbah } from "@/features/pipeline/dialog-ubah";
 import { GerbangPipeline, type AksesPipeline } from "@/features/pipeline/gerbang";
 import { ALASAN_BATAL_ORDER, BAYAR, BAYAR_BELUM_DICATAT, rupiah } from "@/features/pipeline/konstanta";
 import { PilTahap } from "@/features/pipeline/pil-tahap";
+import { RiwayatPelanggan } from "@/features/pipeline/riwayat-pelanggan";
 import { useLeadUbah } from "@/features/pipeline/mutasi";
 import { usePipelineLead } from "@/features/pipeline/queries";
 import { useProfil } from "@/features/profil/penyedia-profil";
@@ -90,7 +94,13 @@ function IsiDetail({ lead, akses }: { lead: LeadDetail; akses: AksesPipeline }) 
 
       <dl className="grid grid-cols-[88px_minmax(0,1fr)] gap-y-2 gap-x-3 rounded-xl border bg-card px-3 py-3 text-sm">
         <Baris dt="Perusahaan">
-          <span className="font-medium">{lead.pelanggan.nama}</span>
+          <Link
+            href={`/pipeline/pelanggan/${encodeURIComponent(lead.pelanggan.id)}`}
+            className="font-medium underline-offset-2 hover:underline"
+            data-uji="tautan-pelanggan-lead"
+          >
+            {lead.pelanggan.nama}
+          </Link>
           {lead.pelanggan.kota ? <span className="text-muted-foreground"> · {lead.pelanggan.kota}</span> : null}
         </Baris>
         {lead.kontak ? (
@@ -209,6 +219,8 @@ function IsiDetail({ lead, akses }: { lead: LeadDetail; akses: AksesPipeline }) 
           </Button>
         </div>
       ) : null}
+
+      <RiwayatPelanggan lead={lead} />
 
       <section aria-label="Riwayat" className="space-y-3">
         <h2 className="text-sm font-semibold">Riwayat</h2>

@@ -11,6 +11,7 @@ import { useState, type ReactNode } from "react";
 
 import { Chip } from "@/components/umum/chip";
 import { Button } from "@/components/ui/button";
+import { ChipRepeat } from "@/features/pipeline/chip-repeat";
 import { DialogOrder } from "@/features/pipeline/dialog-order";
 import { BAYAR, BAYAR_BELUM_DICATAT, ringkasProduk, rupiah } from "@/features/pipeline/konstanta";
 import { csvOrder, kelompokOrder, sisaTagihan, type GrupOrder } from "@/features/pipeline/order";
@@ -225,10 +226,15 @@ function TabelOrder({ items, hariIni, namaKategori, bisaUbah, onUbah }: PropsBar
                     {l.kota ? ` · ${l.kota}` : ""}
                     {l.periksa ? " · periksa" : ""}
                   </div>
-                  {kat ? (
-                    <Chip nada="garis" className="mt-1 max-w-full truncate">
-                      {kat}
-                    </Chip>
+                  {l.order_sebelumnya || kat ? (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      <ChipRepeat n={l.order_sebelumnya} />
+                      {kat ? (
+                        <Chip nada="garis" className="max-w-full truncate">
+                          {kat}
+                        </Chip>
+                      ) : null}
+                    </div>
                   ) : null}
                 </td>
                 <td className="px-3 py-2 break-words text-muted-foreground">{ringkasProduk(l.produk)}</td>
@@ -275,10 +281,15 @@ function KartuOrder({
           {ringkasProduk(l.produk)}
           {l.pemilik_nama ? ` · ${l.pemilik_nama}` : ""}
         </div>
-        {kategori ? (
-          <Chip nada="garis" className="max-w-full truncate">
-            {kategori}
-          </Chip>
+        {l.order_sebelumnya || kategori ? (
+          <div className="flex flex-wrap gap-1">
+            <ChipRepeat n={l.order_sebelumnya} />
+            {kategori ? (
+              <Chip nada="garis" className="max-w-full truncate">
+                {kategori}
+              </Chip>
+            ) : null}
+          </div>
         ) : null}
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">

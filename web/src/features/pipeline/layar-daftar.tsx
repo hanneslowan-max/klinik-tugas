@@ -10,11 +10,11 @@
 // yang bertahan saat Kembali dari detail; kotak cari terpisah (ketikan tidak merender ulang daftar); baris di-memo.
 // Papan (dnd-kit) dimuat malas: dipramuat saat ?v=papan aktif, saat senggang sesudah daftar tiba, atau tombol Papan
 // disentuh/difokus; gagal memuat → pesan + Coba lagi di tempat papan (muatKomponen).
-import { BarChart3, List, Plus, Search, ShieldCheck, SquareKanban } from "lucide-react";
+import { BarChart3, Building2, List, Plus, ShieldCheck, SquareKanban } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { memo, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 
 import { IsiHalaman } from "@/components/layout/isi-halaman";
 import { IsiTautan } from "@/components/layout/petunjuk-tautan";
@@ -22,15 +22,17 @@ import { KepalaHalaman } from "@/components/layout/kepala-halaman";
 import { GalatMuat, Kosong, MemuatDaftar } from "@/components/umum/keadaan";
 import { Chip } from "@/components/umum/chip";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { DaftarOrder } from "@/features/pipeline/daftar-order";
 import { DialogLeadBaru } from "@/features/pipeline/dialog-lead-baru";
 import { GerbangPipeline, type AksesPipeline } from "@/features/pipeline/gerbang";
 import { infoFu, ringkasProduk, rupiah, TAB_DAFTAR } from "@/features/pipeline/konstanta";
+import { ChipRepeat } from "@/features/pipeline/chip-repeat";
+import { KotakCari } from "@/features/pipeline/kotak-cari";
 import { bulanTersedia, saringLead, type SaringanLead as NilaiSaringan } from "@/features/pipeline/order";
 import { PilTahap } from "@/features/pipeline/pil-tahap";
 import { usePipelineDaftar, usePipelineKategori } from "@/features/pipeline/queries";
 import { opsiStatus, SaringanLead, tanggalSah } from "@/features/pipeline/saringan-lead";
+import { TampilLagi, useBatasTampil } from "@/features/pipeline/tampil-bertahap";
 import { useProfil } from "@/features/profil/penyedia-profil";
 import { pramuat, saatSenggang } from "@/lib/impor-aman";
 import { muatKomponen } from "@/lib/muat-komponen";
@@ -48,8 +50,6 @@ const PapanLead = dynamic(() => muatKomponen(() => import("@/features/pipeline/p
 });
 const pramuatPapan = () => pramuat(() => import("@/features/pipeline/papan-lead"));
 
-const LANGKAH = 50;
-
 /** URL /pipeline dari parameter `dasar` dengan sebagian parameter diganti (null/kosong = hapus). */
 function urlPipeline(dasar: string, ubah: Record<string, string | null>) {
   const p = new URLSearchParams(dasar);
@@ -59,154 +59,6 @@ function urlPipeline(dasar: string, ubah: Record<string, string | null>) {
   }
   const s = p.toString();
   return s ? `/pipeline?${s}` : "/pipeline";
-}
-
-/**
- * Batas baris yang dirender per kunci daftar (tab|pemilik|cari|saringan). Tingkat modul supaya bertahan saat halaman
- * di-unmount (buka detail lead → Kembali): jumlah baris sama → posisi gulir bisa dipulihkan. Ganti kunci = mulai 50 lagi.
- */
-const batasTersimpan = new Map<string, number>();
-
-function useBatasTampil(kunci: string) {
-  const [keadaan, setKeadaan] = useState(() => ({ kunci, batas: batasTersimpan.get(kunci) ?? LANGKAH }));
-  let batas = keadaan.batas;
-  if (keadaan.kunci !== kunci) {
-    batas = LANGKAH;
-    setKeadaan({ kunci, batas }); // sesuaikan state saat kunci berubah (saat render, bukan di efek)
-  }
-  useEffect(() => {
-    if (batasTersimpan.size > 50) batasTersimpan.clear(); // varian cari tak terbatas: jangan menumpuk
-    batasTersimpan.set(kunci, batas);
-  }, [kunci, batas]);
-  const tambah = () => setKeadaan((k) => ({ kunci: k.kunci, batas: k.batas + LANGKAH }));
-  return { batas, tambah };
-}
-
-/**
- * Tombol "Tampilkan 50 lagi" yang juga menjadi sentinel gulir: saat mendekati layar (±600px) baris berikutnya
- * ditambahkan otomatis; tombol tetap ada sebagai cadangan (keyboard, pembaca layar, IntersectionObserver tak ada).
- */
-function TampilLagi({ sisa, tambah }: { sisa: number; tambah: () => void }) {
-  const ref = useRef<HTMLButtonElement>(null);
-  const saatTerlihat = useEffectEvent(() => tambah());
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(
-      (e) => {
-        if (e.some((x) => x.isIntersecting)) saatTerlihat();
-      },
-      { rootMargin: "600px 0px" },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [sisa]);
-  return (
-    <button
-      ref={ref}
-      type="button"
-      onClick={tambah}
-      className="w-full rounded-lg border border-dashed py-2.5 text-sm font-medium text-primary hover:bg-muted"
-      data-uji="tampil-lagi"
-    >
-      Tampilkan {Math.min(LANGKAH, sisa)} lagi (sisa {sisa})
-    </button>
-  );
-}
-
-/**
- * Kotak cari dengan isian lokal: ketikan hanya merender komponen ini; kata ter-debounce 300 ms ditulis ke URL (?q)
- * lewat `tulis` (daftar disaring dari URL; Kembali dari detail lead memulihkan pencarian).
- * - Tulisan tertunda tidak boleh jatuh saat navigasi sedang menunggu RSC: replaceState = ACTION_RESTORE di router
- *   Next yang MENGGANTIKAN navigasi itu (ketukan diabaikan). Maka klik selagi timer menunggu (fase capture dokumen,
- *   sebelum onClick <Link>): tautan yang berpindah halaman → timer dibatalkan & ketikan yang belum diterapkan
- *   dibuang; klik lain (tab/saringan, tautan URL-dangkal `data-url-dangkal`, Ctrl/Shift+klik) → ditulis SEKARANG,
- *   serempak sebelum handler-nya. Kembali/Maju (popstate) → dibatalkan.
- * - ?q berubah dari luar (ketuk menu Pipeline = /pipeline tanpa remount, Kembali/Maju) → isian ikut URL. Gema tulisan
- *   sendiri dikenali dari `tertulis`, jadi ketikan lanjutan tidak tertimpa.
- */
-function KotakCari({ nilaiUrl, tulis }: { nilaiUrl: string; tulis: (q: string) => void }) {
-  const [isi, setIsi] = useState(nilaiUrl);
-  const [jejak, setJejak] = useState({ url: nilaiUrl, tertulis: nilaiUrl.trim() });
-  if (jejak.url !== nilaiUrl) {
-    setJejak({ url: nilaiUrl, tertulis: nilaiUrl.trim() }); // sesuaikan state saat render, bukan di efek
-    if (nilaiUrl.trim() !== jejak.tertulis) setIsi(nilaiUrl);
-  }
-  const input = useRef<HTMLInputElement>(null);
-  const tunda = useRef<ReturnType<typeof setTimeout>>(undefined);
-  // hanya ketikan PENGGUNA yang boleh ditulis ke URL. Isian yang disamakan dari URL (navigasi, Kembali) tidak pernah
-  // ditulis balik — kalau tidak, kata lama bisa "hidup lagi" 300 ms sesudah menu Pipeline diketuk (update setIsi yang
-  // sama nilainya ditahan React lalu diputar ulang sesudah render transisi navigasi).
-  const diketik = useRef(false);
-  const kirim = useEffectEvent(() => {
-    if (!diketik.current) return;
-    diketik.current = false;
-    const q = isi.trim();
-    if (q === nilaiUrl.trim()) return;
-    setJejak((j) => ({ ...j, tertulis: q }));
-    tulis(q);
-  });
-  const buang = useEffectEvent(() => {
-    diketik.current = false;
-    if (isi !== nilaiUrl) setIsi(nilaiUrl);
-  });
-  useEffect(() => {
-    const t = setTimeout(() => {
-      tunda.current = undefined;
-      kirim();
-    }, 300);
-    tunda.current = t;
-    return () => {
-      clearTimeout(t);
-      if (tunda.current === t) tunda.current = undefined;
-    };
-  }, [isi]);
-  useEffect(() => {
-    const henti = () => {
-      clearTimeout(tunda.current);
-      tunda.current = undefined;
-    };
-    const saatKlik = (e: MouseEvent) => {
-      if (tunda.current === undefined || e.target === input.current) return;
-      henti();
-      const a = e.target instanceof Element ? e.target.closest("a[href]") : null;
-      const pindah =
-        a instanceof HTMLAnchorElement &&
-        !a.hasAttribute("data-url-dangkal") &&
-        !a.target &&
-        !(e.ctrlKey || e.metaKey || e.shiftKey || e.altKey);
-      if (pindah) buang();
-      else kirim();
-    };
-    const saatKembali = () => {
-      if (tunda.current === undefined) return;
-      henti();
-      buang();
-    };
-    document.addEventListener("click", saatKlik, true);
-    window.addEventListener("popstate", saatKembali);
-    return () => {
-      document.removeEventListener("click", saatKlik, true);
-      window.removeEventListener("popstate", saatKembali);
-    };
-  }, []);
-  return (
-    <div className="relative">
-      <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-      <Input
-        ref={input}
-        value={isi}
-        onChange={(e) => {
-          diketik.current = true;
-          setIsi(e.target.value);
-        }}
-        placeholder="Cari perusahaan, PIC, produk, No SP/PO, kode lead"
-        className="pl-9"
-        aria-label="Cari lead"
-        data-uji="cari-lead"
-      />
-    </div>
-  );
 }
 
 // memo: daftar besar tidak dirender ulang per baris saat induk berubah (data lead = objek cache yang sama)
@@ -231,7 +83,10 @@ const BarisLead = memo(function BarisLead({ lead, hariIni, kategori }: { lead: L
               </Chip>
             ) : null}
           </div>
-          <div className="truncate text-sm text-muted-foreground">{ringkasProduk(lead.produk)}</div>
+          <div className="flex items-center gap-2">
+            <span className="min-w-0 truncate text-sm text-muted-foreground">{ringkasProduk(lead.produk)}</span>
+            <ChipRepeat n={lead.order_sebelumnya} />
+          </div>
           <div className="truncate text-xs text-muted-foreground">
             {lead.kode}
             {lead.kota ? ` · ${lead.kota}` : ""}
@@ -395,6 +250,12 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
               </Link>
             </Button>
           ) : null}
+          <Button asChild variant="outline">
+            <Link href="/pipeline/pelanggan" data-uji="tautan-pelanggan">
+              <Building2 aria-hidden />
+              Pelanggan
+            </Link>
+          </Button>
           {akses.boleh_ringkas ? (
             <Button asChild variant="outline">
               <Link href="/pipeline/ringkasan" data-uji="tautan-ringkasan">

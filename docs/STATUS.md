@@ -253,6 +253,63 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   layar dan mouse biasa tidak bisa menggeser papan. Kini di desktop (lg) papan setinggi sisa layar (`--atas-papan`
   diukur `useGeserPapan`), tiap kolom menggulir sendiri, dan ada tombol geser ◀ ▶ di tepi papan (Shift + roda juga
   bisa). HP tidak berubah (usap). Tes e2e di `pipeline-papan.spec.ts` (9 kolom). Tanpa migrasi.
+- **Database pelanggan & log repeat order (17 Okt, permintaan Hannes, migrasi `20261017120000_pipeline_pelanggan`).**
+  "Lead yang diinput dijadikan database, jadi customer yang sama repeat order ketahuan log-nya." Tabel `pelanggan`
+  sudah ada sejak PR #8, tetapi data impor sheet terpecah (17 Okt produksi: 1.856 pelanggan / 2.062 lead; 48–49 nama
+  dobel beda ejaan, 56 nomor HP di >1 pelanggan, 458 nama pengisi "-"/"Perorangan"/"Pribadi"). Yang dibangun:
+  - **Layar Pelanggan** (`/pipeline/pelanggan`, tombol "Pelanggan" di layar Pipeline, semua peran): daftar pelanggan +
+    jumlah lead/order, nilai order, order terakhir, chip **Repeat** (≥2 order); saringan Semua / Repeat order / Pernah
+    order / Ada lead aktif; urutan aktivitas terakhir / order terbanyak / nilai / nama; cari nama (juga ejaan lain:
+    "berkah nidatama" = "PT. BERKAH NIDATAMA"), kota, PIC & nomor HP (PIC/HP bukan untuk peran baca).
+  - **Detail pelanggan** (`/pipeline/pelanggan/[id]`): data & kontak (baca: disembunyikan), ringkasan (order, nilai,
+    order pertama/terakhir, **jeda rata-rata antar order**), **log semua lead & order** terbaru dulu dengan chip
+    **"Order ke-N"** (urut tanggal SP), riwayat gabung, tombol Ubah data pelanggan (admin & rep). Tautan lama ke
+    pelanggan yang sudah digabung dialihkan ke tujuannya.
+  - **Detail lead**: nama perusahaan menautkan ke halaman pelanggan + bagian **"Order & lead lain pelanggan ini"**
+    (sudah order berapa kali, total, order terakhir, lead ini order ke berapa, 5 lead lain terbaru).
+  - **Label Repeat** di daftar lead, tab Order, dan Papan: field ringkas baru `order_sebelumnya` (order lain pelanggan
+    yang sama sebelum lead ini; tanggal order = tanggal SP) + `pelanggan_id`, di `j_pipeline_lead_ringkas` DAN `_banyak`.
+  - **Form Lead baru**: saran pelanggan lama kini cocok lewat kunci nama & nomor HP, menampilkan "N order · terakhir …",
+    nama pengisi tidak disarankan lewat nama (hanya lewat nomor HP, tampil sebagai nama PIC), dan batas 15 hasil kini
+    benar-benar berlaku (dulu `limit` jatuh pada hasil agregat, jadi semua kecocokan dikirim).
+  - **Gabung pelanggan dobel (admin)**: saran di detail pelanggan ("Mungkin pelanggan yang sama": nama sama / nomor HP
+    sama / nama mirip ≥0,6 trigram) dan layar **Saran gabung** (`/pipeline/pelanggan/dobel`: pilih tujuan, ganti nama,
+    Gabungkan, atau "Bukan dobel"). Lead & kontak dipindah, pelanggan sumber dihapus; **setiap gabung tercatat**
+    (`pelanggan_gabung`: salinan baris sumber + id lead/kontak) dan **bisa dibatalkan** (juga untuk rantai A→B→C; lead baru
+    milik tujuan tidak tersentuh). Data lead selain `pelanggan_id` tidak berubah.
+  - **Sumber lead TIDAK diubah otomatis** jadi "Repeat order": sumber = kanal yang dicocokkan Agen Data Harian dengan
+    konversi Google Ads; status repeat dihitung dari riwayat.
+  - **Gabung otomatis data lama** (keputusan Hannes: "otomatis + alat"): `pipeline_pelanggan_gabung_otomatis(aktor,
+    jalankan)` — hanya yang pasti sama: kunci nama sama persis (bukan nama pengisi) dan pelanggan bernama pengisi dengan
+    nomor HP sama. Tujuan = lead terbanyak, lalu order terbanyak, lalu lead tertua. `false` = uji kering (dijalankan lalu
+    di-rollback, laporan sama persis). Uji kering produksi 17 Okt (kueri baca setara): **49 kelompok nama + 5 kelompok
+    nomor HP → 61 pelanggan digabung, 66 lead dipindah**, tanpa lead hilang. Sisanya (nomor sama tapi nama beda, nama
+    mirip/salah ketik) lewat layar Saran gabung.
+  - **Alat impor** (`alat/impor-pipeline.mjs`) kini menghormati gabung/ubah nama di Anvil (lihat `docs/IMPOR-PIPELINE.md`);
+    tanpa ini impor ulang hari pindah membatalkan penggabungan (dibuktikan di DB lokal: alat lama 3 pelanggan dibuat ulang
+    + 3 lead pindah kembali, alat baru 0 + 0). **Butuh migrasi `20261017120000` sudah terpasang.**
+  - Skema: kolom terhitung `pelanggan.kunci` / `pelanggan.semu` (STORED, indeks btree), tabel `pelanggan_gabung` (log) &
+    `pelanggan_dobel_abaikan`, 7 fungsi `web_pipeline_pelanggan*`. Saran "nama mirip" membandingkan pasangan yang 2 huruf
+    awal / 3 huruf akhir kuncinya sama (produksi: 30 dari 30 pasangan perbandingan penuh). Kinerja lokal (1.900 pelanggan,
+    2.060 lead): daftar ±110–120 ms, detail ±16 ms, cari ±4 ms, saran gabung (admin) ±0,5 dtk, daftar lead tetap ±90 ms.
+  - **Perbaikan hak (migrasi `20261017130000_pipeline_pelanggan_hak`):** `inti_pipeline_pelanggan_cari` & `_ubah` memakai
+    `peran not in ('admin','rep')`, sehingga anggota TANPA akses Pipeline (peran NULL) lolos: lewat RPC langsung bisa
+    mencari pelanggan + kontak (nama PIC, nomor HP). `_ubah` kebetulan tetap gagal (detail di akhir fungsi menolak →
+    rollback). Kini `coalesce(peran, '')` → PT403. Ditemukan sesudah `20261017120000` diterapkan; perbaikan diterapkan ke
+    produksi 17 Okt. Pola yang sama di fungsi lama (`inti_pipeline_lead_buat`, `pipeline_boleh_ubah`; dicatat PR #14)
+    belum diubah.
+  - Tes: `uji/db/26_pipeline_pelanggan.sql` (134 cek, termasuk 9 cek anggota tanpa akses), 09 (jumlah `web_*` 48 → 55), `uji/pipeline/jalankan.mjs` (111 cek),
+    unit `web/src/features/pipeline/pelanggan.test.ts`, e2e `web/tests/e2e/pipeline-pelanggan.spec.ts` (8 tes × HP/desktop).
+    Verifikasi 17 Okt dari `supabase db reset`: `uji/db` **26/26 berkas, 1.457 cek**; vitest 104 tes; typecheck, lint, build
+    produksi hijau; e2e penuh `next start` + Supabase lokal: **130 lulus, 14 dilewati sengaja**.
+  - **Urutan produksi:** terapkan migrasi `20261017120000` **SEBELUM merge** (web baru di DB lama → layar Pelanggan galat
+    "fungsi tidak ditemukan"); lalu, dengan izin Hannes, jalankan gabung otomatis:
+    `select public.pipeline_pelanggan_gabung_otomatis(312823267, false);` (uji kering) lalu `…(312823267, true)`.
+  - **Sudah diterapkan di produksi 17 Okt (izin Hannes):** migrasi `20261017120000` (lewat `alat/sql-proyek.sh --migrasi`)
+    lalu gabung otomatis — uji kering & jalankan identik: **54 kelompok, 61 pelanggan digabung, 66 lead dipindah**;
+    pelanggan 1.856 → 1.795; lead 2.062 (sidik md5 id/tahap/SP/nilai/pemilik/tanggal sama sebelum & sesudah), item 2.062,
+    aktivitas 587, kontak 1.900 tetap; 0 lead/kontak yatim; 0 nama dobel tersisa; 61 catatan gabung (bisa dibatalkan per
+    pelanggan). Pelanggan dengan ≥2 order 43 → 46; 102 order kini tercatat sebagai repeat (Order ke-2 dst.).
 - **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md` — **wajib pakai alat impor versi berpenjaga (14 Okt, sesudah Batal order)**; versi lama mengembalikan order yang dibatalkan di Anvil ke ORDER.
 
 ## Notifikasi "Dari tim" / "Dari agent" (revisi #2, 13 Okt 2026, branch `rev2-notif`)
