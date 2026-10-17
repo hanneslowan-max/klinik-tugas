@@ -26,6 +26,14 @@ export const kunci = {
   /** akar semua varian daftar lead (tab/pemilik/cari) */
   semuaPipelineDaftar: ["pipeline", "daftar"] as const,
   pipelineLead: (id: string) => ["pipeline", "lead", id] as const,
+  /** akar semua detail lead (nama pelanggan berubah saat pelanggan diubah/digabung) */
+  semuaPipelineLead: ["pipeline", "lead"] as const,
+  // database pelanggan (20261017120000)
+  pipelinePelangganDaftar: (q: string, saring: string, urut: string) => ["pipeline", "pelanggan", "daftar", q, saring, urut] as const,
+  pipelinePelanggan: (id: string) => ["pipeline", "pelanggan", "detail", id] as const,
+  pipelinePelangganDobel: ["pipeline", "pelanggan", "dobel"] as const,
+  /** akar semua data pelanggan (daftar, detail, saran dobel) */
+  semuaPipelinePelanggan: ["pipeline", "pelanggan"] as const,
   pipelineRingkas: (bulan: string, dasar: string) => ["pipeline", "ringkas", bulan, dasar] as const,
   /** akar semua varian ringkasan bulanan */
   semuaPipelineRingkas: ["pipeline", "ringkas"] as const,

@@ -544,7 +544,14 @@ function blokLead(lead) {
   L.push(`  if v_lead is not null and exists (select 1 from public.lead where id = v_lead and tahap = 'BATAL' and alasan_batal = ${qstrWajib(ALASAN_BATAL_ORDER)}) then return; end if;`);
   // pelanggan
   if (p.dedup) {
+    // Cari pelanggan (database pelanggan, migrasi 20261017120000 — WAJIB sudah terpasang): (1) nama persis; (2) kunci nama
+    // sama (PT./CV/tanda baca beda = aturan gabung otomatis); (3) nama pelanggan yang sudah DIGABUNG di Anvil → tujuan
+    // gabungnya; (4) lead lama: tetap di pelanggannya sekarang (gabung/ubah nama di Anvil dihormati); (5) baru → buat.
+    // Tanpa (2)–(4) impor ulang di hari pindah membuat lagi pelanggan yang sudah digabung dan memindah lead-nya kembali.
     L.push(`  select id into v_pel from public.pelanggan where lower(btrim(nama)) = lower(${qstrWajib(p.nama)}) limit 1;`);
+    L.push(`  if v_pel is null then select id into v_pel from public.pelanggan where kunci = public.pipeline_nama_kunci(${qstrWajib(p.nama)}) order by id limit 1; end if;`);
+    L.push(`  if v_pel is null then select public.pipeline_pelanggan_akhir(g.dari_id) into v_pel from public.pelanggan_gabung g where g.dibatalkan_pada is null and public.pipeline_nama_kunci(g.dari ->> 'nama') = public.pipeline_nama_kunci(${qstrWajib(p.nama)}) order by g.id desc limit 1; end if;`);
+    L.push(`  if v_pel is null then v_pel := v_pel_lama; end if;`);
     L.push(`  if v_pel is null then`);
     L.push(`    insert into public.pelanggan (nama, jenis, kota) values (${qstrWajib(p.nama)}, ${qstr(p.jenis)}, ${qstr(p.kota)}) returning id into v_pel;`);
     L.push(`  elsif ${qstr(p.kota)} is not null then update public.pelanggan set kota = coalesce(kota, ${qstr(p.kota)}) where id = v_pel; end if;`);
