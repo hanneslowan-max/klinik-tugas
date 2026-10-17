@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { GrupChip, GrupChipGanda } from "@/features/pipeline/chip-pilih";
-import { PRODUK, SATUAN, SUMBER } from "@/features/pipeline/konstanta";
+import { BANTU_SUMBER, PRODUK, SATUAN, SUMBER } from "@/features/pipeline/konstanta";
 import { useLeadUbah, type BodyLeadUbah, type ItemMasuk } from "@/features/pipeline/mutasi";
 import { pesanGalat } from "@/lib/api/galat";
 import type { LeadDetail, ProdukLead, SatuanItem, SumberLead } from "@/types/domain";
@@ -94,6 +94,7 @@ function IsiUbah({ lead, onSelesai }: { lead: LeadDetail; onSelesai: () => void 
       <div className="space-y-1.5">
         <Label>Sumber</Label>
         <GrupChip opsi={SUMBER} nilai={sumber} onUbah={setSumber} label="Sumber lead" />
+        <p className="text-xs text-muted-foreground">{BANTU_SUMBER}</p>
       </div>
       <div className="space-y-1.5">
         <Label>Produk</Label>

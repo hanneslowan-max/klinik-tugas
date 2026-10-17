@@ -253,6 +253,27 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   layar dan mouse biasa tidak bisa menggeser papan. Kini di desktop (lg) papan setinggi sisa layar (`--atas-papan`
   diukur `useGeserPapan`), tiap kolom menggulir sendiri, dan ada tombol geser ◀ ▶ di tepi papan (Shift + roda juga
   bisa). HP tidak berubah (usap). Tes e2e di `pipeline-papan.spec.ts` (9 kolom). Tanpa migrasi.
+- **Peringatan lead dobel per nomor WA (15 Okt, IMP-CMO-261015-1, ACC Hannes, branch `claude/anvil-cek-duplikat-wa`,
+  migrasi `20261015120000_pipeline_cek_duplikat_wa`).** 50 dari 170 lead Okt bernama pelanggan "-", jadi kunci dobel =
+  nomor. Form Lead baru memanggil `web_pipeline_cek_duplikat(p_telepon)` (inti `inti_pipeline_cek_duplikat`; normalisasi
+  `pipeline_telp_norm`, nomor < 8 digit diabaikan; maks 5 lead terbaru + total) saat kolom Telepon / WA ditinggalkan dan
+  sebelum simpan → peringatan "Nomor ini sudah ada di lead: <kode> (<tahap>, PIC <sales>) — cek dulu, jangan dobel".
+  BUKAN blokir: bila baru ketahuan saat Simpan, ditahan sekali; tekan lagi tersimpan. Hak = `web_pipeline_pelanggan_cari`
+  (admin/owner/bot + rep; 'baca' & tanpa akses PT403). Nomor tidak bisa diubah sesudah lead dibuat (dialog Ubah tanpa
+  kolom telepon), jadi tidak ada cek di sana. Ikut di PR yang sama: **teks bantu di bawah Sumber** (Lead baru & Ubah):
+  "Tanya pelanggan: dapat kontak kami dari mana? …" — data 15 Okt: 46 dari 48 lead sejak 13/10 "WA langsung", 0 "Google
+  Ads"; daftar nilai Sumber, CHECK DB, dan data lama TIDAK diubah. Tes: `uji/db/27_pipeline_cek_duplikat.sql` (36 cek;
+  dinomori ulang dari 26 karena 26 dipakai database pelanggan; 09: `web_*` 56 sesudah digabung dengan PR #15),
+  `web/src/features/pipeline/duplikat.test.ts`, `web/tests/e2e/pipeline-cek-duplikat.spec.ts`.
+  **Migrasi diterapkan ke produksi 17 Okt** (sebelum merge, bersama `20261017140000`). Temuan sampingan peran NULL
+  (`inti_pipeline_lead_buat` / `pipeline_boleh_ubah` / `inti_pipeline_fu_set` memakai `peran not in ('admin','rep')`, jadi
+  anggota tanpa akses Pipeline bisa membuat lead, mencatat FU / pindah tahap / ubah lead tanpa pemilik, dan mengatur
+  rencana FU lewat RPC langsung) **sudah diperbaiki**: migrasi `20261017140000_pipeline_hak_peran_null` (coalesce →
+  PT403; tes `uji/db/28_pipeline_hak_peran_null.sql` 16 cek, gagal tanpa perbaikan, lulus dengan). `inti_pipeline_pelanggan_cari`
+  sudah diperbaiki di `20261017130000` (PR #15). Diterapkan ke produksi 17 Okt.
+  Digabung dengan PR #15 17 Okt (form Lead baru memuat keduanya: saran pelanggan lama + jumlah order, dan peringatan
+  nomor dobel). Verifikasi dari `supabase db reset`: `uji/db` **28/28 berkas, 1.509 cek**; vitest 112 tes; typecheck, lint,
+  build hijau; e2e penuh `next start`: **136 lulus, 14 dilewati sengaja**.
 - **Database pelanggan & log repeat order (17 Okt, permintaan Hannes, migrasi `20261017120000_pipeline_pelanggan`).**
   "Lead yang diinput dijadikan database, jadi customer yang sama repeat order ketahuan log-nya." Tabel `pelanggan`
   sudah ada sejak PR #8, tetapi data impor sheet terpecah (17 Okt produksi: 1.856 pelanggan / 2.062 lead; 48–49 nama

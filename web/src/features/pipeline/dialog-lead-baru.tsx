@@ -3,6 +3,8 @@
 // Form "Lead baru" (§5, target isi <30 detik): perusahaan (dedup via web_pipeline_pelanggan_cari), PIC, kota,
 // telepon, produk (chips multi + qty/satuan per produk, qty wajib K5), kebutuhan, sumber (chips WAJIB, §3).
 // Tanggal/pemilik/tahap otomatis di server. Pesan validasi jelas; galat server (§3) ditampilkan apa adanya.
+// Lead dobel per nomor WA (IMP-CMO-261015-1): web_pipeline_cek_duplikat saat kolom telepon ditinggalkan & sebelum
+// simpan → PERINGATAN (bukan blokir). Bila baru ketahuan saat Simpan, simpan ditahan SEKALI; tekan lagi = tetap simpan.
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -15,12 +17,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { GrupChip, GrupChipGanda } from "@/features/pipeline/chip-pilih";
-import { namaPelanggan, PRODUK, SATUAN, SUMBER } from "@/features/pipeline/konstanta";
-import { cariPelanggan, useLeadBaru, type BodyLeadBaru, type ItemMasuk } from "@/features/pipeline/mutasi";
+import { kalimatDuplikat, normalTelepon } from "@/features/pipeline/duplikat";
+import { BANTU_SUMBER, namaPelanggan, PRODUK, SATUAN, SUMBER } from "@/features/pipeline/konstanta";
+import { cariPelanggan, cekDuplikatTelepon, useLeadBaru, type BodyLeadBaru, type ItemMasuk } from "@/features/pipeline/mutasi";
 import { pesanGalat } from "@/lib/api/galat";
 import { fmtTanggal } from "@/lib/tanggal";
 import { cn } from "@/lib/utils";
-import type { PelangganCari, ProdukLead, SatuanItem, SumberLead } from "@/types/domain";
+import type { CekDuplikatTelepon, PelangganCari, ProdukLead, SatuanItem, SumberLead } from "@/types/domain";
 
 /** Nama tampilan saran: nama pengisi ("-", "Perorangan") diganti nama PIC pertama. */
 const namaSaran = (p: PelangganCari) => namaPelanggan({ nama: p.nama, semu: p.semu, pic: p.kontak.find((k) => k.nama)?.nama });
@@ -54,6 +57,10 @@ function FormLeadBaru({ buka, ubahBuka }: { buka: boolean; ubahBuka: (b: boolean
 
   const [saran, setSaran] = useState<PelangganCari[]>([]);
   const [peringatanTelp, setPeringatanTelp] = useState<PelangganCari[]>([]);
+  // hasil cek lead dobel, per nomor TERNORMALISASI (tampil hanya selama nomor di kolom masih sama)
+  const [dobel, setDobel] = useState<{ nomor: string; hasil: CekDuplikatTelepon } | null>(null);
+  const [memeriksa, setMemeriksa] = useState(false);
+  const [tahanDobel, setTahanDobel] = useState(false); // simpan baru saja ditahan karena nomor dobel
   const [galat, setGalat] = useState<string | null>(null);
   const [galatField, setGalatField] = useState<Record<string, boolean>>({});
 
@@ -64,6 +71,7 @@ function FormLeadBaru({ buka, ubahBuka }: { buka: boolean; ubahBuka: (b: boolean
       setNama(""); setPelangganId(null); setJejakLama(""); setPic(""); setKota(""); setTelepon("");
       setProduk([]); setDetail({}); setKebutuhan(""); setSumber(null);
       setSaran([]); setPeringatanTelp([]); setGalat(null); setGalatField({});
+      setDobel(null); setTahanDobel(false);
     }
     ubahBuka(b);
   };
@@ -95,6 +103,22 @@ function FormLeadBaru({ buka, ubahBuka }: { buka: boolean; ubahBuka: (b: boolean
 
   const tampilSaran = !pelangganId && nama.trim().length >= 2 && saran.length > 0;
   const tampilPeringatanTelp = !pelangganId && telepon.replace(/\D/g, "").length >= 7 && peringatanTelp.length > 0;
+  const dobelTampil = dobel && dobel.nomor === normalTelepon(telepon) && dobel.hasil.items.length > 0 ? dobel.hasil : null;
+
+  // Cek lead lain dengan nomor yang sama. Nomor < 8 digit tidak dicek; hasil per nomor dipakai ulang. Gagal (jaringan
+  // dll.) = tanpa peringatan: pengecekan ini tidak boleh menghalangi input lead.
+  async function cekDobel(nilai: string): Promise<CekDuplikatTelepon | null> {
+    const nomor = normalTelepon(nilai);
+    if (!nomor) return null;
+    if (dobel?.nomor === nomor) return dobel.hasil;
+    try {
+      const hasil = await cekDuplikatTelepon(nilai.trim());
+      setDobel({ nomor, hasil });
+      return hasil;
+    } catch {
+      return null;
+    }
+  }
 
   function pilihPelanggan(p: PelangganCari) {
     setPelangganId(p.id);
@@ -104,7 +128,11 @@ function FormLeadBaru({ buka, ubahBuka }: { buka: boolean; ubahBuka: (b: boolean
     const k = p.kontak[0];
     if (k) {
       if (k.nama) setPic(k.nama);
-      if (k.telepon) setTelepon(k.telepon);
+      if (k.telepon) {
+        setTelepon(k.telepon);
+        setTahanDobel(false);
+        void cekDobel(k.telepon);
+      }
     }
     setSaran([]);
     setPeringatanTelp([]);
@@ -148,6 +176,18 @@ function FormLeadBaru({ buka, ubahBuka }: { buka: boolean; ubahBuka: (b: boolean
       return;
     }
 
+    // Nomor dobel yang BELUM terlihat pengguna (mis. langsung tekan Simpan tanpa meninggalkan kolom): tahan sekali
+    // supaya peringatannya terbaca. Sudah terlihat → lanjut simpan (peringatan, bukan blokir).
+    if (normalTelepon(telepon) && !dobelTampil) {
+      setMemeriksa(true);
+      const hasil = await cekDobel(telepon);
+      setMemeriksa(false);
+      if (hasil && hasil.items.length > 0) {
+        setTahanDobel(true);
+        return;
+      }
+    }
+
     const items: ItemMasuk[] = produk.map((p) => ({
       produk: p,
       qty: Number(detail[p].qty),
@@ -182,8 +222,8 @@ function FormLeadBaru({ buka, ubahBuka }: { buka: boolean; ubahBuka: (b: boolean
           <Button type="button" variant="outline" onClick={() => tutup(false)}>
             Batal
           </Button>
-          <Button type="button" onClick={kirim} disabled={buat.isPending} data-uji="kirim-lead-baru">
-            {buat.isPending ? "Menyimpan…" : "Simpan lead"}
+          <Button type="button" onClick={kirim} disabled={buat.isPending || memeriksa} data-uji="kirim-lead-baru">
+            {buat.isPending ? "Menyimpan…" : memeriksa ? "Memeriksa…" : "Simpan lead"}
           </Button>
         </>
       }
@@ -255,7 +295,34 @@ function FormLeadBaru({ buka, ubahBuka }: { buka: boolean; ubahBuka: (b: boolean
 
       <div className="space-y-1.5">
         <Label htmlFor="lb-telp">Telepon / WA</Label>
-        <Input id="lb-telp" inputMode="tel" value={telepon} onChange={(e) => setTelepon(e.target.value)} autoComplete="off" />
+        <Input
+          id="lb-telp"
+          inputMode="tel"
+          value={telepon}
+          onChange={(e) => {
+            setTelepon(e.target.value);
+            setTahanDobel(false);
+          }}
+          onBlur={() => void cekDobel(telepon)}
+          autoComplete="off"
+          data-uji="lb-telp"
+        />
+        {dobelTampil ? (
+          <KotakPesan nada="peringatan" data-uji="peringatan-dobel">
+            <p>{kalimatDuplikat(dobelTampil)}</p>
+            <ul className="mt-1 space-y-0.5 text-xs">
+              {dobelTampil.items.map((l) => (
+                <li key={l.id}>
+                  <a href={`/pipeline/${encodeURIComponent(l.id)}`} target="_blank" rel="noopener noreferrer" className="font-medium">
+                    {l.kode}
+                  </a>
+                  {` · ${l.pelanggan}${l.kontak_nama ? ` · ${l.kontak_nama}` : ""} · masuk ${fmtTanggal(l.tanggal_masuk)}`}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1 text-xs">Tetap bisa disimpan bila memang lead baru.</p>
+          </KotakPesan>
+        ) : null}
         {tampilPeringatanTelp ? (
           <KotakPesan nada="peringatan">
             Nomor ini mungkin milik pelanggan lama:{" "}
@@ -328,11 +395,19 @@ function FormLeadBaru({ buka, ubahBuka }: { buka: boolean; ubahBuka: (b: boolean
       <div className="space-y-1.5">
         <Label>Sumber</Label>
         <GrupChip opsi={SUMBER} nilai={sumber} onUbah={setSumber} label="Sumber lead" ariaInvalid={galatField.sumber} />
+        <p className="text-xs text-muted-foreground">{BANTU_SUMBER}</p>
       </div>
 
       <KotakPesan nada="info" tanpaIkon>
         Otomatis: tanggal hari ini, pemilik Anda, tahap BARU.
       </KotakPesan>
+
+      {tahanDobel && dobelTampil ? (
+        <KotakPesan nada="peringatan" data-uji="tahan-dobel">
+          Nomor WA ini sudah ada di lead lain (lihat peringatan di kolom Telepon / WA). Tekan Simpan lead sekali lagi bila
+          memang lead baru.
+        </KotakPesan>
+      ) : null}
 
       {galat ? <KotakPesan nada="galat">{galat}</KotakPesan> : null}
       </div>

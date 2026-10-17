@@ -28,6 +28,13 @@ export const SUMBER: SumberLead[] = [
   "Telepon", "Referral", "Repeat order", "Lainnya",
 ];
 
+/**
+ * Teks bantu di bawah pilihan Sumber (form Lead baru & Ubah). Data 15 Okt: 46 dari 48 lead baru diisi "WA langsung"
+ * dan 0 "Google Ads" walau iklan Google ±8 konversi/hari — rep mengisi MEDIA chat, bukan ASAL pelanggan.
+ */
+export const BANTU_SUMBER =
+  "Tanya pelanggan: dapat kontak kami dari mana? Pilih ASALNYA (Google = Google Ads/Website organik, Instagram/Facebook = Meta Ads). 'WA langsung' hanya bila pelanggan sudah menyimpan nomor kita sebelumnya.";
+
 export const SATUAN: SatuanItem[] = ["unit", "set", "pcs"];
 
 /** Jenis follow-up yang bisa dipilih rep (tanpa "Catatan impor" yang khusus impor). */

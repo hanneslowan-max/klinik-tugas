@@ -11,6 +11,7 @@ import { klienBrowser } from "@/lib/supabase/client";
 import type { Json } from "@/types/database";
 import type {
   AlasanDobel,
+  CekDuplikatTelepon,
   JenisPelanggan,
   LeadDetail,
   PapanKategori,
@@ -158,6 +159,14 @@ export function useOrderUbah() {
 /** Pencarian pelanggan (dedup saat input lead baru). Dipanggil imperatif (debounce di komponen). */
 export function cariPelanggan(q: string): Promise<PelangganCari[]> {
   return rpc(klienBrowser(), "web_pipeline_pelanggan_cari", { p_q: q });
+}
+
+/**
+ * Lead lain dengan nomor WA/telepon yang sama (peringatan dobel, bukan blokir; IMP-CMO-261015-1). Maks 5 terbaru +
+ * total. Dipanggil imperatif saat kolom telepon ditinggalkan & sebelum simpan.
+ */
+export function cekDuplikatTelepon(telepon: string): Promise<CekDuplikatTelepon> {
+  return rpc(klienBrowser(), "web_pipeline_cek_duplikat", { p_telepon: telepon });
 }
 
 // -------------------------------------------------------------------- database pelanggan (20261017120000)
