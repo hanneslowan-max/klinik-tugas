@@ -299,6 +299,11 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   - **Urutan produksi:** terapkan migrasi `20261017120000` **SEBELUM merge** (web baru di DB lama → layar Pelanggan galat
     "fungsi tidak ditemukan"); lalu, dengan izin Hannes, jalankan gabung otomatis:
     `select public.pipeline_pelanggan_gabung_otomatis(312823267, false);` (uji kering) lalu `…(312823267, true)`.
+  - **Sudah diterapkan di produksi 17 Okt (izin Hannes):** migrasi `20261017120000` (lewat `alat/sql-proyek.sh --migrasi`)
+    lalu gabung otomatis — uji kering & jalankan identik: **54 kelompok, 61 pelanggan digabung, 66 lead dipindah**;
+    pelanggan 1.856 → 1.795; lead 2.062 (sidik md5 id/tahap/SP/nilai/pemilik/tanggal sama sebelum & sesudah), item 2.062,
+    aktivitas 587, kontak 1.900 tetap; 0 lead/kontak yatim; 0 nama dobel tersisa; 61 catatan gabung (bisa dibatalkan per
+    pelanggan). Pelanggan dengan ≥2 order 43 → 46; 102 order kini tercatat sebagai repeat (Order ke-2 dst.).
 - **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md` — **wajib pakai alat impor versi berpenjaga (14 Okt, sesudah Batal order)**; versi lama mengembalikan order yang dibatalkan di Anvil ke ORDER.
 
 ## Notifikasi "Dari tim" / "Dari agent" (revisi #2, 13 Okt 2026, branch `rev2-notif`)
