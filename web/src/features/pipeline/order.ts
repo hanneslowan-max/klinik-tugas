@@ -11,14 +11,29 @@ export const BELUM_DICATAT = "TANPA";
 
 export type StatusSaring = StatusBayar | typeof BELUM_DICATAT | TahapLead;
 
-/** Saringan daftar: status (tab Order = status bayar, tab lain = tahap) + rentang tanggal (Order = tanggal SP, lain = tanggal masuk). */
-/** + produk (19 Okt): lead yang memuat produk itu (salah satu item), di semua tab. */
-export type SaringanLead = { status: string | null; dari: string | null; sampai: string | null; produk: string | null };
+/**
+ * Saringan daftar: status (tab Order = status bayar, tab lain = tahap) + rentang tanggal (Order = tanggal SP, lain = tanggal
+ * masuk) + produk (19 Okt): lead yang memuat produk itu (salah satu item), di semua tab.
+ * + sales (19 Okt): id pemilik lead, atau TANPA_PEMILIK; hanya saat daftar memuat semua pemilik.
+ */
+export type SaringanLead = {
+  status: string | null;
+  dari: string | null;
+  sampai: string | null;
+  produk: string | null;
+  sales: string | null;
+};
 
-export const SARINGAN_KOSONG: SaringanLead = { status: null, dari: null, sampai: null, produk: null };
+export const SARINGAN_KOSONG: SaringanLead = { status: null, dari: null, sampai: null, produk: null, sales: null };
+
+/** Urutan nama Indonesia (tanpa beda huruf besar/kecil, angka sebagai angka). */
+const NAMA = new Intl.Collator("id", { sensitivity: "base", numeric: true });
+
+/** Nilai saringan sales untuk lead tanpa pemilik. */
+export const TANPA_PEMILIK = "tanpa";
 
 /** Jumlah saringan di panel Filter (produk punya tombol sendiri di sebelahnya, tidak dihitung di sini). */
-export const jumlahSaringan = (f: SaringanLead) => [f.status, f.dari, f.sampai].filter(Boolean).length;
+export const jumlahSaringan = (f: SaringanLead) => [f.status, f.dari, f.sampai, f.sales].filter(Boolean).length;
 
 /** Tanggal acuan saringan & pengelompokan. */
 export const tanggalAcuan = (l: LeadRingkas, modeOrder: boolean) => (modeOrder ? l.tanggal_sp : l.tanggal_masuk);
@@ -27,6 +42,7 @@ export function saringLead(leads: LeadRingkas[], f: SaringanLead, modeOrder: boo
   if (!jumlahSaringan(f) && !f.produk) return leads;
   return leads.filter((l) => {
     if (f.produk && !l.produk.some((i) => i.produk === f.produk)) return false;
+    if (f.sales && (f.sales === TANPA_PEMILIK ? l.pemilik != null : String(l.pemilik) !== f.sales)) return false;
     if (f.status) {
       if (modeOrder) {
         if (f.status === BELUM_DICATAT ? l.bayar_status != null : l.bayar_status !== f.status) return false;
@@ -47,6 +63,28 @@ export function hitungProduk(leads: LeadRingkas[]): Map<string, number> {
   const m = new Map<string, number>();
   for (const l of leads) for (const p of new Set(l.produk.map((i) => i.produk))) m.set(p, (m.get(p) ?? 0) + 1);
   return m;
+}
+
+export type OpsiSales = { k: string; nama: string; n: number };
+
+/**
+ * Pilihan saringan sales: nama dari SEMUA lead yang dimuat (pilihan tidak hilang walau saringan lain mengosongkannya),
+ * jumlah dari lead yang lolos saringan lain. Urut nama; "Tanpa pemilik" terakhir.
+ */
+export function daftarSales(semua: LeadRingkas[], tersaring: LeadRingkas[]): OpsiSales[] {
+  const nama = new Map<string, string>();
+  for (const l of semua) {
+    const k = l.pemilik == null ? TANPA_PEMILIK : String(l.pemilik);
+    if (!nama.has(k)) nama.set(k, l.pemilik == null ? "Tanpa pemilik" : (l.pemilik_nama ?? `Anggota ${k}`));
+  }
+  const n = new Map<string, number>();
+  for (const l of tersaring) {
+    const k = l.pemilik == null ? TANPA_PEMILIK : String(l.pemilik);
+    n.set(k, (n.get(k) ?? 0) + 1);
+  }
+  return [...nama]
+    .map(([k, nm]) => ({ k, nama: nm, n: n.get(k) ?? 0 }))
+    .sort((a, b) => Number(a.k === TANPA_PEMILIK) - Number(b.k === TANPA_PEMILIK) || NAMA.compare(a.nama, b.nama));
 }
 
 /** Uang yang sudah diterima: LUNAS = nominal, DP = nominal DP, selain itu 0. */
@@ -150,7 +188,6 @@ export const opsiUrut = (modeOrder: boolean): readonly { k: string | null; label
 export const urutSah = (u: string | null, modeOrder: boolean) => (u && opsiUrut(modeOrder).some((o) => o.k === u) ? u : null);
 
 type Banding = (a: LeadRingkas, b: LeadRingkas) => number;
-const NAMA = new Intl.Collator("id", { sensitivity: "base", numeric: true });
 const spBaru: Banding = (a, b) => (b.tanggal_sp ?? "").localeCompare(a.tanggal_sp ?? "") || b.kode.localeCompare(a.kode);
 const masukBaru: Banding = (a, b) => b.tanggal_masuk.localeCompare(a.tanggal_masuk) || b.kode.localeCompare(a.kode);
 

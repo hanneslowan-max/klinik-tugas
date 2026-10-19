@@ -358,6 +358,12 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   (juga otomatis bila rentang di URL bukan salah satu pintasan); Custom lagi = tutup & hapus tanggal. Tombol Urutkan
   pindah dari baris "N order" (di HP tertutup tombol melayang "Lead baru", laporan Hannes) ke baris Filter · Produk ·
   Urutkan; teks tombol "Urutkan" atau nama pendek urutan terpilih. Tombol Produk kini berlabel "Produk" saat belum dipilih.
+- **Saringan Sales (19 Okt, permintaan Hannes "filter lead berdasarkan sales"):** grup **Sales** di panel Filter: Semua,
+  tiap pemilik lead (nama dari `pemilik_nama`), dan Tanpa pemilik, masing-masing dengan jumlah lead (saringan lain tetap
+  berlaku). `?sales=<id>|tanpa`, dihitung di lencana Filter, ikut Reset, berlaku di semua tab & Papan. Hanya tampil saat
+  daftar memuat semua pemilik (admin/baca, atau rep di "Semua"); rep di "Lead saya" sudah disaring server (`?m=`), dan
+  pindah ke "Lead saya" membuang `sales`. Disaring di web; tanpa perubahan DB. Produksi 19 Okt: Michael Eppy 705 lead,
+  Riksa Sri Gustiana 528, tanpa pemilik 842.
 - **Kuota GitHub Actions habis (19 Okt):** 2.000 menit/bulan akun `hanneslowan-max` terpakai 100% (email GitHub 11:19
   WIB; budget $0 → job tidak diberi runner, gagal ±4 dtk tanpa log). Reset 1 Nov 2026. Keputusan Hannes: sampai reset,
   **gerbang merge = verifikasi lokal** di sesi (lint, typecheck, vitest, build produksi, e2e lengkap HP+desktop terhadap
