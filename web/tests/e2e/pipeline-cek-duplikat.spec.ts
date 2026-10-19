@@ -45,7 +45,7 @@ const jumlahLeadNomor = () =>
 async function bukaForm(page: Page) {
   await masuk(page, AKUN.citra.email);
   await page.goto("/pipeline");
-  await page.getByTestId("tombol-lead-baru").click();
+  await page.getByTestId("tombol-lead-baru").filter({ visible: true }).click();
   await expect(page.getByTestId("dialog-lead-baru")).toBeVisible();
 }
 

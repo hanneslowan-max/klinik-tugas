@@ -331,6 +331,12 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
     pelanggan 1.856 → 1.795; lead 2.062 (sidik md5 id/tahap/SP/nilai/pemilik/tanggal sama sebelum & sesudah), item 2.062,
     aktivitas 587, kontak 1.900 tetap; 0 lead/kontak yatim; 0 nama dobel tersisa; 61 catatan gabung (bisa dibatalkan per
     pelanggan). Pelanggan dengan ≥2 order 43 → 46; 102 order kini tercatat sebagai repeat (Order ke-2 dst.).
+- **Baris alat daftar Pipeline dirapikan (19 Okt, permintaan Hannes "kelola akses sampai lead baru agak berantakan"):**
+  di HP tombol Kelola akses / Pelanggan / Ringkasan / Lead baru dulu pecah jadi 2–3 baris di bawah sakelar Daftar|Papan.
+  Kini Pelanggan, Ringkasan (admin/baca), Kelola akses (owner) pindah ke kepala halaman (`AksiPipeline`): desktop (`lg`)
+  tombol berlabel, HP/tablet satu tombol ⋯ (`menu-pipeline`). Lead baru: desktop tetap tombol di baris alat, HP/tablet
+  tombol melayang di atas navigasi bawah (pola "+ Tugas"). Rep: ikon Daftar|Papan disembunyikan di bawah `sm` supaya
+  "Lead saya|Semua" + "Daftar|Papan" tetap satu baris di HP 360 px. Tanpa perubahan DB.
 - **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md` — **wajib pakai alat impor versi berpenjaga (14 Okt, sesudah Batal order)**; versi lama mengembalikan order yang dibatalkan di Anvil ke ORDER.
 
 ## Notifikasi "Dari tim" / "Dari agent" (revisi #2, 13 Okt 2026, branch `rev2-notif`)

@@ -57,7 +57,13 @@ const logLead = (page: Page, id: string) => page.locator(`[data-uji="log-lead"][
 test("daftar pelanggan: dari menu Pipeline, cari ejaan berbeda, saringan Repeat order", async ({ page }) => {
   await masuk(page, AKUN.citra.email);
   await page.goto("/pipeline");
-  await page.getByTestId("tautan-pelanggan").click();
+  // HP/tablet: tautan ada di menu ⋯ kepala halaman; desktop: tombol berlabel di kepala halaman
+  if (diHp(page)) {
+    await page.getByTestId("menu-pipeline").click();
+    await page.getByTestId("menu-tautan-pelanggan").click();
+  } else {
+    await page.getByTestId("tautan-pelanggan").click();
+  }
   await expect(page).toHaveURL(/\/pipeline\/pelanggan$/);
 
   // kunci nama: "uji repeat pelanggan" menemukan kedua ejaan
@@ -120,7 +126,7 @@ test("peran baca: kontak & nomor HP disembunyikan, tanpa tombol ubah", async ({ 
 test("form Lead baru: saran pelanggan lama menampilkan jumlah order", async ({ page }) => {
   await masuk(page, AKUN.citra.email);
   await page.goto("/pipeline");
-  await page.getByTestId("tombol-lead-baru").click();
+  await page.getByTestId("tombol-lead-baru").filter({ visible: true }).click();
   await page.getByTestId("lb-nama").fill("Uji Repeat Pelanggan");
   const saran = page.getByTestId("saran-pelanggan");
   await expect(saran).toContainText(NAMA);

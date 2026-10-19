@@ -10,7 +10,7 @@
 // yang bertahan saat Kembali dari detail; kotak cari terpisah (ketikan tidak merender ulang daftar); baris di-memo.
 // Papan (dnd-kit) dimuat malas: dipramuat saat ?v=papan aktif, saat senggang sesudah daftar tiba, atau tombol Papan
 // disentuh/difokus; gagal memuat → pesan + Coba lagi di tempat papan (muatKomponen).
-import { BarChart3, Building2, List, Plus, ShieldCheck, SquareKanban } from "lucide-react";
+import { List, Plus, SquareKanban } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -22,6 +22,7 @@ import { KepalaHalaman } from "@/components/layout/kepala-halaman";
 import { GalatMuat, Kosong, MemuatDaftar } from "@/components/umum/keadaan";
 import { Chip } from "@/components/umum/chip";
 import { Button } from "@/components/ui/button";
+import { AksiPipeline } from "@/features/pipeline/aksi-pipeline";
 import { DaftarOrder } from "@/features/pipeline/daftar-order";
 import { DialogLeadBaru } from "@/features/pipeline/dialog-lead-baru";
 import { GerbangPipeline, type AksesPipeline } from "@/features/pipeline/gerbang";
@@ -116,7 +117,7 @@ const BarisLead = memo(function BarisLead({ lead, hariIni, kategori }: { lead: L
 });
 
 function IsiDaftar({ akses }: { akses: AksesPipeline }) {
-  const { member, hariIni, owner } = useProfil();
+  const { member, hariIni } = useProfil();
   const idSaya = Number(member.id);
   const sp = useSearchParams();
 
@@ -236,41 +237,20 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
                 papan === b ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <Ikon className="size-4" aria-hidden />
+              {/* rep: dua sakelar berdampingan; ikon disembunyikan di HP sempit agar tetap satu baris */}
+              <Ikon className={cn("size-4", akses.peran === "rep" && "max-sm:hidden")} aria-hidden />
               {label}
             </Link>
           ))}
         </div>
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-          {owner ? (
-            <Button asChild variant="outline">
-              <Link href="/admin/pipeline" data-uji="tautan-akses-pipeline">
-                <ShieldCheck aria-hidden />
-                Kelola akses
-              </Link>
-            </Button>
-          ) : null}
-          <Button asChild variant="outline">
-            <Link href="/pipeline/pelanggan" data-uji="tautan-pelanggan">
-              <Building2 aria-hidden />
-              Pelanggan
-            </Link>
+        {/* Pelanggan / Ringkasan / Kelola akses ada di kepala halaman (AksiPipeline). Lead baru: tombol di sini untuk
+            desktop; di HP/tablet tombol melayang di bawah (pola "+ Tugas" layar list), jadi baris ini tetap satu baris. */}
+        {akses.bolehTulis ? (
+          <Button onClick={() => setBukaBaru(true)} className="ml-auto hidden lg:inline-flex" data-uji="tombol-lead-baru">
+            <Plus aria-hidden />
+            Lead baru
           </Button>
-          {akses.boleh_ringkas ? (
-            <Button asChild variant="outline">
-              <Link href="/pipeline/ringkasan" data-uji="tautan-ringkasan">
-                <BarChart3 aria-hidden />
-                Ringkasan
-              </Link>
-            </Button>
-          ) : null}
-          {akses.bolehTulis ? (
-            <Button onClick={() => setBukaBaru(true)} data-uji="tombol-lead-baru">
-              <Plus aria-hidden />
-              Lead baru
-            </Button>
-          ) : null}
-        </div>
+        ) : null}
       </div>
 
       <div role="tablist" aria-label="Saring lead" className="flex gap-1.5 overflow-x-auto pb-1">
@@ -355,7 +335,22 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
         </>
       )}
 
-      {akses.bolehTulis ? <DialogLeadBaru buka={bukaBaru} ubahBuka={setBukaBaru} /> : null}
+      {akses.bolehTulis ? (
+        <>
+          {/* ruang supaya baris terakhir tidak tertutup tombol melayang */}
+          <div className="h-16 lg:hidden" aria-hidden />
+          <Button
+            type="button"
+            onClick={() => setBukaBaru(true)}
+            className="fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 h-13 gap-1.5 rounded-full px-5 text-base font-semibold shadow-lg lg:hidden"
+            data-uji="tombol-lead-baru"
+          >
+            <Plus className="size-5" aria-hidden />
+            Lead baru
+          </Button>
+          <DialogLeadBaru buka={bukaBaru} ubahBuka={setBukaBaru} />
+        </>
+      ) : null}
     </div>
   );
 }
@@ -366,7 +361,7 @@ export function LayarDaftar() {
   const lebar = sp.get("v") === "papan" || sp.get("tab") === "order";
   return (
     <>
-      <KepalaHalaman judul="Pipeline" />
+      <KepalaHalaman judul="Pipeline" aksi={<AksiPipeline />} />
       <IsiHalaman lebar={lebar} className="space-y-4">
         <GerbangPipeline>{(akses) => <IsiDaftar akses={akses} />}</GerbangPipeline>
       </IsiHalaman>
