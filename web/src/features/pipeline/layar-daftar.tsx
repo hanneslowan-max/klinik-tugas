@@ -30,7 +30,16 @@ import { GerbangPipeline, type AksesPipeline } from "@/features/pipeline/gerbang
 import { infoFu, PRODUK, ringkasProduk, rupiah, TAB_DAFTAR } from "@/features/pipeline/konstanta";
 import { ChipRepeat } from "@/features/pipeline/chip-repeat";
 import { KotakCari } from "@/features/pipeline/kotak-cari";
-import { hitungProduk, saringLead, urutkan, urutSah, type SaringanLead as NilaiSaringan } from "@/features/pipeline/order";
+import {
+  daftarSales,
+  hitungProduk,
+  SARINGAN_KOSONG,
+  saringLead,
+  TANPA_PEMILIK,
+  urutkan,
+  urutSah,
+  type SaringanLead as NilaiSaringan,
+} from "@/features/pipeline/order";
 import { PilTahap } from "@/features/pipeline/pil-tahap";
 import { usePipelineDaftar, usePipelineKategori } from "@/features/pipeline/queries";
 import { opsiStatus, SaringanLead, tanggalSah } from "@/features/pipeline/saringan-lead";
@@ -126,19 +135,22 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
   const papan = sp.get("v") === "papan";
   const modeOrder = tab === "order";
   // nilai URL yang tidak sah untuk tab ini diabaikan (bukan mengosongkan daftar diam-diam)
+  // pemilik: ?m=<id> | "semua". Rep default ke dirinya; admin/baca default semua.
+  const mParam = sp.get("m");
+  const pemilik: number | null =
+    mParam === "semua" ? null : mParam && /^\d+$/.test(mParam) ? Number(mParam) : akses.peran === "rep" ? idSaya : null;
   const stUrl = sp.get("st");
   const produkUrl = sp.get("produk");
+  const salesUrl = sp.get("sales");
   const saringan: NilaiSaringan = {
     status: stUrl && opsiStatus(tab).some((o) => o.v === stUrl) ? stUrl : null,
     dari: tanggalSah(sp.get("dari")),
     sampai: tanggalSah(sp.get("sampai")),
     produk: produkUrl && PRODUK.some((p) => p === produkUrl) ? produkUrl : null,
+    // saringan sales (di web) hanya saat daftar memuat semua pemilik; "Lead saya" / ?m=<id> sudah disaring server
+    sales: pemilik === null && salesUrl && (salesUrl === TANPA_PEMILIK || /^\d+$/.test(salesUrl)) ? salesUrl : null,
   };
   const urut = urutSah(sp.get("urut"), modeOrder);
-  // pemilik: ?m=<id> | "semua". Rep default ke dirinya; admin/baca default semua.
-  const mParam = sp.get("m");
-  const pemilik: number | null =
-    mParam === "semua" ? null : mParam && /^\d+$/.test(mParam) ? Number(mParam) : akses.peran === "rep" ? idSaya : null;
 
   // kata cari ter-debounce disimpan di URL (?q): Kembali dari detail lead memulihkan pencarian
   const qUrl = sp.get("q") ?? "";
@@ -153,7 +165,8 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
     gantiUrl(urlPipeline(window.location.search, ubah));
   };
   const setParam = (kunci: string, nilai: string | null) => gantiParams({ [kunci]: nilai });
-  const setSaringan = (f: NilaiSaringan) => gantiParams({ st: f.status, dari: f.dari, sampai: f.sampai, produk: f.produk });
+  const setSaringan = (f: NilaiSaringan) =>
+    gantiParams({ st: f.status, dari: f.dari, sampai: f.sampai, produk: f.produk, sales: f.sales });
   // status selalu dibuang saat ganti tab (pilihannya beda per tab); tanggal & urutan berarti lain di tab Order (tanggal
   // SP) → dibuang saat pindah masuk/keluar tab Order
   const pindahTab = (kunci: string) =>
@@ -177,20 +190,29 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
   }, [papan, adaDaftar]);
   const namaKategori = useMemo(() => new Map(kategori.data?.kategori.map((k) => [k.id, k.nama])), [kategori.data]);
   const kategoriLead = (id: string) => namaKategori.get(kategori.data?.posisi[id] ?? "");
-  const { status: stSaring, dari: dariSaring, sampai: sampaiSaring, produk: produkSaring } = saringan;
-  // jumlah per produk = lead yang tampil bila produk itu dipilih (saringan lain tetap berlaku)
-  const tanpaProduk = useMemo(
-    () => (daftar.data ? saringLead(daftar.data.items, { status: stSaring, dari: dariSaring, sampai: sampaiSaring, produk: null }, modeOrder) : []),
+  const { status: stSaring, dari: dariSaring, sampai: sampaiSaring, produk: produkSaring, sales: salesSaring } = saringan;
+  // saringan inti (status & tanggal) sekali; produk & sales di atasnya. Jumlah per produk / per sales = lead yang tampil
+  // bila pilihan itu diambil (saringan lain tetap berlaku).
+  const inti = useMemo(
+    () => (daftar.data ? saringLead(daftar.data.items, { ...SARINGAN_KOSONG, status: stSaring, dari: dariSaring, sampai: sampaiSaring }, modeOrder) : []),
     [daftar.data, stSaring, dariSaring, sampaiSaring, modeOrder],
   );
+  const tanpaProduk = useMemo(() => saringLead(inti, { ...SARINGAN_KOSONG, sales: salesSaring }, modeOrder), [inti, salesSaring, modeOrder]);
   const jumlahProduk = useMemo(() => hitungProduk(tanpaProduk), [tanpaProduk]);
+  const tanpaSales = useMemo(() => saringLead(inti, { ...SARINGAN_KOSONG, produk: produkSaring }, modeOrder), [inti, produkSaring, modeOrder]);
+  const opsiSales = useMemo(
+    () => (pemilik === null && daftar.data ? daftarSales(daftar.data.items, tanpaSales) : []),
+    [pemilik, daftar.data, tanpaSales],
+  );
   const tersaring = useMemo(
-    () => (produkSaring ? tanpaProduk.filter((l) => l.produk.some((i) => i.produk === produkSaring)) : tanpaProduk),
-    [tanpaProduk, produkSaring],
+    () => saringLead(tanpaProduk, { ...SARINGAN_KOSONG, produk: produkSaring }, modeOrder),
+    [tanpaProduk, produkSaring, modeOrder],
   );
   // tab Order dikelompokkan & diurutkan di DaftarOrder; daftar lead & papan memakai salinan terurut ini
   const terurut = useMemo(() => urutkan(tersaring, urut, modeOrder), [tersaring, urut, modeOrder]);
-  const { batas, tambah } = useBatasTampil([tab, pemilik ?? "semua", q, stSaring, dariSaring, sampaiSaring, produkSaring, urut].join("|"));
+  const { batas, tambah } = useBatasTampil(
+    [tab, pemilik ?? "semua", q, stSaring, dariSaring, sampaiSaring, produkSaring, salesSaring, urut].join("|"),
+  );
   const bisaUbahOrder = (l: LeadRingkas) =>
     akses.bolehTulis && (akses.peran === "admin" || l.pemilik == null || Number(l.pemilik) === idSaya);
   const hitungan = daftar.data
@@ -214,7 +236,7 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
                   key={o.label}
                   type="button"
                   aria-pressed={aktif}
-                  onClick={() => setParam("m", o.k === null ? null : "semua")}
+                  onClick={() => gantiParams({ m: o.k === null ? null : "semua", sales: null })}
                   className={cn(
                     "inline-flex h-8 items-center rounded-md px-3 text-sm font-medium transition-colors",
                     aktif ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
@@ -295,6 +317,8 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
         hariIni={hariIni}
         jumlahProduk={jumlahProduk}
         jumlahSemua={tanpaProduk.length}
+        opsiSales={opsiSales}
+        jumlahSemuaSales={tanpaSales.length}
         urut={urut}
         ubahUrut={(u) => setParam("urut", u)}
       />

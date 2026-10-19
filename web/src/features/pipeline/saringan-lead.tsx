@@ -3,7 +3,8 @@
 // Saringan daftar Pipeline (revisi #4), melengkapi kotak cari (perusahaan, PIC, produk, No SP/PO, kode — di server):
 // status (tab Order = status bayar, tab lain = tahap) + rentang tanggal (tab Order = tanggal SP, tab lain = tanggal masuk):
 // pintasan Hari ini / Minggu ini (Senin–Minggu) / Bulan ini / Bulan lalu / Tahun ini, atau Custom = isi Dari–Sampai sendiri
-// (19 Okt, ganti daftar bulan). Disimpan di URL (st, dari, sampai) oleh layar daftar; panel terbuka bila ada saringan aktif.
+// (19 Okt, ganti daftar bulan). Sales (19 Okt): pemilik lead + jumlahnya, hanya saat daftar memuat semua pemilik (admin/baca,
+// atau rep di "Semua"). Disimpan di URL (st, dari, sampai, sales) oleh layar daftar; panel terbuka bila ada saringan aktif.
 // Baris tombol: Filter, Produk (19 Okt, ganti tab "Pallet Mesh"; ?produk=, berlaku di semua tab), Urutkan (?urut=; bukan
 // saringan, Reset tidak mengubahnya), Reset. Urutkan dulu di baris jumlah lead, tetapi di HP tertutup tombol "Lead baru".
 import { ArrowUpDown, ChevronDown, Package, SlidersHorizontal, X } from "lucide-react";
@@ -26,6 +27,7 @@ import {
   BELUM_DICATAT,
   bulanSebelum,
   jumlahSaringan,
+  type OpsiSales,
   opsiUrut,
   rentangBulan,
   rentangMinggu,
@@ -76,13 +78,28 @@ type Props = {
   /** jumlah lead per produk & total, dengan saringan lain tetap berlaku */
   jumlahProduk: Map<string, number>;
   jumlahSemua: number;
+  /** pemilik lead yang bisa dipilih (kosong = daftar sudah satu pemilik, grup Sales disembunyikan) */
+  opsiSales: OpsiSales[];
+  jumlahSemuaSales: number;
   urut: string | null;
   ubahUrut: (u: string | null) => void;
 };
 
 const ANGKA = new Intl.NumberFormat("id-ID");
 
-export function SaringanLead({ tab, modeOrder, nilai: f, ubah, hariIni, jumlahProduk, jumlahSemua, urut, ubahUrut }: Props) {
+export function SaringanLead({
+  tab,
+  modeOrder,
+  nilai: f,
+  ubah,
+  hariIni,
+  jumlahProduk,
+  jumlahSemua,
+  opsiSales,
+  jumlahSemuaSales,
+  urut,
+  ubahUrut,
+}: Props) {
   const aktif = jumlahSaringan(f);
   const [buka, setBuka] = useState(aktif > 0);
   const status = opsiStatus(tab);
@@ -161,6 +178,36 @@ export function SaringanLead({ tab, modeOrder, nilai: f, ubah, hariIni, jumlahPr
 
       {buka ? (
         <div className="space-y-3 rounded-xl border bg-card p-3" data-uji="panel-saringan">
+          {opsiSales.length ? (
+            <div className="space-y-1.5">
+              <div className="text-xs font-medium text-muted-foreground">Sales</div>
+              <div role="group" aria-label="Sales" className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  aria-pressed={!f.sales}
+                  className={kelasChip(!f.sales)}
+                  onClick={() => ubah({ ...f, sales: null })}
+                  data-uji="saring-sales-semua"
+                >
+                  Semua
+                  <span className="ml-1.5 text-xs font-normal tabular-nums opacity-70">{ANGKA.format(jumlahSemuaSales)}</span>
+                </button>
+                {opsiSales.map((o) => (
+                  <button
+                    key={o.k}
+                    type="button"
+                    aria-pressed={f.sales === o.k}
+                    className={kelasChip(f.sales === o.k)}
+                    onClick={() => ubah({ ...f, sales: f.sales === o.k ? null : o.k })}
+                    data-uji={`saring-sales-${o.k}`}
+                  >
+                    {o.nama}
+                    <span className="ml-1.5 text-xs font-normal tabular-nums opacity-70">{ANGKA.format(o.n)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
           {status.length ? (
           <div className="space-y-1.5">
             <div className="text-xs font-medium text-muted-foreground">{modeOrder ? "Status pembayaran" : "Tahap"}</div>

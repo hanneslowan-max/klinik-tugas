@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  BELUM_DICATAT, bulanSebelum, csvOrder, hitungProduk, jumlahSaringan, kelompokOrder, labelBulan, rentangBulan, rentangMinggu,
-  SARINGAN_KOSONG, saringLead, sisaTagihan, TANPA_TANGGAL, terbayar, urutkan, urutSah,
+  BELUM_DICATAT, bulanSebelum, csvOrder, daftarSales, hitungProduk, jumlahSaringan, kelompokOrder, labelBulan, rentangBulan,
+  rentangMinggu, SARINGAN_KOSONG, saringLead, sisaTagihan, TANPA_PEMILIK, TANPA_TANGGAL, terbayar, urutkan, urutSah,
 } from "@/features/pipeline/order";
 import type { LeadRingkas } from "@/types/domain";
 
@@ -75,21 +75,21 @@ describe("kelompokOrder", () => {
 
 describe("saringLead", () => {
   it("tab Order: status bayar, termasuk 'belum dicatat'", () => {
-    const st = (status: string) => saringLead(DATA, { status, dari: null, sampai: null, produk: null }, true).map((l) => l.kode);
+    const st = (status: string) => saringLead(DATA, { status, dari: null, sampai: null, produk: null, sales: null }, true).map((l) => l.kode);
     expect(st("DP")).toEqual(["L-00002"]);
     expect(st("BELUM")).toEqual(["L-00003", "L-00005"]);
     expect(st(BELUM_DICATAT)).toEqual(["L-00004", "L-00006"]);
   });
 
   it("tab Order: rentang tanggal SP inklusif; tanpa tanggal tersaring keluar", () => {
-    const r = saringLead(DATA, { status: null, produk: null, ...rentangBulan("2026-10") }, true).map((l) => l.kode);
+    const r = saringLead(DATA, { status: null, produk: null, sales: null, ...rentangBulan("2026-10") }, true).map((l) => l.kode);
     expect(r).toEqual(["L-00002", "L-00003", "L-00005"]);
-    expect(saringLead(DATA, { status: null, dari: "2026-10-12", sampai: null, produk: null }, true).map((l) => l.kode)).toEqual(["L-00003", "L-00005"]);
+    expect(saringLead(DATA, { status: null, dari: "2026-10-12", sampai: null, produk: null, sales: null }, true).map((l) => l.kode)).toEqual(["L-00003", "L-00005"]);
   });
 
   it("tab lain: status = tahap, tanggal = tanggal masuk", () => {
-    expect(saringLead(DATA, { status: "PENAWARAN", dari: null, sampai: null, produk: null }, false).map((l) => l.kode)).toEqual(["L-00006"]);
-    expect(saringLead(DATA, { status: null, dari: "2026-10-01", sampai: "2026-10-31", produk: null }, false).map((l) => l.kode)).toEqual(["L-00006"]);
+    expect(saringLead(DATA, { status: "PENAWARAN", dari: null, sampai: null, produk: null, sales: null }, false).map((l) => l.kode)).toEqual(["L-00006"]);
+    expect(saringLead(DATA, { status: null, dari: "2026-10-01", sampai: "2026-10-31", produk: null, sales: null }, false).map((l) => l.kode)).toEqual(["L-00006"]);
   });
 
   it("tanpa saringan → daftar yang sama", () => {
@@ -141,6 +141,33 @@ describe("urutkan", () => {
     const lama = kelompokOrder(DATA, "lama").grup.map((g) => [g.kunci, ...g.items.map((l) => l.kode)]);
     expect(lama).toEqual([["2026-09", "L-00001"], ["2026-10", "L-00002", "L-00003", "L-00005"], [TANPA_TANGGAL, "L-00004"]]);
     expect(kelompokOrder(DATA, "baru")).toEqual(kelompokOrder(DATA)); // 'baru' tidak ada di tab Order → bawaan
+  });
+});
+
+describe("saringan sales", () => {
+  const S = [
+    lead("L-00041", { tahap: "BARU", pemilik: 7, pemilik_nama: "Riksa Sri Gustiana" }),
+    lead("L-00042", { tahap: "PENAWARAN", pemilik: 5, pemilik_nama: "michael eppy" }),
+    lead("L-00043", { tahap: "BARU", pemilik: null, pemilik_nama: null }),
+    lead("L-00044", { tahap: "PENAWARAN", pemilik: 7, pemilik_nama: "Riksa Sri Gustiana" }),
+  ];
+  const kode = (f: Partial<typeof SARINGAN_KOSONG>) => saringLead(S, { ...SARINGAN_KOSONG, ...f }, false).map((l) => l.kode);
+
+  it("per pemilik, tanpa pemilik, digabung dengan saringan lain; dihitung di lencana Filter", () => {
+    expect(kode({ sales: "7" })).toEqual(["L-00041", "L-00044"]);
+    expect(kode({ sales: TANPA_PEMILIK })).toEqual(["L-00043"]);
+    expect(kode({ sales: "7", status: "PENAWARAN" })).toEqual(["L-00044"]);
+    expect(kode({ sales: "99" })).toEqual([]);
+    expect(jumlahSaringan({ ...SARINGAN_KOSONG, sales: "7" })).toBe(1);
+  });
+
+  it("daftarSales: nama dari semua lead, jumlah dari yang tersaring; urut nama, Tanpa pemilik terakhir", () => {
+    const penawaran = saringLead(S, { ...SARINGAN_KOSONG, status: "PENAWARAN" }, false);
+    expect(daftarSales(S, penawaran)).toEqual([
+      { k: "5", nama: "michael eppy", n: 1 },
+      { k: "7", nama: "Riksa Sri Gustiana", n: 1 },
+      { k: TANPA_PEMILIK, nama: "Tanpa pemilik", n: 0 },
+    ]);
   });
 });
 

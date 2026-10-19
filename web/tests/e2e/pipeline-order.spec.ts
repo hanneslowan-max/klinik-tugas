@@ -3,7 +3,7 @@
 // Pipeline → tiap tes menyiapkan akses + 2 order + 1 lead lewat psql lokal dan membersihkannya.
 import { expect, test, type Page } from "@playwright/test";
 
-import { AKUN, diHp, masuk, sqlLokal } from "./bantu";
+import { AKUN, diHp, keluar, masuk, sqlLokal } from "./bantu";
 
 const PELANGGAN = "PT Uji Order Rekap";
 const ROMAWI = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
@@ -183,6 +183,54 @@ test("Papan + tab Order + saringan Lunas: hanya order lunas", async ({ page }) =
   // status tak dikenal di URL diabaikan (bukan mengosongkan daftar)
   await page.goto("/pipeline?tab=order&st=ngawur");
   await hanyaPelangganUji(page);
+});
+
+test("saringan Sales: pemilik + jumlah di Filter (admin & rep di Semua), Tanpa pemilik, ikut Reset; tidak ada di Lead saya", async ({ page }) => {
+  // pelanggan yang sama: 3 lead citra (beforeEach) + 1 lead eka + 1 lead tanpa pemilik
+  const [milikEka, tanpaPemilik] = [`ld${acak()}`, `ld${acak()}`];
+  sqlLokal(
+    `insert into public.lead (id, pelanggan_id, sumber, pemilik, tahap) select x.id, l.pelanggan_id, 'Telepon', x.pemilik, 'BARU'` +
+      ` from public.lead l, (values ('${milikEka}', ${AKUN.eka.id}::bigint), ('${tanpaPemilik}', null::bigint)) x(id, pemilik)` +
+      ` where l.id = '${baru}';` +
+      ` insert into public.lead_item (lead_id, produk, qty) values ('${milikEka}', 'Roda', 1), ('${tanpaPemilik}', 'Locker', 1);`,
+  );
+  await masuk(page, AKUN.owner.email);
+  await page.goto("/pipeline");
+  await page.getByTestId("cari-lead").fill(PELANGGAN);
+  await expect(page.getByTestId("baris-lead")).toHaveCount(5);
+  await page.getByTestId("tombol-saringan").click();
+  const sales = page.getByRole("group", { name: "Sales" });
+  await expect(sales.getByRole("button")).toHaveText([/^Semua\s*5$/, /^citra lestari\s*3$/, /^eka wulandari\s*1$/, /^Tanpa pemilik\s*1$/]);
+
+  await page.getByTestId(`saring-sales-${AKUN.eka.id}`).click();
+  await expect(page).toHaveURL(new RegExp(`sales=${AKUN.eka.id}`));
+  await expect(page.getByTestId("baris-lead")).toHaveCount(1);
+  await expect(page.getByText(/^1 dari 5 lead$/)).toBeVisible();
+  await expect(page.getByTestId("tombol-saringan")).toContainText("1"); // lencana Filter
+  await page.getByTestId("saring-sales-tanpa").click();
+  await expect(page.getByTestId("baris-lead")).toHaveCount(1);
+  await expect(page.getByText("Locker · 1 unit")).toBeVisible();
+  // digabung dengan Produk: jumlah sales mengikuti produk terpilih
+  await page.getByTestId("saring-sales-semua").click();
+  await page.getByTestId("tombol-produk").click();
+  await page.getByRole("menuitemradio", { name: /^Roda/ }).click();
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(sales.getByRole("button")).toHaveText([/^Semua\s*2$/, /^citra lestari\s*1$/, /^eka wulandari\s*1$/, /^Tanpa pemilik\s*0$/]);
+  await page.getByTestId(`saring-sales-${AKUN.eka.id}`).click();
+  await page.getByTestId("reset-saringan").click();
+  await expect(page).not.toHaveURL(/sales=|produk=/);
+  await expect(page.getByTestId("baris-lead")).toHaveCount(5);
+
+  // rep: di "Lead saya" tidak ada grup Sales; di "Semua" ada
+  await keluar(page, diHp(page));
+  await masuk(page, AKUN.citra.email);
+  await page.goto("/pipeline");
+  await page.getByTestId("tombol-saringan").click();
+  await expect(page.getByRole("group", { name: "Sales" })).toHaveCount(0);
+  await page.getByRole("group", { name: "Pemilik" }).getByRole("button", { name: "Semua" }).click();
+  await expect(page).toHaveURL(/m=semua/);
+  await page.getByTestId("cari-lead").fill(PELANGGAN);
+  await expect(page.getByRole("group", { name: "Sales" }).getByRole("button")).toHaveCount(4);
 });
 
 test("saringan tanggal SP: pintasan Hari ini…Tahun ini tanpa daftar bulan; Custom memunculkan Dari/Sampai", async ({ page }) => {
