@@ -345,6 +345,13 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   Bedanya dengan tab lama: tab "Pallet Mesh" hanya lead terbuka (BARU/PENAWARAN); kini Semua + Pallet Mesh = semua tahap
   (pakai tab Penawaran atau Filter → Tahap untuk mempersempit). Produksi 19 Okt (lead per produk): Roda 1.417,
   Lainnya 218, Pallet Mesh 202, Airport Trolley 92, Shopping Cart 74, Lemari Arsip 59; Material Handling & Locker 0.
+- **Urutkan daftar Pipeline (19 Okt, permintaan Hannes "opsi untuk sort"):** tombol kecil di kanan baris "N lead"
+  (`PilihUrut`, `?urut=`). Tab lead: Paling lama diam (bawaan = urutan server), Terbaru masuk, Terlama masuk, Follow up
+  terdekat (tanpa jadwal di akhir), Nama pelanggan A–Z. Tab Order: Tanggal SP terbaru (bawaan), Tanggal SP terlama
+  (bulan juga dibalik; "Tanpa tanggal SP" tetap terakhir), Nilai terbesar & Nama A–Z (dalam bulan; rekap per bulan
+  tetap). Berlaku juga di Papan dan unduhan CSV. Urutan dibuang saat masuk/keluar tab Order (pilihannya beda); bukan
+  saringan, jadi Reset tidak mengubahnya. Diurutkan di web (urutan stabil: yang setara tetap urutan server); tanpa
+  perubahan DB.
 - **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md` — **wajib pakai alat impor versi berpenjaga (14 Okt, sesudah Batal order)**; versi lama mengembalikan order yang dibatalkan di Anvil ke ORDER.
 
 ## Notifikasi "Dari tim" / "Dari agent" (revisi #2, 13 Okt 2026, branch `rev2-notif`)
