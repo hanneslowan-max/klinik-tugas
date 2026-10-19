@@ -1,6 +1,6 @@
-// Tab Order Pipeline (revisi #3–#7): rekap & kelompok per bulan SP, saringan status bayar/tanggal/produk, cari No PO/produk,
-// Data order (No PO, DP → sisa tagihan, Lunas), detail lead, dan unduh CSV. Seed sintetis tidak punya data Pipeline →
-// tiap tes menyiapkan akses + 2 order + 1 lead lewat psql lokal dan membersihkannya.
+// Tab Order Pipeline (revisi #3–#7): rekap & kelompok per bulan SP, saringan status bayar/tanggal/produk, urutan, cari
+// No PO/produk, Data order (No PO, DP → sisa tagihan, Lunas), detail lead, dan unduh CSV. Seed sintetis tidak punya data
+// Pipeline → tiap tes menyiapkan akses + 2 order + 1 lead lewat psql lokal dan membersihkannya.
 import { expect, test, type Page } from "@playwright/test";
 
 import { AKUN, diHp, masuk, sqlLokal } from "./bantu";
@@ -51,6 +51,14 @@ const baris = (page: Page, id: string) => page.locator(`[data-uji="baris-order"]
 async function hanyaPelangganUji(page: Page) {
   await page.getByTestId("cari-lead").fill(PELANGGAN);
   await expect(page.locator('[data-uji="baris-order"]')).toHaveCount(2);
+}
+
+/** Pilih urutan lewat menu, lalu tunggu menu terlepas: menu Radix yang sama tidak terbuka bila diketuk lagi selagi
+ *  animasi tutupnya berjalan (±60 ms; jauh di bawah ketukan manusia, tetapi tes bisa secepat itu di runner CI). */
+async function pilihUrut(page: Page, kunci: string) {
+  await page.getByTestId("tombol-urut").click();
+  await page.getByTestId(`urut-${kunci}`).click();
+  await expect(page.getByRole("menu")).toHaveCount(0);
 }
 
 async function bukaOrder(page: Page) {
@@ -127,6 +135,40 @@ test("saringan Produk: semua produk + jumlah, berlaku di tab Semua & Order, ikut
   await expect(page).not.toHaveURL(/produk=/);
   await expect(page.getByTestId("tombol-produk")).toHaveText(/Semua produk/);
   await expect(page.locator('[data-uji="baris-order"]')).toHaveCount(2);
+});
+
+test("Urutkan: terbaru/terlama masuk di daftar lead; tab Order punya pilihan sendiri (tanggal SP); tersimpan di URL", async ({ page }) => {
+  sqlLokal(
+    `update public.lead set tanggal_masuk = case id when '${lunas}' then date '2026-03-01' when '${belum}' then date '2026-01-01'` +
+      ` else date '2026-02-01' end where id in ('${lunas}', '${belum}', '${baru}');`,
+  );
+  await masuk(page, AKUN.citra.email);
+  await page.goto("/pipeline");
+  await page.getByTestId("cari-lead").fill(PELANGGAN);
+  await expect(page.getByTestId("baris-lead")).toHaveCount(3);
+  const urutanLead = () => page.getByTestId("baris-lead").evaluateAll((el) => el.map((e) => e.getAttribute("href")?.split("/").pop()));
+  const urutanOrder = () => page.locator('[data-uji="baris-order"]').evaluateAll((el) => el.map((e) => e.getAttribute("data-id")));
+
+  await expect(page.getByTestId("tombol-urut")).toHaveText(/Paling lama diam/);
+  await pilihUrut(page, "baru");
+  await expect(page).toHaveURL(/urut=baru/);
+  await expect.poll(urutanLead).toEqual([lunas, baru, belum]);
+  await pilihUrut(page, "lama");
+  await expect(page.getByTestId("tombol-urut")).toHaveText(/Terlama masuk/);
+  await expect.poll(urutanLead).toEqual([belum, baru, lunas]);
+
+  // masuk tab Order: urutan lead dibuang, pilihannya berganti (bawaan tanggal SP terbaru)
+  await page.getByRole("tab", { name: "Order" }).click();
+  await expect(page).not.toHaveURL(/urut=/);
+  await expect(page.getByTestId("tombol-urut")).toHaveText(/Tanggal SP terbaru/);
+  await expect.poll(urutanOrder).toEqual([lunas, belum]);
+  await page.getByTestId("tombol-urut").click();
+  await expect(page.getByTestId("urut-nilai")).toBeVisible();
+  await expect(page.getByTestId("urut-baru")).toHaveCount(0); // pilihan tab lead tidak ada di tab Order
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await pilihUrut(page, "lama");
+  await expect.poll(urutanOrder).toEqual([belum, lunas]);
 });
 
 test("Papan + tab Order + saringan Lunas: hanya order lunas", async ({ page }) => {

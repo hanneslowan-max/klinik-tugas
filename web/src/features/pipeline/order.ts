@@ -119,10 +119,61 @@ const bulanDari = (l: LeadRingkas) =>
   l.tanggal_sp && /^\d{4}-\d{2}/.test(l.tanggal_sp) ? l.tanggal_sp.slice(0, 7) : TANPA_TANGGAL;
 
 /**
- * Kelompokkan order per bulan SP, terbaru dulu ("Tanpa tanggal SP" paling akhir). Dalam bulan: tanggal SP terbaru dulu,
- * lalu kode lead terbaru. Lead selain tahap ORDER diabaikan.
+ * Urutan daftar (?urut=, 19 Okt). Bawaan tab lead = urutan server (paling lama diam dulu); bawaan tab Order = tanggal SP
+ * terbaru. Kunci yang tidak ada di tab ini diabaikan. Urutan stabil: yang setara tetap dalam urutan server.
  */
-export function kelompokOrder(leads: LeadRingkas[]): RingkasOrder {
+export const URUT_LEAD = [
+  { k: null, label: "Paling lama diam" },
+  { k: "baru", label: "Terbaru masuk" },
+  { k: "lama", label: "Terlama masuk" },
+  { k: "fu", label: "Follow up terdekat" },
+  { k: "nama", label: "Nama pelanggan A–Z" },
+] as const;
+export const URUT_ORDER = [
+  { k: null, label: "Tanggal SP terbaru" },
+  { k: "lama", label: "Tanggal SP terlama" },
+  { k: "nilai", label: "Nilai terbesar" },
+  { k: "nama", label: "Nama pelanggan A–Z" },
+] as const;
+
+export const opsiUrut = (modeOrder: boolean): readonly { k: string | null; label: string }[] =>
+  modeOrder ? URUT_ORDER : URUT_LEAD;
+export const urutSah = (u: string | null, modeOrder: boolean) => (u && opsiUrut(modeOrder).some((o) => o.k === u) ? u : null);
+
+type Banding = (a: LeadRingkas, b: LeadRingkas) => number;
+const NAMA = new Intl.Collator("id", { sensitivity: "base", numeric: true });
+const spBaru: Banding = (a, b) => (b.tanggal_sp ?? "").localeCompare(a.tanggal_sp ?? "") || b.kode.localeCompare(a.kode);
+const masukBaru: Banding = (a, b) => b.tanggal_masuk.localeCompare(a.tanggal_masuk) || b.kode.localeCompare(a.kode);
+
+/** Pembanding untuk urutan ini; null = biarkan urutan server (bawaan tab lead). */
+export function pembanding(urut: string | null, modeOrder: boolean): Banding | null {
+  const u = urutSah(urut, modeOrder);
+  if (modeOrder) {
+    if (u === "lama") return (a, b) => spBaru(b, a);
+    if (u === "nilai") return (a, b) => (b.nilai_transaksi ?? -1) - (a.nilai_transaksi ?? -1) || spBaru(a, b);
+    if (u === "nama") return (a, b) => NAMA.compare(a.pelanggan, b.pelanggan) || spBaru(a, b);
+    return spBaru;
+  }
+  if (u === "baru") return masukBaru;
+  if (u === "lama") return (a, b) => masukBaru(b, a);
+  // tanpa jadwal FU di akhir
+  if (u === "fu") return (a, b) => Number(!a.fu_berikutnya) - Number(!b.fu_berikutnya) || (a.fu_berikutnya ?? "").localeCompare(b.fu_berikutnya ?? "");
+  if (u === "nama") return (a, b) => NAMA.compare(a.pelanggan, b.pelanggan);
+  return null;
+}
+
+/** Daftar terurut (salinan) atau daftar yang sama bila urutan bawaan server. */
+export function urutkan(leads: LeadRingkas[], urut: string | null, modeOrder: boolean): LeadRingkas[] {
+  const c = pembanding(urut, modeOrder);
+  return c ? [...leads].sort(c) : leads;
+}
+
+/**
+ * Kelompokkan order per bulan SP, terbaru dulu ("Tanpa tanggal SP" paling akhir). Dalam bulan: tanggal SP terbaru dulu,
+ * lalu kode lead terbaru. Lead selain tahap ORDER diabaikan. `urut` (URUT_ORDER) mengubah urutan dalam bulan; "lama"
+ * juga membalik urutan bulan (terlama dulu, "Tanpa tanggal SP" tetap paling akhir).
+ */
+export function kelompokOrder(leads: LeadRingkas[], urut: string | null = null): RingkasOrder {
   const order = leads.filter((l) => l.tahap === "ORDER");
   const peta = new Map<string, LeadRingkas[]>();
   for (const l of order) {
@@ -131,11 +182,13 @@ export function kelompokOrder(leads: LeadRingkas[]): RingkasOrder {
     if (isi) isi.push(l);
     else peta.set(k, [l]);
   }
-  const urutKunci = [...peta.keys()].sort((a, b) => (a === TANPA_TANGGAL ? 1 : b === TANPA_TANGGAL ? -1 : b.localeCompare(a)));
+  const naik = urutSah(urut, true) === "lama";
+  const urutKunci = [...peta.keys()].sort((a, b) =>
+    a === TANPA_TANGGAL ? 1 : b === TANPA_TANGGAL ? -1 : naik ? a.localeCompare(b) : b.localeCompare(a),
+  );
+  const banding = pembanding(urut, true) ?? spBaru;
   const grup = urutKunci.map((kunci): GrupOrder => {
-    const items = (peta.get(kunci) ?? []).sort(
-      (a, b) => (b.tanggal_sp ?? "").localeCompare(a.tanggal_sp ?? "") || b.kode.localeCompare(a.kode),
-    );
+    const items = (peta.get(kunci) ?? []).sort(banding);
     return { kunci, label: labelBulan(kunci), items, ...rekap(items) };
   });
   return { ...rekap(order), grup };

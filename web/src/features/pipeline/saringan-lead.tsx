@@ -4,14 +4,16 @@
 // status (tab Order = status bayar, tab lain = tahap) + rentang tanggal (tab Order = tanggal SP, tab lain = tanggal masuk)
 // dengan pintasan bulan. Disimpan di URL (st, dari, sampai) oleh layar daftar; panel terbuka bila ada saringan aktif.
 // Produk (19 Okt, ganti tab "Pallet Mesh"): tombol sendiri di sebelah Filter, semua produk + jumlah lead, berlaku di semua
-// tab (?produk=). Reset menghapus semuanya.
-import { ChevronDown, Package, SlidersHorizontal, X } from "lucide-react";
+// tab (?produk=). Reset menghapus semuanya. Urutkan (PilihUrut, 19 Okt): di baris jumlah lead, bukan saringan (Reset
+// tidak mengubahnya).
+import { ArrowUpDown, ChevronDown, Package, SlidersHorizontal, X } from "lucide-react";
 import { useState, type ComponentProps } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
@@ -20,7 +22,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BAYAR, BAYAR_BELUM_DICATAT, PRODUK, TAHAP } from "@/features/pipeline/konstanta";
-import { BELUM_DICATAT, bulanSebelum, jumlahSaringan, labelBulan, rentangBulan, SARINGAN_KOSONG, type SaringanLead } from "@/features/pipeline/order";
+import {
+  BELUM_DICATAT,
+  bulanSebelum,
+  jumlahSaringan,
+  labelBulan,
+  opsiUrut,
+  rentangBulan,
+  SARINGAN_KOSONG,
+  type SaringanLead,
+} from "@/features/pipeline/order";
 import { cn } from "@/lib/utils";
 import type { StatusBayar, TahapLead } from "@/types/domain";
 
@@ -211,6 +222,40 @@ export function SaringanLead({ tab, modeOrder, nilai: f, ubah, hariIni, bulan, j
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** Pilihan urutan daftar (URUT_LEAD / URUT_ORDER) — tombol kecil di kanan baris jumlah lead. */
+export function PilihUrut({ nilai, modeOrder, ubah }: { nilai: string | null; modeOrder: boolean; ubah: (u: string | null) => void }) {
+  const opsi = opsiUrut(modeOrder);
+  const pilih = opsi.find((o) => o.k === nilai) ?? opsi[0];
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-label={`Urutkan: ${pilih.label}`}
+          className={cn("shrink-0 text-xs pointer-coarse:min-h-[44px]", pilih.k ? "text-primary" : "text-muted-foreground")}
+          data-uji="tombol-urut"
+        >
+          <ArrowUpDown aria-hidden />
+          {pilih.label}
+          <ChevronDown aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="text-xs text-muted-foreground">Urutkan</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={pilih.k ?? ""} onValueChange={(v) => ubah(v || null)}>
+          {opsi.map((o) => (
+            <DropdownMenuRadioItem key={o.label} value={o.k ?? ""} className="min-h-11" data-uji={`urut-${o.k ?? "bawaan"}`}>
+              {o.label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

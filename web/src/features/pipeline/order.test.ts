@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   BELUM_DICATAT, bulanSebelum, bulanTersedia, csvOrder, hitungProduk, jumlahSaringan, kelompokOrder, labelBulan, rentangBulan,
-  SARINGAN_KOSONG, saringLead, sisaTagihan, TANPA_TANGGAL, terbayar,
+  SARINGAN_KOSONG, saringLead, sisaTagihan, TANPA_TANGGAL, terbayar, urutkan, urutSah,
 } from "@/features/pipeline/order";
 import type { LeadRingkas } from "@/types/domain";
 
@@ -111,6 +111,38 @@ describe("saringLead", () => {
     expect(kode({ produk: "Locker" })).toEqual([]);
     expect(kode({ produk: "Roda", status: "PENAWARAN" })).toEqual(["L-00011"]);
     expect(jumlahSaringan({ ...SARINGAN_KOSONG, produk: "Roda" })).toBe(0); // produk tidak dihitung di lencana Filter
+  });
+});
+
+describe("urutkan", () => {
+  const L = [
+    lead("L-00031", { tahap: "BARU", pelanggan: "PT Zeta", tanggal_masuk: "2026-10-02", fu_berikutnya: null }),
+    lead("L-00032", { tahap: "PENAWARAN", pelanggan: "cv alfa", tanggal_masuk: "2026-10-05", fu_berikutnya: "2026-10-20" }),
+    lead("L-00033", { tahap: "BARU", pelanggan: "PT Beta", tanggal_masuk: "2026-09-30", fu_berikutnya: "2026-10-19" }),
+    lead("L-00034", { tahap: "BARU", pelanggan: "PT Beta", tanggal_masuk: "2026-10-05", fu_berikutnya: null }),
+  ];
+  const kode = (u: string | null) => urutkan(L, u, false).map((l) => l.kode);
+
+  it("bawaan (null / kunci tak dikenal) = urutan server, tanpa salinan", () => {
+    expect(urutkan(L, null, false)).toBe(L);
+    expect(urutkan(L, "nilai", false)).toBe(L); // 'nilai' hanya untuk tab Order
+    expect(urutSah("ngawur", false)).toBeNull();
+  });
+
+  it("terbaru / terlama masuk (seri: kode), follow up terdekat (tanpa jadwal di akhir), nama A–Z tanpa beda huruf besar", () => {
+    expect(kode("baru")).toEqual(["L-00034", "L-00032", "L-00031", "L-00033"]);
+    expect(kode("lama")).toEqual(["L-00033", "L-00031", "L-00032", "L-00034"]);
+    expect(kode("fu")).toEqual(["L-00033", "L-00032", "L-00031", "L-00034"]);
+    expect(kode("nama")).toEqual(["L-00032", "L-00033", "L-00034", "L-00031"]); // seri nama: urutan server
+    expect(L.map((l) => l.kode)).toEqual(["L-00031", "L-00032", "L-00033", "L-00034"]); // asli tidak berubah
+  });
+
+  it("tab Order: nilai terbesar / nama dalam bulan; terlama membalik bulan (Tanpa tanggal SP tetap terakhir)", () => {
+    const nilai = kelompokOrder(DATA, "nilai").grup.map((g) => g.items.map((l) => l.kode));
+    expect(nilai).toEqual([["L-00002", "L-00003", "L-00005"], ["L-00001"], ["L-00004"]]);
+    const lama = kelompokOrder(DATA, "lama").grup.map((g) => [g.kunci, ...g.items.map((l) => l.kode)]);
+    expect(lama).toEqual([["2026-09", "L-00001"], ["2026-10", "L-00002", "L-00003", "L-00005"], [TANPA_TANGGAL, "L-00004"]]);
+    expect(kelompokOrder(DATA, "baru")).toEqual(kelompokOrder(DATA)); // 'baru' tidak ada di tab Order → bawaan
   });
 });
 

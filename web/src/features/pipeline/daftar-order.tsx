@@ -27,6 +27,8 @@ const labelPo = (no: string) => (/^po\b/i.test(no) ? no : `PO ${no}`);
 type Props = {
   /** order yang lolos saringan (urutan bebas; dikelompokkan di sini) */
   leads: LeadRingkas[];
+  /** urutan dalam bulan (URUT_ORDER); null = tanggal SP terbaru */
+  urut?: string | null;
   namaKategori: (leadId: string) => string | undefined;
   bisaUbah: (lead: LeadRingkas) => boolean;
   /** jumlah baris order yang dirender (urut kelompok); sisanya lewat `lagi` */
@@ -35,7 +37,7 @@ type Props = {
   lagi?: (sisa: number) => ReactNode;
 };
 
-export function DaftarOrder({ leads, namaKategori, bisaUbah, batas = Infinity, lagi }: Props) {
+export function DaftarOrder({ leads, urut = null, namaKategori, bisaUbah, batas = Infinity, lagi }: Props) {
   const { hariIni } = useProfil();
   const desktop = useDesktop();
   // lead terakhir yang diubah tetap disimpan saat dialog tertutup: dialog tetap ter-mount supaya animasi tutup jalan dan
@@ -46,7 +48,7 @@ export function DaftarOrder({ leads, namaKategori, bisaUbah, batas = Infinity, l
     setUbah(l);
     setBukaUbah(true);
   };
-  const r = kelompokOrder(leads);
+  const r = kelompokOrder(leads, urut);
   const tampil = irisGrup(r.grup, batas);
   const sisa = r.grup.reduce((n, g) => n + g.items.length, 0) - tampil.reduce((n, x) => n + x.items.length, 0);
 

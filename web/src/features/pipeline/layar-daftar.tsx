@@ -1,7 +1,7 @@
 "use client";
 
 // Layar "Lead saya" (§5): tab Semua / Follow up / Diam >7 hari / Penawaran / Order, pencarian, saringan Produk (semua
-// produk, ?produk=) + Filter, tombol Lead baru.
+// produk, ?produk=) + Filter, Urutkan (?urut=, di baris jumlah), tombol Lead baru.
 // Rep default melihat leadnya sendiri; admin/baca default semua lead. Filter pemilik & tab disimpan di URL; semua
 // perubahan URL di layar ini lewat history.replaceState (gantiUrl) — data dari TanStack, tanpa permintaan ke server.
 // Dua tampilan (?v=papan): Daftar, atau Papan = kolom kategori PRIBADI pengguna, lead diseret antar kolom (papan-lead).
@@ -15,7 +15,7 @@ import { List, Plus, SquareKanban } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { IsiHalaman } from "@/components/layout/isi-halaman";
 import { IsiTautan } from "@/components/layout/petunjuk-tautan";
@@ -30,10 +30,10 @@ import { GerbangPipeline, type AksesPipeline } from "@/features/pipeline/gerbang
 import { infoFu, PRODUK, ringkasProduk, rupiah, TAB_DAFTAR } from "@/features/pipeline/konstanta";
 import { ChipRepeat } from "@/features/pipeline/chip-repeat";
 import { KotakCari } from "@/features/pipeline/kotak-cari";
-import { bulanTersedia, hitungProduk, saringLead, type SaringanLead as NilaiSaringan } from "@/features/pipeline/order";
+import { bulanTersedia, hitungProduk, saringLead, urutkan, urutSah, type SaringanLead as NilaiSaringan } from "@/features/pipeline/order";
 import { PilTahap } from "@/features/pipeline/pil-tahap";
 import { usePipelineDaftar, usePipelineKategori } from "@/features/pipeline/queries";
-import { opsiStatus, SaringanLead, tanggalSah } from "@/features/pipeline/saringan-lead";
+import { opsiStatus, PilihUrut, SaringanLead, tanggalSah } from "@/features/pipeline/saringan-lead";
 import { TampilLagi, useBatasTampil } from "@/features/pipeline/tampil-bertahap";
 import { useProfil } from "@/features/profil/penyedia-profil";
 import { pramuat, saatSenggang } from "@/lib/impor-aman";
@@ -117,6 +117,26 @@ const BarisLead = memo(function BarisLead({ lead, hariIni, kategori }: { lead: L
   );
 });
 
+/** Baris "N lead" + pilihan urutan di kanan. */
+function BarisJumlah({
+  children,
+  urut,
+  modeOrder,
+  ubahUrut,
+}: {
+  children: ReactNode;
+  urut: string | null;
+  modeOrder: boolean;
+  ubahUrut: (u: string | null) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <p className="min-w-0 text-xs text-muted-foreground">{children}</p>
+      <PilihUrut nilai={urut} modeOrder={modeOrder} ubah={ubahUrut} />
+    </div>
+  );
+}
+
 function IsiDaftar({ akses }: { akses: AksesPipeline }) {
   const { member, hariIni } = useProfil();
   const idSaya = Number(member.id);
@@ -134,6 +154,7 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
     sampai: tanggalSah(sp.get("sampai")),
     produk: produkUrl && PRODUK.some((p) => p === produkUrl) ? produkUrl : null,
   };
+  const urut = urutSah(sp.get("urut"), modeOrder);
   // pemilik: ?m=<id> | "semua". Rep default ke dirinya; admin/baca default semua.
   const mParam = sp.get("m");
   const pemilik: number | null =
@@ -153,13 +174,13 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
   };
   const setParam = (kunci: string, nilai: string | null) => gantiParams({ [kunci]: nilai });
   const setSaringan = (f: NilaiSaringan) => gantiParams({ st: f.status, dari: f.dari, sampai: f.sampai, produk: f.produk });
-  // status selalu dibuang saat ganti tab (pilihannya beda per tab); tanggal berarti lain di tab Order (tanggal SP) →
-  // dibuang saat pindah masuk/keluar tab Order
+  // status selalu dibuang saat ganti tab (pilihannya beda per tab); tanggal & urutan berarti lain di tab Order (tanggal
+  // SP) → dibuang saat pindah masuk/keluar tab Order
   const pindahTab = (kunci: string) =>
     gantiParams({
       tab: kunci === "semua" ? null : kunci,
       st: null,
-      ...((kunci === "order") !== modeOrder ? { dari: null, sampai: null } : {}),
+      ...((kunci === "order") !== modeOrder ? { dari: null, sampai: null, urut: null } : {}),
     });
 
   const daftar = usePipelineDaftar({ tab, pemilik, q });
@@ -187,7 +208,9 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
     () => (produkSaring ? tanpaProduk.filter((l) => l.produk.some((i) => i.produk === produkSaring)) : tanpaProduk),
     [tanpaProduk, produkSaring],
   );
-  const { batas, tambah } = useBatasTampil([tab, pemilik ?? "semua", q, stSaring, dariSaring, sampaiSaring, produkSaring].join("|"));
+  // tab Order dikelompokkan & diurutkan di DaftarOrder; daftar lead & papan memakai salinan terurut ini
+  const terurut = useMemo(() => urutkan(tersaring, urut, modeOrder), [tersaring, urut, modeOrder]);
+  const { batas, tambah } = useBatasTampil([tab, pemilik ?? "semua", q, stSaring, dariSaring, sampaiSaring, produkSaring, urut].join("|"));
   const bisaUbahOrder = (l: LeadRingkas) =>
     akses.bolehTulis && (akses.peran === "admin" || l.pemilik == null || Number(l.pemilik) === idSaya);
   const hitungan = daftar.data
@@ -305,10 +328,10 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
           <MemuatDaftar />
         ) : (
           <>
-            <p className="text-xs text-muted-foreground">
+            <BarisJumlah urut={urut} modeOrder={modeOrder} ubahUrut={(u) => setParam("urut", u)}>
               {hitungan} · Kategori di papan ini pribadi, hanya terlihat oleh Anda. Menyeret lead tidak mengubah tahapnya.
-            </p>
-            <PapanLead leads={tersaring} papan={kategori.data} />
+            </BarisJumlah>
+            <PapanLead leads={terurut} papan={kategori.data} />
           </>
         )
       ) : daftar.isError ? (
@@ -325,9 +348,12 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
         </Kosong>
       ) : modeOrder ? (
         <>
-          <p className="text-xs text-muted-foreground">{hitungan}</p>
+          <BarisJumlah urut={urut} modeOrder={modeOrder} ubahUrut={(u) => setParam("urut", u)}>
+            {hitungan}
+          </BarisJumlah>
           <DaftarOrder
             leads={tersaring}
+            urut={urut}
             namaKategori={kategoriLead}
             bisaUbah={bisaUbahOrder}
             batas={batas}
@@ -336,13 +362,15 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
         </>
       ) : (
         <>
-          <p className="text-xs text-muted-foreground">{hitungan}</p>
+          <BarisJumlah urut={urut} modeOrder={modeOrder} ubahUrut={(u) => setParam("urut", u)}>
+            {hitungan}
+          </BarisJumlah>
           <div className="space-y-2">
-            {tersaring.slice(0, batas).map((l) => (
+            {terurut.slice(0, batas).map((l) => (
               <BarisLead key={l.id} lead={l} hariIni={hariIni} kategori={kategoriLead(l.id)} />
             ))}
           </div>
-          {tersaring.length > batas ? <TampilLagi sisa={tersaring.length - batas} tambah={tambah} /> : null}
+          {terurut.length > batas ? <TampilLagi sisa={terurut.length - batas} tambah={tambah} /> : null}
         </>
       )}
 
