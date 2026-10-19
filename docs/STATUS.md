@@ -337,6 +337,14 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   tombol berlabel, HP/tablet satu tombol ⋯ (`menu-pipeline`). Lead baru: desktop tetap tombol di baris alat, HP/tablet
   tombol melayang di atas navigasi bawah (pola "+ Tugas"). Rep: ikon Daftar|Papan disembunyikan di bawah `sm` supaya
   "Lead saya|Semua" + "Daftar|Papan" tetap satu baris di HP 360 px. Tanpa perubahan DB.
+- **Saringan Produk menggantikan tab "Pallet Mesh" (19 Okt, permintaan Hannes "lihat semua produk, termasuk roda,
+  lemari arsip"):** tombol **Produk** di sebelah Filter berisi Semua produk + 8 produk (`PRODUK`) dengan jumlah lead
+  masing-masing (saringan lain tetap berlaku). Berlaku di semua tab (termasuk Order & Papan), disimpan di URL
+  `?produk=`, ikut Reset. Lead dengan beberapa produk muncul di setiap produknya. Disaring di web dari daftar yang sudah
+  dimuat (tanpa permintaan baru, tanpa perubahan DB); `tab=pm` di `web_pipeline_daftar` dibiarkan (tidak dipakai web).
+  Bedanya dengan tab lama: tab "Pallet Mesh" hanya lead terbuka (BARU/PENAWARAN); kini Semua + Pallet Mesh = semua tahap
+  (pakai tab Penawaran atau Filter → Tahap untuk mempersempit). Produksi 19 Okt (lead per produk): Roda 1.417,
+  Lainnya 218, Pallet Mesh 202, Airport Trolley 92, Shopping Cart 74, Lemari Arsip 59; Material Handling & Locker 0.
 - **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md` — **wajib pakai alat impor versi berpenjaga (14 Okt, sesudah Batal order)**; versi lama mengembalikan order yang dibatalkan di Anvil ke ORDER.
 
 ## Notifikasi "Dari tim" / "Dari agent" (revisi #2, 13 Okt 2026, branch `rev2-notif`)

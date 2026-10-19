@@ -86,12 +86,14 @@ export const BAYAR: Record<StatusBayar, { label: string; nada: NadaChip }> = {
 };
 export const BAYAR_BELUM_DICATAT = { label: "Belum dicatat", nada: "biasa" as NadaChip };
 
-/** Tab daftar "Lead saya" (§5). Kunci = nilai `tab` yang diterima web_pipeline_daftar. */
+/**
+ * Tab daftar "Lead saya" (§5). Kunci = nilai `tab` yang diterima web_pipeline_daftar. Tab "Pallet Mesh" (`pm`) diganti
+ * pilihan Produk di sebelah Filter (19 Okt) yang berlaku untuk semua produk & semua tab; `pm` di server dibiarkan.
+ */
 export const TAB_DAFTAR = [
   { kunci: "semua", label: "Semua" },
   { kunci: "fu", label: "Follow up hari ini" },
   { kunci: "diam", label: "Diam >7 hari" },
-  { kunci: "pm", label: "Pallet Mesh" },
   { kunci: "penawaran", label: "Penawaran" },
   { kunci: "order", label: "Order" },
 ] as const;

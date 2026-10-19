@@ -3,13 +3,23 @@
 // Saringan daftar Pipeline (revisi #4), melengkapi kotak cari (perusahaan, PIC, produk, No SP/PO, kode — di server):
 // status (tab Order = status bayar, tab lain = tahap) + rentang tanggal (tab Order = tanggal SP, tab lain = tanggal masuk)
 // dengan pintasan bulan. Disimpan di URL (st, dari, sampai) oleh layar daftar; panel terbuka bila ada saringan aktif.
-import { ChevronDown, SlidersHorizontal, X } from "lucide-react";
+// Produk (19 Okt, ganti tab "Pallet Mesh"): tombol sendiri di sebelah Filter, semua produk + jumlah lead, berlaku di semua
+// tab (?produk=). Reset menghapus semuanya.
+import { ChevronDown, Package, SlidersHorizontal, X } from "lucide-react";
 import { useState, type ComponentProps } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { BAYAR, BAYAR_BELUM_DICATAT, TAHAP } from "@/features/pipeline/konstanta";
+import { BAYAR, BAYAR_BELUM_DICATAT, PRODUK, TAHAP } from "@/features/pipeline/konstanta";
 import { BELUM_DICATAT, bulanSebelum, jumlahSaringan, labelBulan, rentangBulan, SARINGAN_KOSONG, type SaringanLead } from "@/features/pipeline/order";
 import { cn } from "@/lib/utils";
 import type { StatusBayar, TahapLead } from "@/types/domain";
@@ -18,7 +28,7 @@ const STATUS_ORDER: { v: string; label: string }[] = [
   ...(["BELUM", "DP", "LUNAS"] as StatusBayar[]).map((v) => ({ v, label: BAYAR[v].label })),
   { v: BELUM_DICATAT, label: BAYAR_BELUM_DICATAT.label },
 ];
-/** Status yang bisa dipilih di tab ini (nilai lain di URL diabaikan). Tab FU/Diam/PM hanya memuat lead terbuka; tab Penawaran
+/** Status yang bisa dipilih di tab ini (nilai lain di URL diabaikan). Tab FU/Diam hanya memuat lead terbuka; tab Penawaran
  * hanya satu tahap → tanpa pilihan status. */
 export function opsiStatus(tab: string): { v: string; label: string }[] {
   if (tab === "order") return STATUS_ORDER;
@@ -45,9 +55,14 @@ type Props = {
   hariIni: string;
   /** bulan SP yang ada (tab Order) untuk pintasan */
   bulan: string[];
+  /** jumlah lead per produk & total, dengan saringan lain tetap berlaku */
+  jumlahProduk: Map<string, number>;
+  jumlahSemua: number;
 };
 
-export function SaringanLead({ tab, modeOrder, nilai: f, ubah, hariIni, bulan }: Props) {
+const ANGKA = new Intl.NumberFormat("id-ID");
+
+export function SaringanLead({ tab, modeOrder, nilai: f, ubah, hariIni, bulan, jumlahProduk, jumlahSemua }: Props) {
   const aktif = jumlahSaringan(f);
   const [buka, setBuka] = useState(aktif > 0);
   const status = opsiStatus(tab);
@@ -69,7 +84,42 @@ export function SaringanLead({ tab, modeOrder, nilai: f, ubah, hariIni, bulan }:
           {aktif ? <span className="rounded-full bg-primary px-1.5 text-xs leading-4 text-primary-foreground">{aktif}</span> : null}
           <ChevronDown aria-hidden className={cn("transition-transform", buka && "rotate-180")} />
         </Button>
-        {aktif ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              // pemicu menu memakai data-slot sendiri → aturan 44px [data-slot="button"] (layar sentuh) tidak berlaku; samakan
+              className={cn(
+                "min-w-0 pointer-coarse:min-h-[44px]",
+                f.produk &&
+                  "border-primary bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary dark:border-primary dark:bg-primary/10 dark:hover:bg-primary/15",
+              )}
+              data-uji="tombol-produk"
+            >
+              <Package aria-hidden />
+              <span className="truncate">{f.produk ?? "Semua produk"}</span>
+              <ChevronDown aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-60">
+            <DropdownMenuRadioGroup value={f.produk ?? ""} onValueChange={(v) => ubah({ ...f, produk: v || null })}>
+              <DropdownMenuRadioItem value="" className="min-h-11" data-uji="pilih-produk-semua">
+                Semua produk
+                <span className="ml-auto text-xs text-muted-foreground tabular-nums">{ANGKA.format(jumlahSemua)}</span>
+              </DropdownMenuRadioItem>
+              <DropdownMenuSeparator />
+              {PRODUK.map((p) => (
+                <DropdownMenuRadioItem key={p} value={p} className="min-h-11" data-uji={`pilih-produk-${p}`}>
+                  {p}
+                  <span className="ml-auto text-xs text-muted-foreground tabular-nums">{ANGKA.format(jumlahProduk.get(p) ?? 0)}</span>
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {aktif || f.produk ? (
           <Button type="button" variant="ghost" size="sm" onClick={() => ubah(SARINGAN_KOSONG)} data-uji="reset-saringan">
             <X aria-hidden />
             Reset
