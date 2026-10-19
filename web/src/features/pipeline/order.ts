@@ -115,6 +115,14 @@ export function bulanSebelum(kunci: string): string {
   return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
 }
 
+/** Minggu (Senin–Minggu) yang memuat tanggal 'YYYY-MM-DD'. */
+export function rentangMinggu(tanggal: string): { dari: string; sampai: string } {
+  const [y, m, d] = tanggal.split("-").map(Number);
+  const senin = new Date(Date.UTC(y, m - 1, d - ((new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7)));
+  const minggu = new Date(senin.getTime() + 6 * 86_400_000);
+  return { dari: senin.toISOString().slice(0, 10), sampai: minggu.toISOString().slice(0, 10) };
+}
+
 const bulanDari = (l: LeadRingkas) =>
   l.tanggal_sp && /^\d{4}-\d{2}/.test(l.tanggal_sp) ? l.tanggal_sp.slice(0, 7) : TANPA_TANGGAL;
 
@@ -122,21 +130,22 @@ const bulanDari = (l: LeadRingkas) =>
  * Urutan daftar (?urut=, 19 Okt). Bawaan tab lead = urutan server (paling lama diam dulu); bawaan tab Order = tanggal SP
  * terbaru. Kunci yang tidak ada di tab ini diabaikan. Urutan stabil: yang setara tetap dalam urutan server.
  */
+// `pendek` = teks tombol di baris Filter (sempit di HP); bawaan tampil sebagai "Urutkan".
 export const URUT_LEAD = [
-  { k: null, label: "Paling lama diam" },
-  { k: "baru", label: "Terbaru masuk" },
-  { k: "lama", label: "Terlama masuk" },
-  { k: "fu", label: "Follow up terdekat" },
-  { k: "nama", label: "Nama pelanggan A–Z" },
+  { k: null, label: "Paling lama diam", pendek: "Urutkan" },
+  { k: "baru", label: "Terbaru masuk", pendek: "Terbaru" },
+  { k: "lama", label: "Terlama masuk", pendek: "Terlama" },
+  { k: "fu", label: "Follow up terdekat", pendek: "FU terdekat" },
+  { k: "nama", label: "Nama pelanggan A–Z", pendek: "Nama A–Z" },
 ] as const;
 export const URUT_ORDER = [
-  { k: null, label: "Tanggal SP terbaru" },
-  { k: "lama", label: "Tanggal SP terlama" },
-  { k: "nilai", label: "Nilai terbesar" },
-  { k: "nama", label: "Nama pelanggan A–Z" },
+  { k: null, label: "Tanggal SP terbaru", pendek: "Urutkan" },
+  { k: "lama", label: "Tanggal SP terlama", pendek: "SP terlama" },
+  { k: "nilai", label: "Nilai terbesar", pendek: "Nilai terbesar" },
+  { k: "nama", label: "Nama pelanggan A–Z", pendek: "Nama A–Z" },
 ] as const;
 
-export const opsiUrut = (modeOrder: boolean): readonly { k: string | null; label: string }[] =>
+export const opsiUrut = (modeOrder: boolean): readonly { k: string | null; label: string; pendek: string }[] =>
   modeOrder ? URUT_ORDER : URUT_LEAD;
 export const urutSah = (u: string | null, modeOrder: boolean) => (u && opsiUrut(modeOrder).some((o) => o.k === u) ? u : null);
 
@@ -192,11 +201,6 @@ export function kelompokOrder(leads: LeadRingkas[], urut: string | null = null):
     return { kunci, label: labelBulan(kunci), items, ...rekap(items) };
   });
   return { ...rekap(order), grup };
-}
-
-/** Semua bulan SP yang ada di order (terbaru dulu) — pilihan cepat periode. */
-export function bulanTersedia(leads: LeadRingkas[]): string[] {
-  return [...new Set(leads.filter((l) => l.tahap === "ORDER").map(bulanDari))].filter((b) => b !== TANPA_TANGGAL).sort().reverse();
 }
 
 const LABEL_BAYAR: Record<StatusBayar, string> = { BELUM: "Belum bayar", DP: "DP", LUNAS: "Lunas" };

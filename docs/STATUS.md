@@ -345,13 +345,19 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   Bedanya dengan tab lama: tab "Pallet Mesh" hanya lead terbuka (BARU/PENAWARAN); kini Semua + Pallet Mesh = semua tahap
   (pakai tab Penawaran atau Filter → Tahap untuk mempersempit). Produksi 19 Okt (lead per produk): Roda 1.417,
   Lainnya 218, Pallet Mesh 202, Airport Trolley 92, Shopping Cart 74, Lemari Arsip 59; Material Handling & Locker 0.
-- **Urutkan daftar Pipeline (19 Okt, permintaan Hannes "opsi untuk sort"):** tombol kecil di kanan baris "N lead"
-  (`PilihUrut`, `?urut=`). Tab lead: Paling lama diam (bawaan = urutan server), Terbaru masuk, Terlama masuk, Follow up
+- **Urutkan daftar Pipeline (19 Okt, permintaan Hannes "opsi untuk sort"):** tombol Urutkan (`PilihUrut`, `?urut=`;
+  semula di kanan baris "N lead", lihat di bawah). Tab lead: Paling lama diam (bawaan = urutan server), Terbaru masuk, Terlama masuk, Follow up
   terdekat (tanpa jadwal di akhir), Nama pelanggan A–Z. Tab Order: Tanggal SP terbaru (bawaan), Tanggal SP terlama
   (bulan juga dibalik; "Tanpa tanggal SP" tetap terakhir), Nilai terbesar & Nama A–Z (dalam bulan; rekap per bulan
   tetap). Berlaku juga di Papan dan unduhan CSV. Urutan dibuang saat masuk/keluar tab Order (pilihannya beda); bukan
   saringan, jadi Reset tidak mengubahnya. Diurutkan di web (urutan stabil: yang setara tetap urutan server); tanpa
   perubahan DB.
+- **Filter tanggal dipadatkan + tombol Urutkan dipindah (19 Okt, permintaan Hannes):** pintasan tanggal (Tanggal SP di tab
+  Order, Tanggal masuk di tab lain) kini Hari ini / Minggu ini (Senin–Minggu) / Bulan ini / Bulan lalu / Tahun ini /
+  **Custom**; daftar per bulan ("Oktober 2025" dst., `bulanTersedia`) dihapus. Kolom Dari–Sampai hanya muncul saat Custom
+  (juga otomatis bila rentang di URL bukan salah satu pintasan); Custom lagi = tutup & hapus tanggal. Tombol Urutkan
+  pindah dari baris "N order" (di HP tertutup tombol melayang "Lead baru", laporan Hannes) ke baris Filter · Produk ·
+  Urutkan; teks tombol "Urutkan" atau nama pendek urutan terpilih. Tombol Produk kini berlabel "Produk" saat belum dipilih.
 - **Kuota GitHub Actions habis (19 Okt):** 2.000 menit/bulan akun `hanneslowan-max` terpakai 100% (email GitHub 11:19
   WIB; budget $0 → job tidak diberi runner, gagal ±4 dtk tanpa log). Reset 1 Nov 2026. Keputusan Hannes: sampai reset,
   **gerbang merge = verifikasi lokal** di sesi (lint, typecheck, vitest, build produksi, e2e lengkap HP+desktop terhadap
