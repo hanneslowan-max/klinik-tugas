@@ -1,4 +1,4 @@
-// Tab Order Pipeline (revisi #3–#7): rekap & kelompok per bulan SP, saringan status bayar/tanggal, cari No PO/produk,
+// Tab Order Pipeline (revisi #3–#7): rekap & kelompok per bulan SP, saringan status bayar/tanggal/produk, cari No PO/produk,
 // Data order (No PO, DP → sisa tagihan, Lunas), detail lead, dan unduh CSV. Seed sintetis tidak punya data Pipeline →
 // tiap tes menyiapkan akses + 2 order + 1 lead lewat psql lokal dan membersihkannya.
 import { expect, test, type Page } from "@playwright/test";
@@ -93,6 +93,40 @@ test("tab Order: rekap, kelompok per bulan SP, saringan status bayar", async ({ 
   await page.getByRole("tab", { name: "Semua" }).click();
   await expect(page).toHaveURL(/\/pipeline(\?(?!.*st=).*)?$/);
   await expect(page).not.toHaveURL(/st=/);
+});
+
+test("saringan Produk: semua produk + jumlah, berlaku di tab Semua & Order, ikut Reset (ganti tab Pallet Mesh)", async ({ page }) => {
+  await masuk(page, AKUN.citra.email);
+  await page.goto("/pipeline");
+  await expect(page.getByRole("tab", { name: "Pallet Mesh" })).toHaveCount(0);
+  await page.getByTestId("cari-lead").fill(PELANGGAN);
+  await expect(page.getByTestId("baris-lead")).toHaveCount(3);
+
+  await page.getByTestId("tombol-produk").click();
+  const pilihan = (nama: string | RegExp) => page.getByRole("menuitemradio", { name: nama });
+  await expect(pilihan(/^Semua produk/)).toContainText("3");
+  await expect(pilihan(/^Roda/)).toContainText("1");
+  await expect(pilihan(/^Lemari Arsip/)).toContainText("0");
+  await pilihan(/^Roda/).click();
+  await expect(page).toHaveURL(/produk=Roda/);
+  await expect(page.getByTestId("tombol-produk")).toHaveText(/Roda/);
+  await expect(page.getByTestId("baris-lead")).toHaveCount(1);
+  await expect(page.getByText("Roda · 2 unit")).toBeVisible();
+  await expect(page.getByText(/^1 dari 3 lead$/)).toBeVisible();
+
+  // pindah tab: produk tetap; lead Roda belum order → tab Order kosong
+  await page.getByRole("tab", { name: "Order" }).click();
+  await expect(page).toHaveURL(/tab=order.*produk=Roda|produk=Roda.*tab=order/);
+  await expect(page.getByText("Tidak ada order yang cocok.")).toBeVisible();
+  await page.getByTestId("tombol-produk").click();
+  await pilihan(/^Pallet Mesh/).click();
+  await expect(baris(page, lunas)).toBeVisible();
+  await expect(page.locator('[data-uji="baris-order"]')).toHaveCount(1);
+
+  await page.getByTestId("reset-saringan").click();
+  await expect(page).not.toHaveURL(/produk=/);
+  await expect(page.getByTestId("tombol-produk")).toHaveText(/Semua produk/);
+  await expect(page.locator('[data-uji="baris-order"]')).toHaveCount(2);
 });
 
 test("Papan + tab Order + saringan Lunas: hanya order lunas", async ({ page }) => {

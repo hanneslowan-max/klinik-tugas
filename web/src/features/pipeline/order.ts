@@ -12,18 +12,21 @@ export const BELUM_DICATAT = "TANPA";
 export type StatusSaring = StatusBayar | typeof BELUM_DICATAT | TahapLead;
 
 /** Saringan daftar: status (tab Order = status bayar, tab lain = tahap) + rentang tanggal (Order = tanggal SP, lain = tanggal masuk). */
-export type SaringanLead = { status: string | null; dari: string | null; sampai: string | null };
+/** + produk (19 Okt): lead yang memuat produk itu (salah satu item), di semua tab. */
+export type SaringanLead = { status: string | null; dari: string | null; sampai: string | null; produk: string | null };
 
-export const SARINGAN_KOSONG: SaringanLead = { status: null, dari: null, sampai: null };
+export const SARINGAN_KOSONG: SaringanLead = { status: null, dari: null, sampai: null, produk: null };
 
+/** Jumlah saringan di panel Filter (produk punya tombol sendiri di sebelahnya, tidak dihitung di sini). */
 export const jumlahSaringan = (f: SaringanLead) => [f.status, f.dari, f.sampai].filter(Boolean).length;
 
 /** Tanggal acuan saringan & pengelompokan. */
 export const tanggalAcuan = (l: LeadRingkas, modeOrder: boolean) => (modeOrder ? l.tanggal_sp : l.tanggal_masuk);
 
 export function saringLead(leads: LeadRingkas[], f: SaringanLead, modeOrder: boolean): LeadRingkas[] {
-  if (!jumlahSaringan(f)) return leads;
+  if (!jumlahSaringan(f) && !f.produk) return leads;
   return leads.filter((l) => {
+    if (f.produk && !l.produk.some((i) => i.produk === f.produk)) return false;
     if (f.status) {
       if (modeOrder) {
         if (f.status === BELUM_DICATAT ? l.bayar_status != null : l.bayar_status !== f.status) return false;
@@ -37,6 +40,13 @@ export function saringLead(leads: LeadRingkas[], f: SaringanLead, modeOrder: boo
     }
     return true;
   });
+}
+
+/** Jumlah lead per produk untuk pilihan Produk; lead berisi beberapa produk dihitung di setiap produknya. */
+export function hitungProduk(leads: LeadRingkas[]): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const l of leads) for (const p of new Set(l.produk.map((i) => i.produk))) m.set(p, (m.get(p) ?? 0) + 1);
+  return m;
 }
 
 /** Uang yang sudah diterima: LUNAS = nominal, DP = nominal DP, selain itu 0. */

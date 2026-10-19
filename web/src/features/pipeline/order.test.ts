@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  BELUM_DICATAT, bulanSebelum, bulanTersedia, csvOrder, kelompokOrder, labelBulan, rentangBulan, saringLead, sisaTagihan,
-  TANPA_TANGGAL, terbayar,
+  BELUM_DICATAT, bulanSebelum, bulanTersedia, csvOrder, hitungProduk, jumlahSaringan, kelompokOrder, labelBulan, rentangBulan,
+  SARINGAN_KOSONG, saringLead, sisaTagihan, TANPA_TANGGAL, terbayar,
 } from "@/features/pipeline/order";
 import type { LeadRingkas } from "@/types/domain";
 
@@ -77,25 +77,51 @@ describe("kelompokOrder", () => {
 
 describe("saringLead", () => {
   it("tab Order: status bayar, termasuk 'belum dicatat'", () => {
-    const st = (status: string) => saringLead(DATA, { status, dari: null, sampai: null }, true).map((l) => l.kode);
+    const st = (status: string) => saringLead(DATA, { status, dari: null, sampai: null, produk: null }, true).map((l) => l.kode);
     expect(st("DP")).toEqual(["L-00002"]);
     expect(st("BELUM")).toEqual(["L-00003", "L-00005"]);
     expect(st(BELUM_DICATAT)).toEqual(["L-00004", "L-00006"]);
   });
 
   it("tab Order: rentang tanggal SP inklusif; tanpa tanggal tersaring keluar", () => {
-    const r = saringLead(DATA, { status: null, ...rentangBulan("2026-10") }, true).map((l) => l.kode);
+    const r = saringLead(DATA, { status: null, produk: null, ...rentangBulan("2026-10") }, true).map((l) => l.kode);
     expect(r).toEqual(["L-00002", "L-00003", "L-00005"]);
-    expect(saringLead(DATA, { status: null, dari: "2026-10-12", sampai: null }, true).map((l) => l.kode)).toEqual(["L-00003", "L-00005"]);
+    expect(saringLead(DATA, { status: null, dari: "2026-10-12", sampai: null, produk: null }, true).map((l) => l.kode)).toEqual(["L-00003", "L-00005"]);
   });
 
   it("tab lain: status = tahap, tanggal = tanggal masuk", () => {
-    expect(saringLead(DATA, { status: "PENAWARAN", dari: null, sampai: null }, false).map((l) => l.kode)).toEqual(["L-00006"]);
-    expect(saringLead(DATA, { status: null, dari: "2026-10-01", sampai: "2026-10-31" }, false).map((l) => l.kode)).toEqual(["L-00006"]);
+    expect(saringLead(DATA, { status: "PENAWARAN", dari: null, sampai: null, produk: null }, false).map((l) => l.kode)).toEqual(["L-00006"]);
+    expect(saringLead(DATA, { status: null, dari: "2026-10-01", sampai: "2026-10-31", produk: null }, false).map((l) => l.kode)).toEqual(["L-00006"]);
   });
 
   it("tanpa saringan → daftar yang sama", () => {
-    expect(saringLead(DATA, { status: null, dari: null, sampai: null }, true)).toBe(DATA);
+    expect(saringLead(DATA, SARINGAN_KOSONG, true)).toBe(DATA);
+  });
+
+  it("produk: lead yang memuat produk itu di salah satu item; bisa digabung dengan saringan lain", () => {
+    const P = [
+      lead("L-00011", { tahap: "PENAWARAN", produk: [{ produk: "Roda", qty: 2, satuan: "unit" }] }),
+      lead("L-00012", { tahap: "BARU", produk: [{ produk: "Pallet Mesh", qty: 40, satuan: "unit" }, { produk: "Roda", qty: 4, satuan: "unit" }] }),
+      lead("L-00013", { tahap: "PENAWARAN", produk: [{ produk: "Lemari Arsip", qty: 1, satuan: "unit" }] }),
+      lead("L-00014", { tahap: "BARU", produk: [] }),
+    ];
+    const kode = (f: Partial<typeof SARINGAN_KOSONG>) => saringLead(P, { ...SARINGAN_KOSONG, ...f }, false).map((l) => l.kode);
+    expect(kode({ produk: "Roda" })).toEqual(["L-00011", "L-00012"]);
+    expect(kode({ produk: "Lemari Arsip" })).toEqual(["L-00013"]);
+    expect(kode({ produk: "Locker" })).toEqual([]);
+    expect(kode({ produk: "Roda", status: "PENAWARAN" })).toEqual(["L-00011"]);
+    expect(jumlahSaringan({ ...SARINGAN_KOSONG, produk: "Roda" })).toBe(0); // produk tidak dihitung di lencana Filter
+  });
+});
+
+describe("hitungProduk", () => {
+  it("jumlah lead per produk; produk yang sama dua kali di satu lead dihitung sekali", () => {
+    const m = hitungProduk([
+      lead("L-00021", { produk: [{ produk: "Roda", qty: 2, satuan: "unit" }, { produk: "Roda", qty: 1, satuan: "set" }] }),
+      lead("L-00022", { produk: [{ produk: "Pallet Mesh", qty: 40, satuan: "unit" }, { produk: "Roda", qty: 4, satuan: "unit" }] }),
+      lead("L-00023", { produk: [] }),
+    ]);
+    expect(Object.fromEntries(m)).toEqual({ Roda: 2, "Pallet Mesh": 1 });
   });
 });
 
