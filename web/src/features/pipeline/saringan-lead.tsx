@@ -1,11 +1,11 @@
 "use client";
 
 // Saringan daftar Pipeline (revisi #4), melengkapi kotak cari (perusahaan, PIC, produk, No SP/PO, kode — di server):
-// status (tab Order = status bayar, tab lain = tahap) + rentang tanggal (tab Order = tanggal SP, tab lain = tanggal masuk)
-// dengan pintasan bulan. Disimpan di URL (st, dari, sampai) oleh layar daftar; panel terbuka bila ada saringan aktif.
-// Produk (19 Okt, ganti tab "Pallet Mesh"): tombol sendiri di sebelah Filter, semua produk + jumlah lead, berlaku di semua
-// tab (?produk=). Reset menghapus semuanya. Urutkan (PilihUrut, 19 Okt): di baris jumlah lead, bukan saringan (Reset
-// tidak mengubahnya).
+// status (tab Order = status bayar, tab lain = tahap) + rentang tanggal (tab Order = tanggal SP, tab lain = tanggal masuk):
+// pintasan Hari ini / Minggu ini (Senin–Minggu) / Bulan ini / Bulan lalu / Tahun ini, atau Custom = isi Dari–Sampai sendiri
+// (19 Okt, ganti daftar bulan). Disimpan di URL (st, dari, sampai) oleh layar daftar; panel terbuka bila ada saringan aktif.
+// Baris tombol: Filter, Produk (19 Okt, ganti tab "Pallet Mesh"; ?produk=, berlaku di semua tab), Urutkan (?urut=; bukan
+// saringan, Reset tidak mengubahnya), Reset. Urutkan dulu di baris jumlah lead, tetapi di HP tertutup tombol "Lead baru".
 import { ArrowUpDown, ChevronDown, Package, SlidersHorizontal, X } from "lucide-react";
 import { useState, type ComponentProps } from "react";
 
@@ -26,9 +26,9 @@ import {
   BELUM_DICATAT,
   bulanSebelum,
   jumlahSaringan,
-  labelBulan,
   opsiUrut,
   rentangBulan,
+  rentangMinggu,
   SARINGAN_KOSONG,
   type SaringanLead,
 } from "@/features/pipeline/order";
@@ -58,37 +58,53 @@ const kelasChip = (aktif: boolean) =>
     aktif ? "border-primary bg-primary/10 font-semibold text-primary" : "border-border bg-background text-muted-foreground hover:bg-muted",
   );
 
+// Tombol menu (Produk, Urutkan): pemicu menu memakai data-slot sendiri → aturan 44px [data-slot="button"] layar sentuh tidak
+// berlaku, jadi disamakan di sini; saat terpilih diberi warna primer (juga di mode gelap, yang punya gaya outline sendiri).
+const kelasTombolMenu = (aktif: boolean) =>
+  cn(
+    "min-w-0 pointer-coarse:min-h-[44px]",
+    aktif &&
+      "border-primary bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary dark:border-primary dark:bg-primary/10 dark:hover:bg-primary/15",
+  );
+
 type Props = {
   tab: string;
   modeOrder: boolean;
   nilai: SaringanLead;
   ubah: (f: SaringanLead) => void;
   hariIni: string;
-  /** bulan SP yang ada (tab Order) untuk pintasan */
-  bulan: string[];
   /** jumlah lead per produk & total, dengan saringan lain tetap berlaku */
   jumlahProduk: Map<string, number>;
   jumlahSemua: number;
+  urut: string | null;
+  ubahUrut: (u: string | null) => void;
 };
 
 const ANGKA = new Intl.NumberFormat("id-ID");
 
-export function SaringanLead({ tab, modeOrder, nilai: f, ubah, hariIni, bulan, jumlahProduk, jumlahSemua }: Props) {
+export function SaringanLead({ tab, modeOrder, nilai: f, ubah, hariIni, jumlahProduk, jumlahSemua, urut, ubahUrut }: Props) {
   const aktif = jumlahSaringan(f);
   const [buka, setBuka] = useState(aktif > 0);
   const status = opsiStatus(tab);
   const bulanIni = hariIni.slice(0, 7);
+  const tahun = hariIni.slice(0, 4);
   const pintasan = [
-    { label: "Bulan ini", ...rentangBulan(bulanIni) },
-    { label: "Bulan lalu", ...rentangBulan(bulanSebelum(bulanIni)) },
-    { label: "Tahun ini", dari: `${hariIni.slice(0, 4)}-01-01`, sampai: `${hariIni.slice(0, 4)}-12-31` },
+    { kunci: "hari", label: "Hari ini", dari: hariIni, sampai: hariIni },
+    { kunci: "minggu", label: "Minggu ini", ...rentangMinggu(hariIni) },
+    { kunci: "bulan", label: "Bulan ini", ...rentangBulan(bulanIni) },
+    { kunci: "bulan-lalu", label: "Bulan lalu", ...rentangBulan(bulanSebelum(bulanIni)) },
+    { kunci: "tahun", label: "Tahun ini", dari: `${tahun}-01-01`, sampai: `${tahun}-12-31` },
   ];
-  const bulanLain = modeOrder ? bulan.filter((b) => b !== bulanIni && b !== bulanSebelum(bulanIni)).slice(0, 12) : [];
   const rentangSama = (r: { dari: string; sampai: string }) => f.dari === r.dari && f.sampai === r.sampai;
+  // Custom: dipilih pengguna, atau rentang di URL bukan salah satu pintasan (diketik sendiri, tautan lama, Kembali)
+  const [pilihKustom, setPilihKustom] = useState(false);
+  const adaTanggal = Boolean(f.dari || f.sampai);
+  const kustom = pilihKustom || (adaTanggal && !pintasan.some(rentangSama));
+  const kosongkanTanggal = () => ubah({ ...f, dari: null, sampai: null });
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button type="button" variant="outline" size="sm" onClick={() => setBuka((b) => !b)} aria-expanded={buka} data-uji="tombol-saringan">
           <SlidersHorizontal aria-hidden />
           Filter
@@ -101,16 +117,11 @@ export function SaringanLead({ tab, modeOrder, nilai: f, ubah, hariIni, bulan, j
               type="button"
               variant="outline"
               size="sm"
-              // pemicu menu memakai data-slot sendiri → aturan 44px [data-slot="button"] (layar sentuh) tidak berlaku; samakan
-              className={cn(
-                "min-w-0 pointer-coarse:min-h-[44px]",
-                f.produk &&
-                  "border-primary bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary dark:border-primary dark:bg-primary/10 dark:hover:bg-primary/15",
-              )}
+              className={kelasTombolMenu(Boolean(f.produk))}
               data-uji="tombol-produk"
             >
               <Package aria-hidden />
-              <span className="truncate">{f.produk ?? "Semua produk"}</span>
+              <span className="truncate">{f.produk ?? "Produk"}</span>
               <ChevronDown aria-hidden />
             </Button>
           </DropdownMenuTrigger>
@@ -130,8 +141,18 @@ export function SaringanLead({ tab, modeOrder, nilai: f, ubah, hariIni, bulan, j
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </DropdownMenu>
+        <PilihUrut nilai={urut} modeOrder={modeOrder} ubah={ubahUrut} />
         {aktif || f.produk ? (
-          <Button type="button" variant="ghost" size="sm" onClick={() => ubah(SARINGAN_KOSONG)} data-uji="reset-saringan">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setPilihKustom(false);
+              ubah(SARINGAN_KOSONG);
+            }}
+            data-uji="reset-saringan"
+          >
             <X aria-hidden />
             Reset
           </Button>
@@ -166,34 +187,46 @@ export function SaringanLead({ tab, modeOrder, nilai: f, ubah, hariIni, bulan, j
           <div className="space-y-1.5">
             <div className="text-xs font-medium text-muted-foreground">{modeOrder ? "Tanggal SP" : "Tanggal masuk"}</div>
             <div className="flex flex-wrap gap-1.5">
-              {pintasan.map((p) => (
-                <button
-                  key={p.label}
-                  type="button"
-                  aria-pressed={rentangSama(p)}
-                  className={kelasChip(rentangSama(p))}
-                  onClick={() => ubah(rentangSama(p) ? { ...f, dari: null, sampai: null } : { ...f, dari: p.dari, sampai: p.sampai })}
-                >
-                  {p.label}
-                </button>
-              ))}
-              {bulanLain.map((b) => {
-                const r = rentangBulan(b);
+              {pintasan.map((p) => {
+                const terpilih = !kustom && rentangSama(p);
                 return (
                   <button
-                    key={b}
+                    key={p.kunci}
                     type="button"
-                    aria-pressed={rentangSama(r)}
-                    className={kelasChip(rentangSama(r))}
-                    onClick={() => ubah(rentangSama(r) ? { ...f, dari: null, sampai: null } : { ...f, ...r })}
+                    aria-pressed={terpilih}
+                    className={kelasChip(terpilih)}
+                    onClick={() => {
+                      setPilihKustom(false);
+                      if (terpilih) kosongkanTanggal();
+                      else ubah({ ...f, dari: p.dari, sampai: p.sampai });
+                    }}
+                    data-uji={`saring-tanggal-${p.kunci}`}
                   >
-                    {labelBulan(b)}
+                    {p.label}
                   </button>
                 );
               })}
+              <button
+                type="button"
+                aria-pressed={kustom}
+                aria-expanded={kustom}
+                className={kelasChip(kustom)}
+                onClick={() => {
+                  if (!kustom) {
+                    setPilihKustom(true); // tanggal yang sudah ada (mis. dari pintasan) jadi titik awal
+                    return;
+                  }
+                  setPilihKustom(false);
+                  if (adaTanggal) kosongkanTanggal();
+                }}
+                data-uji="saring-tanggal-kustom"
+              >
+                Custom
+              </button>
             </div>
-            <div className="flex flex-wrap items-end gap-2">
-              <div className="space-y-1">
+            {kustom ? (
+            <div className="grid max-w-sm grid-cols-2 items-end gap-2">
+              <div className="min-w-0 space-y-1">
                 <Label htmlFor="saring-dari" className="text-xs font-normal">
                   Dari
                 </Label>
@@ -205,7 +238,7 @@ export function SaringanLead({ tab, modeOrder, nilai: f, ubah, hariIni, bulan, j
                   data-uji="saring-dari"
                 />
               </div>
-              <div className="space-y-1">
+              <div className="min-w-0 space-y-1">
                 <Label htmlFor="saring-sampai" className="text-xs font-normal">
                   Sampai
                 </Label>
@@ -218,6 +251,7 @@ export function SaringanLead({ tab, modeOrder, nilai: f, ubah, hariIni, bulan, j
                 />
               </div>
             </div>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -225,8 +259,8 @@ export function SaringanLead({ tab, modeOrder, nilai: f, ubah, hariIni, bulan, j
   );
 }
 
-/** Pilihan urutan daftar (URUT_LEAD / URUT_ORDER) — tombol kecil di kanan baris jumlah lead. */
-export function PilihUrut({ nilai, modeOrder, ubah }: { nilai: string | null; modeOrder: boolean; ubah: (u: string | null) => void }) {
+/** Pilihan urutan daftar (URUT_LEAD / URUT_ORDER): "Urutkan" saat bawaan, nama pendek urutan bila dipilih. */
+function PilihUrut({ nilai, modeOrder, ubah }: { nilai: string | null; modeOrder: boolean; ubah: (u: string | null) => void }) {
   const opsi = opsiUrut(modeOrder);
   const pilih = opsi.find((o) => o.k === nilai) ?? opsi[0];
   return (
@@ -234,18 +268,18 @@ export function PilihUrut({ nilai, modeOrder, ubah }: { nilai: string | null; mo
       <DropdownMenuTrigger asChild>
         <Button
           type="button"
-          variant="ghost"
+          variant="outline"
           size="sm"
           aria-label={`Urutkan: ${pilih.label}`}
-          className={cn("shrink-0 text-xs pointer-coarse:min-h-[44px]", pilih.k ? "text-primary" : "text-muted-foreground")}
+          className={kelasTombolMenu(Boolean(pilih.k))}
           data-uji="tombol-urut"
         >
           <ArrowUpDown aria-hidden />
-          {pilih.label}
+          <span className="truncate">{pilih.pendek}</span>
           <ChevronDown aria-hidden />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align="start" className="w-56">
         <DropdownMenuLabel className="text-xs text-muted-foreground">Urutkan</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={pilih.k ?? ""} onValueChange={(v) => ubah(v || null)}>
           {opsi.map((o) => (
@@ -296,7 +330,7 @@ function InputTanggal({
         if (!sah) setDraf(nilai ?? "");
         else if (sah !== nilai) simpan(sah);
       }}
-      className="h-9 w-40"
+      className="h-9 w-full min-w-0"
     />
   );
 }

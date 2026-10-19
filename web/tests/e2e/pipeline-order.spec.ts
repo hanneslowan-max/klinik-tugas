@@ -133,7 +133,7 @@ test("saringan Produk: semua produk + jumlah, berlaku di tab Semua & Order, ikut
 
   await page.getByTestId("reset-saringan").click();
   await expect(page).not.toHaveURL(/produk=/);
-  await expect(page.getByTestId("tombol-produk")).toHaveText(/Semua produk/);
+  await expect(page.getByTestId("tombol-produk")).toHaveText(/^Produk$/);
   await expect(page.locator('[data-uji="baris-order"]')).toHaveCount(2);
 });
 
@@ -149,18 +149,20 @@ test("Urutkan: terbaru/terlama masuk di daftar lead; tab Order punya pilihan sen
   const urutanLead = () => page.getByTestId("baris-lead").evaluateAll((el) => el.map((e) => e.getAttribute("href")?.split("/").pop()));
   const urutanOrder = () => page.locator('[data-uji="baris-order"]').evaluateAll((el) => el.map((e) => e.getAttribute("data-id")));
 
-  await expect(page.getByTestId("tombol-urut")).toHaveText(/Paling lama diam/);
+  await expect(page.getByTestId("tombol-urut")).toHaveText("Urutkan");
+  await expect(page.getByTestId("tombol-urut")).toHaveAccessibleName("Urutkan: Paling lama diam");
   await pilihUrut(page, "baru");
   await expect(page).toHaveURL(/urut=baru/);
   await expect.poll(urutanLead).toEqual([lunas, baru, belum]);
   await pilihUrut(page, "lama");
-  await expect(page.getByTestId("tombol-urut")).toHaveText(/Terlama masuk/);
+  await expect(page.getByTestId("tombol-urut")).toHaveText("Terlama");
+  await expect(page.getByTestId("tombol-urut")).toHaveAccessibleName("Urutkan: Terlama masuk");
   await expect.poll(urutanLead).toEqual([belum, baru, lunas]);
 
   // masuk tab Order: urutan lead dibuang, pilihannya berganti (bawaan tanggal SP terbaru)
   await page.getByRole("tab", { name: "Order" }).click();
   await expect(page).not.toHaveURL(/urut=/);
-  await expect(page.getByTestId("tombol-urut")).toHaveText(/Tanggal SP terbaru/);
+  await expect(page.getByTestId("tombol-urut")).toHaveAccessibleName("Urutkan: Tanggal SP terbaru");
   await expect.poll(urutanOrder).toEqual([lunas, belum]);
   await page.getByTestId("tombol-urut").click();
   await expect(page.getByTestId("urut-nilai")).toBeVisible();
@@ -183,10 +185,39 @@ test("Papan + tab Order + saringan Lunas: hanya order lunas", async ({ page }) =
   await hanyaPelangganUji(page);
 });
 
+test("saringan tanggal SP: pintasan Hari ini…Tahun ini tanpa daftar bulan; Custom memunculkan Dari/Sampai", async ({ page }) => {
+  await bukaOrder(page);
+  await page.getByTestId("tombol-saringan").click();
+  const panel = page.getByTestId("panel-saringan");
+  for (const k of ["hari", "minggu", "bulan", "bulan-lalu", "tahun", "kustom"]) await expect(panel.getByTestId(`saring-tanggal-${k}`)).toBeVisible();
+  await expect(panel.getByRole("button", { name: /\d{4}$/ })).toHaveCount(0); // daftar "Oktober 2025" dst. sudah tidak ada
+  await expect(page.getByTestId("saring-dari")).toHaveCount(0);
+
+  // order lunas: tanggal SP hari ini; order belum lunas: akhir bulan lalu
+  await page.getByTestId("saring-tanggal-hari").click();
+  await expect(baris(page, lunas)).toBeVisible();
+  await expect(baris(page, belum)).toHaveCount(0);
+  await page.getByTestId("saring-tanggal-bulan-lalu").click();
+  await expect(baris(page, belum)).toBeVisible();
+  await expect(baris(page, lunas)).toHaveCount(0);
+
+  // Custom: kolom Dari/Sampai muncul, berangkat dari rentang yang sedang dipakai; Custom lagi = tutup & hapus tanggal
+  await page.getByTestId("saring-tanggal-kustom").click();
+  await expect(page.getByTestId("saring-tanggal-kustom")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("saring-tanggal-bulan-lalu")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByTestId("saring-dari")).toBeVisible();
+  await expect(baris(page, belum)).toBeVisible();
+  await page.getByTestId("saring-tanggal-kustom").click();
+  await expect(page.getByTestId("saring-dari")).toHaveCount(0);
+  await expect(page).not.toHaveURL(/dari=/);
+  await expect(page.locator('[data-uji="baris-order"]')).toHaveCount(2);
+});
+
 test("saringan tanggal bisa diketik dengan keyboard (draf lokal, URL diisi saat tanggal lengkap)", async ({ page }) => {
   test.skip(diHp(page), "HP memakai pemilih tanggal bawaan");
   await bukaOrder(page);
   await page.getByTestId("tombol-saringan").click();
+  await page.getByTestId("saring-tanggal-kustom").click();
   const tahun = sqlLokal(`select extract(year from public.hari_ini_wib())::int`);
   // 01-01: urutan segmen dd/mm atau mm/dd tidak berpengaruh
   const dari = page.getByTestId("saring-dari");

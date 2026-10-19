@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  BELUM_DICATAT, bulanSebelum, bulanTersedia, csvOrder, hitungProduk, jumlahSaringan, kelompokOrder, labelBulan, rentangBulan,
+  BELUM_DICATAT, bulanSebelum, csvOrder, hitungProduk, jumlahSaringan, kelompokOrder, labelBulan, rentangBulan, rentangMinggu,
   SARINGAN_KOSONG, saringLead, sisaTagihan, TANPA_TANGGAL, terbayar, urutkan, urutSah,
 } from "@/features/pipeline/order";
 import type { LeadRingkas } from "@/types/domain";
@@ -69,9 +69,7 @@ describe("kelompokOrder", () => {
     expect(r).toMatchObject({ jumlah: 1, nilai: 1_500_000, terbayar: 0, sisa: 1_500_000 });
     expect(r.grup.map((g) => g.kunci)).toEqual(["2026-10"]);
     expect(r.grup[0].items.map((l) => l.kode)).toEqual(["L-00022"]);
-    expect(bulanTersedia([dibatalkan, lunasBatal, tetap])).toEqual(["2026-10"]);
     expect(kelompokOrder([dibatalkan, lunasBatal])).toMatchObject({ jumlah: 0, nilai: 0, terbayar: 0, sisa: 0, grup: [] });
-    expect(bulanTersedia([dibatalkan])).toEqual([]);
   });
 });
 
@@ -165,8 +163,11 @@ describe("bulan", () => {
     expect(bulanSebelum("2026-01")).toBe("2025-12");
     expect(bulanSebelum("2026-10")).toBe("2026-09");
   });
-  it("bulanTersedia: bulan SP order saja, terbaru dulu", () => {
-    expect(bulanTersedia(DATA)).toEqual(["2026-10", "2026-09"]);
+  it("rentangMinggu: Senin–Minggu, termasuk lintas bulan & tahun", () => {
+    expect(rentangMinggu("2026-10-19")).toEqual({ dari: "2026-10-19", sampai: "2026-10-25" }); // Senin
+    expect(rentangMinggu("2026-10-25")).toEqual({ dari: "2026-10-19", sampai: "2026-10-25" }); // Minggu
+    expect(rentangMinggu("2026-10-01")).toEqual({ dari: "2026-09-28", sampai: "2026-10-04" }); // Kamis
+    expect(rentangMinggu("2027-01-01")).toEqual({ dari: "2026-12-28", sampai: "2027-01-03" });
   });
 });
 
