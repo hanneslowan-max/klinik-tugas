@@ -53,6 +53,14 @@ async function hanyaPelangganUji(page: Page) {
   await expect(page.locator('[data-uji="baris-order"]')).toHaveCount(2);
 }
 
+/** Pilih urutan lewat menu, lalu tunggu menu terlepas: menu Radix yang sama tidak terbuka bila diketuk lagi selagi
+ *  animasi tutupnya berjalan (±60 ms; jauh di bawah ketukan manusia, tetapi tes bisa secepat itu di runner CI). */
+async function pilihUrut(page: Page, kunci: string) {
+  await page.getByTestId("tombol-urut").click();
+  await page.getByTestId(`urut-${kunci}`).click();
+  await expect(page.getByRole("menu")).toHaveCount(0);
+}
+
 async function bukaOrder(page: Page) {
   await masuk(page, AKUN.citra.email);
   await page.goto("/pipeline?tab=order");
@@ -142,12 +150,10 @@ test("Urutkan: terbaru/terlama masuk di daftar lead; tab Order punya pilihan sen
   const urutanOrder = () => page.locator('[data-uji="baris-order"]').evaluateAll((el) => el.map((e) => e.getAttribute("data-id")));
 
   await expect(page.getByTestId("tombol-urut")).toHaveText(/Paling lama diam/);
-  await page.getByTestId("tombol-urut").click();
-  await page.getByTestId("urut-baru").click();
+  await pilihUrut(page, "baru");
   await expect(page).toHaveURL(/urut=baru/);
   await expect.poll(urutanLead).toEqual([lunas, baru, belum]);
-  await page.getByTestId("tombol-urut").click();
-  await page.getByTestId("urut-lama").click();
+  await pilihUrut(page, "lama");
   await expect(page.getByTestId("tombol-urut")).toHaveText(/Terlama masuk/);
   await expect.poll(urutanLead).toEqual([belum, baru, lunas]);
 
@@ -157,8 +163,11 @@ test("Urutkan: terbaru/terlama masuk di daftar lead; tab Order punya pilihan sen
   await expect(page.getByTestId("tombol-urut")).toHaveText(/Tanggal SP terbaru/);
   await expect.poll(urutanOrder).toEqual([lunas, belum]);
   await page.getByTestId("tombol-urut").click();
-  await expect(page.getByTestId("urut-baru")).toHaveCount(0);
-  await page.getByTestId("urut-lama").click();
+  await expect(page.getByTestId("urut-nilai")).toBeVisible();
+  await expect(page.getByTestId("urut-baru")).toHaveCount(0); // pilihan tab lead tidak ada di tab Order
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await pilihUrut(page, "lama");
   await expect.poll(urutanOrder).toEqual([belum, lunas]);
 });
 
