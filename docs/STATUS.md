@@ -352,6 +352,12 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   tetap). Berlaku juga di Papan dan unduhan CSV. Urutan dibuang saat masuk/keluar tab Order (pilihannya beda); bukan
   saringan, jadi Reset tidak mengubahnya. Diurutkan di web (urutan stabil: yang setara tetap urutan server); tanpa
   perubahan DB.
+- **Kuota GitHub Actions habis (19 Okt):** 2.000 menit/bulan akun `hanneslowan-max` terpakai 100% (email GitHub 11:19
+  WIB; budget $0 → job tidak diberi runner, gagal ±4 dtk tanpa log). Reset 1 Nov 2026. Keputusan Hannes: sampai reset,
+  **gerbang merge = verifikasi lokal** di sesi (lint, typecheck, vitest, build produksi, e2e lengkap HP+desktop terhadap
+  `next start` + Supabase lokal, dan build tiruan Hostinger di container `almalinux:8`); CI merah karena kuota tidak
+  menahan merge. Deploy Hostinger (Git) tidak terpengaruh. Hemat kuota (`web.yml`): build-hostinger & e2e hanya di PR /
+  manual (tidak diulang saat push ke main), perubahan `.md` saja tidak memicu workflow. Satu run PR penuh ±13 menit.
 - **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md` — **wajib pakai alat impor versi berpenjaga (14 Okt, sesudah Batal order)**; versi lama mengembalikan order yang dibatalkan di Anvil ke ORDER.
 
 ## Notifikasi "Dari tim" / "Dari agent" (revisi #2, 13 Okt 2026, branch `rev2-notif`)
