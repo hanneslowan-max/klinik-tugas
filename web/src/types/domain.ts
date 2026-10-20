@@ -471,6 +471,8 @@ export type LeadDetail = {
   ref_sheet: string | null;
   diam_sejak: string | null;
   diam_hari: number;
+  /** rencana FU terbaru (YYYY-MM-DD); kosong saat catat FU di lead BARU/PENAWARAN → server isi +2 hari kerja */
+  fu_berikutnya: string | null;
   dibuat_pada: string;
   pelanggan: PelangganLead;
   kontak: KontakLead | null;
