@@ -371,6 +371,13 @@ export type AlasanBatal =
   | "Harga" | "Stok/waktu kirim" | "Spesifikasi tidak cocok" | "Tidak ada respon"
   | "Beli di tempat lain" | "Proyek batal/ditunda" | "Lainnya" | "Order dibatalkan";
 export type JenisPelanggan = "perusahaan" | "perorangan";
+/**
+ * Kelas bukti sumber lead dari chat WA 0878 (diisi agent, pola tetap; 20261021120000) = public.pipeline_sumber_bukti_kelas().
+ * Label tampilan: BUKTI_SUMBER di features/pipeline/konstanta.ts.
+ */
+export type KelasBuktiSumber =
+  | "situs-rh" | "situs-oy" | "web-rh" | "ga-rh" | "web-oy" | "ga-oy" | "meta"
+  | "lastri" | "katalog-wa" | "xs-pm" | "tidur" | "tanpa-sinyal";
 
 /** Hasil web_pipeline_saya: gerbang menu & layar (§6). kode_sp = kode SP aktor sendiri (pratinjau No SP). */
 /** Status pembayaran order (revisi #7). */
@@ -434,6 +441,11 @@ export type LeadRingkas = {
   /** jumlah lead LAIN pelanggan yang sama yang sudah ORDER dan masuk lebih dulu (> 0 = repeat, 20261017120000) */
   order_sebelumnya: number;
   produk: ItemLeadRingkas[];
+  /** bukti sumber dari chat WA (agent, hanya-baca; 20261021120000) — sama dengan LeadDetail */
+  sumber_bukti: KelasBuktiSumber | null;
+  sumber_bukti_kode: string | null;
+  sumber_bukti_chat_pada: string | null;
+  sumber_bukti_diisi_pada: string | null;
 };
 
 /** Detail lead penuh = public.j_pipeline_lead. */
@@ -479,6 +491,15 @@ export type LeadDetail = {
   items: ItemLead[];
   aktivitas: AktivitasLead[];
   riwayat_tahap: RiwayatTahapLead[];
+  /**
+   * Bukti sumber dari chat WA 0878, diisi agent lewat x_pipeline_sumber_bukti_set (20261021120000). Terpisah dari
+   * `sumber` isian sales; hanya-baca di web. Semua null = belum ada bukti. kode mis. "GA-OY-7K3F" / "PM-06";
+   * chat_pada = pesan pertama pelanggan di chat itu (ISO).
+   */
+  sumber_bukti: KelasBuktiSumber | null;
+  sumber_bukti_kode: string | null;
+  sumber_bukti_chat_pada: string | null;
+  sumber_bukti_diisi_pada: string | null;
 };
 
 export type DaftarLead = { total: number; items: LeadRingkas[] };

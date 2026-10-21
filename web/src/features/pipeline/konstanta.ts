@@ -4,11 +4,13 @@
 import type { VariantProps } from "class-variance-authority";
 
 import type { chipVariants } from "@/components/umum/chip";
-import { fmtTanggal, selisihHari } from "@/lib/tanggal";
+import { fmtTanggal, fmtWaktu, selisihHari } from "@/lib/tanggal";
 import type {
   AlasanBatal,
   AlasanDobel,
   JenisAktivitas,
+  KelasBuktiSumber,
+  LeadDetail,
   ProdukLead,
   SaringPelanggan,
   SatuanItem,
@@ -34,6 +36,39 @@ export const SUMBER: SumberLead[] = [
  */
 export const BANTU_SUMBER =
   "Tanya pelanggan: dapat kontak kami dari mana? Pilih ASALNYA (Google = Google Ads/Website organik, Instagram/Facebook = Meta Ads). 'WA langsung' hanya bila pelanggan sudah menyimpan nomor kita sebelumnya.";
+
+/**
+ * Label kelas bukti sumber dari chat WA 0878 (diisi agent, 20261021120000). Kunci PERSIS dengan
+ * public.pipeline_sumber_bukti_kelas() — kelas baru di server = tambah di sini juga (sampai itu, kode kelasnya tampil apa adanya).
+ */
+export const BUKTI_SUMBER: Record<KelasBuktiSumber, string> = {
+  "situs-rh": "Form situs RH",
+  "situs-oy": "Form situs OYAMA",
+  "web-rh": "Tombol WA situs RH",
+  "ga-rh": "Google Ads · situs RH",
+  "web-oy": "Tombol WA situs OYAMA",
+  "ga-oy": "Google Ads · situs OYAMA",
+  meta: "Iklan Meta",
+  lastri: "Sapaan \"Halo Bu Lastri\"",
+  "katalog-wa": "Katalog WhatsApp",
+  "xs-pm": "Kode XS-PM",
+  tidur: "Kode TIDUR",
+  "tanpa-sinyal": "Chat tanpa bukti sumber",
+};
+
+/**
+ * Satu baris bukti sumber untuk detail lead: "Form situs RH · chat 16 Okt 2026, 10.32 WIB", kode bila ada
+ * ("Google Ads · situs OYAMA (GA-OY-7K3F) · chat …"). null bila belum ada bukti (baris tidak ditampilkan).
+ */
+export function teksBuktiSumber(
+  b: Pick<LeadDetail, "sumber_bukti" | "sumber_bukti_kode" | "sumber_bukti_chat_pada">,
+): string | null {
+  if (!b.sumber_bukti) return null;
+  const label = BUKTI_SUMBER[b.sumber_bukti] ?? b.sumber_bukti;
+  const kode = b.sumber_bukti_kode ? ` (${b.sumber_bukti_kode})` : "";
+  const chat = b.sumber_bukti_chat_pada ? fmtWaktu(b.sumber_bukti_chat_pada) : "";
+  return `${label}${kode}${chat ? ` · chat ${chat}` : ""}`;
+}
 
 export const SATUAN: SatuanItem[] = ["unit", "set", "pcs"];
 

@@ -385,6 +385,26 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   migrasi, dialog web tetap jalan tetapi jadwal tidak terisi otomatis). Tidak mengisi mundur lead lama: lead aktif
   tanpa jadwal baru terjadwal saat FU berikutnya dicatat (atau lewat `fu_set` massal).
 - **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md` — **wajib pakai alat impor versi berpenjaga (14 Okt, sesudah Batal order)**; versi lama mengembalikan order yang dibatalkan di Anvil ke ORDER.
+- **Bukti sumber lead dari chat WA (21 Okt, Kapso Fase 1, ACC Hannes, branch `claude/fase-1-kapso-sg6o0q`, migrasi
+  `20261021120000_pipeline_sumber_bukti`).** Chat WA 0878 kini terbaca lewat Kapso (baca saja); routine agent mencari bukti
+  asal lead dengan pola tetap tanpa AI (template form situs, Ref WEB/GA-RH/OY, Ref PM/RD, XS-PM/TIDUR, "Halo Bu Lastri",
+  katalog WA). Label `sumber` sales tidak bisa dipegang (contoh: 28 lead form situs berlabel "WA langsung"), tetapi agent
+  TIDAK menimpanya: bukti ditulis ke 4 kolom baru `lead.sumber_bukti` (kelas, allowlist `pipeline_sumber_bukti_kelas()`),
+  `_kode` (mis. `GA-OY-7K3F`), `_chat_pada`, `_diisi_pada`, satu-satunya lewat `x_pipeline_sumber_bukti_set` (Edge
+  `POST /x/pipeline/sumber-bukti`, scope tulis, aktor owner/bot/admin Pipeline; CLI `pipeline bukti-set --file <items.json>
+  [--dry-run]`, juga di salinan `tools/tugas.mjs` rhj-brain). Maks 200 item, semua-atau-tidak, idempoten; tidak dicatat ke
+  riwayat lead (`lead_aktivitas` menggeser diam & menimpa rencana FU). Jalur web/sales tidak bisa mengubah kolom bukti
+  (payload diabaikan, tabel SELECT saja, penjaga trigger `pipeline_lead_sumber_bukti` → PT403). Detail & daftar lead
+  (web dan `/x`) memuat 4 field; detail web menampilkan baris hanya-baca "Bukti sumber (agent): Form situs RH · chat …" di
+  bawah Sumber. Kontrak: `docs/KONTRAK-DB.md` §11. Tes: `uji/db/30_pipeline_sumber_bukti.sql` (100 cek; dinomori 30 karena
+  29 dipakai PR #22), 09 (`api_/x_/impor_` 35 → 36), unit `web/src/features/pipeline/bukti-sumber.test.ts`, e2e
+  `web/tests/e2e/pipeline-bukti-sumber.spec.ts`. Verifikasi lokal 21 Okt dari `supabase db reset` (CLI 2.120.0): `uji/db`
+  **29/29 berkas, 1.609 cek**; kontrak API lokal 492 lulus, 1 gagal (snapshot `clickup.mjs` rhj-brain sudah bergeser, tidak
+  terkait); vitest 124; typecheck, lint, build hijau; e2e penuh `next start`: **148 lulus, 14 dilewati sengaja**; gabungan
+  uji dengan PR #22: lihat catatan PR.
+  **Hannes: terapkan migrasi ke produksi lalu merge** (web baru di DB lama: baris bukti tidak tampil, tanpa galat; route &
+  CLI `bukti-set` galat sampai migrasi terpasang). Tidak bergantung pada PR #22 (`20261020120000_pipeline_fu_otomatis`);
+  urutan merge bebas.
 
 ## Notifikasi "Dari tim" / "Dari agent" (revisi #2, 13 Okt 2026, branch `rev2-notif`)
 
