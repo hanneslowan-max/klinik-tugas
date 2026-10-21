@@ -1,6 +1,7 @@
 // Uji importer B2: impor/sinkron.mjs terhadap server ClickUp tiruan + Edge `api` lokal + DB lokal bersama.
-//   node impor/uji/jalankan.mjs            (UJI_VERBOSE=1 → cetak semua cek)
-// Syarat: stack Supabase lokal jalan + `supabase functions serve` (Edge api). Exit 0 = lulus, 1 = ada gagal, 2 = prasyarat.
+//   node impor/uji/jalankan.mjs [--izinkan-remote]   (UJI_VERBOSE=1 → cetak semua cek)
+// Syarat: stack Supabase lokal jalan + `supabase functions serve` (Edge api). Exit 0 = lulus, 1 = ada gagal, 2 = prasyarat,
+// 3 = target bukan lokal (penjaga uji/penjaga.mjs: TUGAS_API_URL/SUPABASE_URL/UJI_DB_URL harus 127.0.0.1/localhost).
 // Tidak pernah `db reset`. Data uji: ID fixture 86b2…/9018220000…/882000… (sintetis). Token uji "uji-b2 …" dibersihkan.
 
 import { execFileSync } from "node:child_process";

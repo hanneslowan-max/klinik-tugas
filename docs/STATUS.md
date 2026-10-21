@@ -90,6 +90,7 @@ node uji/banding.mjs                     # varian awal; juga --varian ubah (targ
 npx playwright test -c uji/web/playwright.config.mjs
 node uji/web/salin-vendor.mjs --cek      # integritas pustaka vendor
 ```
+- **Hanya ke stack lokal.** Suite di atas menolak (exit 3, sebelum request apa pun) URL API/Supabase/DB selain `127.0.0.1`/`localhost`; lihat "Penjaga uji lokal (21 Okt 2026)". Di sesi cloud yang env-nya berisi `TUGAS_API_URL` produksi: `env -u TUGAS_API_URL -u TUGAS_API_TOKEN node uji/kontrak/jalankan.mjs`.
 
 ## Hasil verifikasi akhir (29 Sep 2026, ±10.57–11.07 UTC, kode akhir poles DB + web, 1 putaran dari `supabase db reset`)
 `supabase db reset` menerapkan 13 migrasi + seed; `supabase functions serve` tetap jalan dan menjawab `401 OAUTH_017` sebelum suite kontrak. Urutan = urutan suite di atas.
@@ -470,6 +471,36 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   ulang, pintasan + fokus + layar < lg, Kembali/Batal dari Ganti password; HP: tidak ada tombol). Dua tes baru terbukti
   GAGAL terhadap kode sebelum perbaikan. Typecheck, lint, vitest 89, build produksi hijau; e2e penuh terhadap
   `next start` + Supabase lokal: **100 lulus, 14 dilewati sengaja**.
+
+## Penjaga uji lokal (21 Okt 2026)
+
+- **Insiden:** saat PR #23 diuji di container environment "Marketing", env `TUGAS_API_URL` berisi URL Edge Function
+  PRODUKSI (project `admhlyurfvodfyedgaio`), dan `uji/kontrak/jalankan.mjs` memakainya: ±200 request ke produksi. Semua
+  ditolak 401 (token uji hanya ada di DB lokal; `ENV_BERSIH` membuang `TUGAS_*` dari env CLI, jadi token produksi tidak
+  terkirim); tidak ada data yang tertulis.
+- **Pencegahan:** `uji/penjaga.mjs` dipanggil sebelum request apa pun oleh `uji/kontrak` (`konfigurasi()` di `_lib.mjs`:
+  `SUPABASE_URL`, `TUGAS_API_URL`, `DB_URL`, `UJI_EDGE_LANGSUNG`, plus `cli/.env` yang dibaca CLI sebagai fallback di luar
+  `ENV_BERSIH`), `impor/uji/_bantu.mjs` (dipakai `impor/uji/jalankan.mjs` dan `uji/banding.mjs`: `SUPABASE_URL`,
+  `TUGAS_API_URL`, `UJI_DB_URL`), `uji/db/jalankan.sh` (`DB_URL`, lewat `node uji/penjaga.mjs --db DB_URL`) dan
+  `uji/web/bantu.mjs` (`DB_URL` psql; dicek saat modul dimuat, sebelum globalSetup). Host selain `127.0.0.1` /
+  `localhost` / `::1` (DB: juga soket unix; alamat edge langsung: IP privat kontainer Docker) → **exit 3** dengan pesan
+  dan saran `env -u …`. Pesan hanya menampilkan host, bukan URL utuh (DB_URL memuat password).
+- **Izin eksplisit:** `--izinkan-remote` atau `UJI_IZINKAN_REMOTE=1` (Playwright: env saja) → tetap jalan dengan
+  PERINGATAN. URL yang memuat ref produksi `admhlyurfvodfyedgaio` **selalu** ditolak, juga dengan izin itu.
+- Default bila env kosong: API `http://127.0.0.1:54321/functions/v1/api/v2` (dari `SUPABASE_URL` / `supabase status`),
+  DB `127.0.0.1:54322`. Tidak perlu penjaga: `uji/pipeline/jalankan.mjs` (murni Node, tanpa jaringan/DB),
+  `uji/web/server.mjs` (`SUPABASE_URL` hanya untuk header CSP). `web/tests/e2e` (di luar `uji/`) memakai psql
+  `127.0.0.1:54322` yang di-hardcode.
+- **Bukti (21 Okt, Supabase CLI 2.120.0 lokal, `supabase start` + `supabase db reset`, tiap suite di bawah
+  `strace -f -e trace=connect`):** URL palsu `https://contoh.supabase.co/...` di `TUGAS_API_URL` / `SUPABASE_URL` /
+  `DB_URL` / `UJI_DB_URL` / `UJI_EDGE_LANGSUNG` / `cli/.env` (tiap suite dengan variabel yang dibacanya) → kontrak,
+  banding, importer, `uji/db` exit 3, Playwright exit 1 dengan pesan yang sama; **0 koneksi AF_INET/AF_INET6** (web: hanya probe webServer ke 127.0.0.1). Dengan
+  `--izinkan-remote` / `UJI_IZINKAN_REMOTE=1`: PERINGATAN lalu exit 2 (Edge palsu tak terjangkau). Putaran lokal dari
+  `db reset`, urutan baku: `uji/db` 28 berkas 1509 cek 0 gagal; kontrak 492 lulus 0 gagal; importer 119 / 0; banding
+  awal 340/340, sisa beda 0, exit 0; Playwright `uji/web` 69 lulus. Tujuan `connect()` suite: hanya `127.0.0.1` dan IP
+  kontainer edge lokal (kontrak, 2×); di putaran web, Chromium sendiri membuka koneksi latar (DNS, `mtalk.google.com`),
+  bukan request uji. Catatan: `uji/db/13_web.sql` gagal bila dijalankan SESUDAH suite kontrak (lampiran tugas seed
+  `rtujib0003` berubah); sudah begitu sebelum perubahan ini, urutan baku (`uji/db` dulu) lulus.
 
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)
 Prasyarat dari Hannes: project Supabase baru `rhj-tugas` (akun/org baru, Sydney `ap-southeast-2` per keputusan 30/9, Free); env cloud `SUPABASE_ACCESS_TOKEN` (PAT akun baru) + `SUPABASE_PROJECT_REF`; `CLICKUP_API_TOKEN` (sudah ada); sesi baru supaya env terbaca. Semua langkah ke ClickUp **GET saja**. Tidak memakai MCP Supabase (itu ERP).

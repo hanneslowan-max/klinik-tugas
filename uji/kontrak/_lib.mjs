@@ -5,6 +5,7 @@ import { execFile, execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { jagaLokal } from "../penjaga.mjs";
 
 export const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(HERE, "..", "..");
@@ -41,6 +42,16 @@ function edgeLangsung() {
   }
 }
 
+// cli/.env (gitignored) dibaca CLI sebagai fallback bila env proses kosong — jalur yang melewati ENV_BERSIH di bawah.
+function dotenvCli() {
+  try {
+    return Object.fromEntries(fs.readFileSync(path.join(path.dirname(CLI), ".env"), "utf8").split(/\r?\n/)
+      .map((l) => l.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/)).filter(Boolean).map((m) => [m[1], m[2]]));
+  } catch {
+    return {};
+  }
+}
+
 export function konfigurasi() {
   const perlu = !process.env.SUPABASE_ANON_KEY || !process.env.SUPABASE_SERVICE_ROLE_KEY;
   const st = perlu ? statusEnv() : {};
@@ -50,11 +61,22 @@ export function konfigurasi() {
     anon: process.env.SUPABASE_ANON_KEY || st.ANON_KEY || "",
     service: process.env.SUPABASE_SERVICE_ROLE_KEY || st.SERVICE_ROLE_KEY || "",
     api: (process.env.TUGAS_API_URL || `${url}/functions/v1/api/v2`).replace(/\/+$/, ""),
+    db: process.env.DB_URL || "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
     password: process.env.UJI_PASSWORD || "rahasia-dev-123", // password akun seed dev lokal (bukan rahasia)
     asli: process.env.CLICKUP_MJS_ASLI || "/home/user/rhj-brain/tools/clickup.mjs",
   };
   cfg.fnBase = cfg.api.replace(/\/v2$/, "");
   cfg.edgeLangsung = process.env.UJI_EDGE_LANGSUNG || edgeLangsung();
+  // Penjaga: semua target harus lokal SEBELUM request apa pun (uji/penjaga.mjs; --izinkan-remote untuk sengaja remote).
+  const dotenv = dotenvCli();
+  jagaLokal("node uji/kontrak/jalankan.mjs", [
+    { nama: "SUPABASE_URL", nilai: cfg.url, env: "SUPABASE_URL" },
+    { nama: "TUGAS_API_URL", nilai: cfg.api, env: "TUGAS_API_URL" },
+    { nama: "DB_URL", nilai: cfg.db, jenis: "db", env: "DB_URL" },
+    { nama: "UJI_EDGE_LANGSUNG", nilai: cfg.edgeLangsung, jenis: "edge", env: "UJI_EDGE_LANGSUNG" },
+    { nama: "cli/.env TUGAS_API_URL", nilai: dotenv.TUGAS_API_URL },
+    { nama: "cli/.env CLICKUP_API_TOKEN (CLI mode clickup → api.clickup.com)", nilai: dotenv.CLICKUP_API_TOKEN && "https://api.clickup.com/api/v2" },
+  ]);
   if (!cfg.anon || !cfg.service) throw new Error("Kunci lokal tidak ditemukan: set SUPABASE_ANON_KEY & SUPABASE_SERVICE_ROLE_KEY atau SUPABASE_CLI");
   return cfg;
 }

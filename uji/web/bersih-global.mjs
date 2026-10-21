@@ -4,9 +4,7 @@
 //     + objek Storage-nya dihapus lewat Storage API (service role lokal)
 //  2. psql (superuser DB LOKAL): token, hari libur, list/space, akun Auth & anggota uji — hanya milik tes web.
 import { execFileSync } from 'node:child_process';
-import { AKUN, rpcSebagai, klienSebagai, layanan } from './bantu.mjs';
-
-const DB_URL = process.env.DB_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
+import { AKUN, DB_URL, rpcSebagai, klienSebagai, layanan } from './bantu.mjs';
 
 async function purgeTugasUji() {
   const c = await klienSebagai(AKUN.owner.email);

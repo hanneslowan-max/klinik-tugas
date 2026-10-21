@@ -8,7 +8,9 @@
 // normalisasi yang DICATAT (uji/banding/normalisasi.mjs + README). Target: sisa beda = 0.
 //
 //   node uji/banding.mjs [--varian awal|ubah] [--lewati-impor] [--saring <regex perintah>] [--izinkan-diketahui] [--simpan]
-// Syarat: Supabase lokal + `supabase functions serve`. Exit 0 = sisa beda 0, 1 = ada beda/gagal, 2 = prasyarat.
+//                        [--izinkan-remote]
+// Syarat: Supabase lokal + `supabase functions serve`. Exit 0 = sisa beda 0, 1 = ada beda/gagal, 2 = prasyarat,
+// 3 = target bukan lokal (penjaga uji/penjaga.mjs lewat konfigurasi(): TUGAS_API_URL/SUPABASE_URL/UJI_DB_URL).
 // Hasil: uji/banding/hasil/<waktu>-<varian>.json (gitignored).
 
 import crypto from "node:crypto";
@@ -37,6 +39,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (a === "--saring") opsi.saring = new RegExp(argv[++i]);
   else if (a === "--izinkan-diketahui") opsi.izinkanDiketahui = true;
   else if (a === "--simpan") opsi.simpan = true;
+  else if (a === "--izinkan-remote") continue; // dibaca penjaga (uji/penjaga.mjs)
   else { console.error(`banding: argumen tidak dikenal ${a}`); process.exit(2); }
 }
 if (!["awal", "ubah"].includes(opsi.varian)) { console.error("banding: --varian awal|ubah"); process.exit(2); }

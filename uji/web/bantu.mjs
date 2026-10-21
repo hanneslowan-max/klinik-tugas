@@ -7,6 +7,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
+import { jagaLokal } from '../penjaga.mjs';
 
 const DIR = dirname(fileURLToPath(import.meta.url));
 const AKAR = resolve(DIR, '..', '..');
@@ -22,6 +23,11 @@ export const AKUN = {
 };
 export const RUN = `${Date.now().toString(36)}`;        // pembeda antar-run
 export const AWALAN = 'uji-b3';
+export const DB_URL = process.env.DB_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
+// Penjaga (uji/penjaga.mjs): psql tes web hanya ke DB lokal; dicek saat modul dimuat, jadi globalSetup gagal sebelum
+// menyentuh DB. Sengaja remote non-produksi: UJI_IZINKAN_REMOTE=1 (Playwright menolak argumen --izinkan-remote).
+jagaLokal('npx playwright test -c uji/web/playwright.config.mjs', [{ nama: 'DB_URL', nilai: DB_URL, jenis: 'db', env: 'DB_URL' }],
+  { lempar: true, argumen: false });
 
 let _env = null;
 export function envLokal() {
@@ -119,8 +125,7 @@ export async function bersihkanTugas() {
 
 /** SQL baca-saja ke DB lokal (psql superuser lokal; khusus tes). Mengembalikan teks hasil (-At). */
 export function sqlLokal(sql) {
-  const db = process.env.DB_URL || 'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
-  return execFileSync('psql', [db, '-X', '-At', '-v', 'ON_ERROR_STOP=1', '-c', sql], { encoding: 'utf8' }).trim();
+  return execFileSync('psql', [DB_URL, '-X', '-At', '-v', 'ON_ERROR_STOP=1', '-c', sql], { encoding: 'utf8' }).trim();
 }
 /** SQL UBAH ke DB lokal (khusus tes: menyiapkan keadaan yang tidak bisa dibuat lewat web, mis. tasks.extra hasil impor,
  *  atau memulihkan read_at notifikasi seed). Hanya data sintetis/uji; jangan dipakai untuk memeriksa hasil. */
