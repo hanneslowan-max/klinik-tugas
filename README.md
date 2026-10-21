@@ -17,6 +17,7 @@ Repo ini berisi seluruh sistem, bukan hanya website. **Yang di-deploy ke Hosting
 | `uji/` | Tes database, kontrak API, banding CLI, tes web lama | Lokal / sesi pengembangan |
 | `docs/` | Arsitektur, kontrak database, status & langkah berikutnya (`docs/STATUS.md`) | — |
 | `web-lama/` | Website statis versi lama; dihapus setelah web baru lulus semua tes | — (tidak dipakai) |
+| `.claude/` | Skill agent untuk mengerjakan repo ini (`anvil-supabase`, `anvil-shadcn`; sumber & audit di `SUMBER.md` masing-masing dan `docs/AUDIT-SKILL-21Okt.md`) + pengaman ERP baca-saja (`settings.json`, `hooks/`) | Sesi Claude Code |
 | `.github/workflows/` | `web.yml`: cek + tes web (gerbang sebelum merge; Hostinger deploy sendiri dari `main`); `sinkron.yml` & `backup.yml`: jadwal sinkron ClickUp & backup | GitHub Actions |
 
 ## Menjalankan website di komputer (Windows / macOS)
