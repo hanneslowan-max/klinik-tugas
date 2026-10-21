@@ -364,13 +364,6 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   daftar memuat semua pemilik (admin/baca, atau rep di "Semua"); rep di "Lead saya" sudah disaring server (`?m=`), dan
   pindah ke "Lead saya" membuang `sales`. Disaring di web; tanpa perubahan DB. Produksi 19 Okt: Michael Eppy 705 lead,
   Riksa Sri Gustiana 528, tanpa pemilik 842.
-- **Kuota GitHub Actions habis (19 Okt):** 2.000 menit/bulan akun `hanneslowan-max` terpakai 100% (email GitHub 11:19
-  WIB; budget $0 → job tidak diberi runner, gagal ±4 dtk tanpa log). Reset 1 Nov 2026. Keputusan Hannes: sampai reset,
-  **gerbang merge = verifikasi lokal** di sesi (lint, typecheck, vitest, build produksi, e2e lengkap HP+desktop terhadap
-  `next start` + Supabase lokal, dan build tiruan Hostinger di container `almalinux:8`); CI merah karena kuota tidak
-  menahan merge. Deploy Hostinger (Git) tidak terpengaruh. Hemat kuota (`web.yml`): build-hostinger & e2e hanya di PR /
-  manual (tidak diulang saat push ke main), perubahan `.md` saja tidak memicu workflow. Satu run PR penuh ±13 menit.
-- **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md` — **wajib pakai alat impor versi berpenjaga (14 Okt, sesudah Batal order)**; versi lama mengembalikan order yang dibatalkan di Anvil ke ORDER.
 - **Sumber "Instagram/TikTok organik" (21 Okt, permintaan Hannes, branch `claude/sumber-igtt`, migrasi
   `20261021140000_pipeline_sumber_igtt`).** Pilihan Sumber lead ke-9 untuk chat dari akun organik Instagram/TikTok Bu
   Lastri (link bio WA, sapaan "Halo Bu Lastri"); iklan Instagram/Facebook tetap "Meta Ads". CHECK `lead.sumber`
@@ -379,6 +372,13 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   tanpa migrasi), vitest `features/pipeline/sumber.test.ts` (web = CHECK migrasi = alat impor), e2e
   `pipeline-sumber-igtt.spec.ts`. **Terapkan migrasi ke produksi SEBELUM merge** (tanpa migrasi, memilih chip baru →
   galat 23514 saat simpan).
+- **Kuota GitHub Actions habis (19 Okt):** 2.000 menit/bulan akun `hanneslowan-max` terpakai 100% (email GitHub 11:19
+  WIB; budget $0 → job tidak diberi runner, gagal ±4 dtk tanpa log). Reset 1 Nov 2026. Keputusan Hannes: sampai reset,
+  **gerbang merge = verifikasi lokal** di sesi (lint, typecheck, vitest, build produksi, e2e lengkap HP+desktop terhadap
+  `next start` + Supabase lokal, dan build tiruan Hostinger di container `almalinux:8`); CI merah karena kuota tidak
+  menahan merge. Deploy Hostinger (Git) tidak terpengaruh. Hemat kuota (`web.yml`): build-hostinger & e2e hanya di PR /
+  manual (tidak diulang saat push ke main), perubahan `.md` saja tidak memicu workflow. Satu run PR penuh ±13 menit.
+- **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md` — **wajib pakai alat impor versi berpenjaga (14 Okt, sesudah Batal order)**; versi lama mengembalikan order yang dibatalkan di Anvil ke ORDER.
 
 ## Notifikasi "Dari tim" / "Dari agent" (revisi #2, 13 Okt 2026, branch `rev2-notif`)
 
