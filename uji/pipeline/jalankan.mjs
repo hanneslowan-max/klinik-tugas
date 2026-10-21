@@ -239,6 +239,8 @@ bagian("End-to-end jalankanImpor + argumen");
   const salah = (a) => { try { bacaArgumen(a); return false; } catch { return true; } };
   cek("argumen: --pemilik salah ditolak", salah([FIXTURE, "--pemilik", "Riksa"]));
   cek("argumen: --sumber-default di luar enum ditolak", salah([FIXTURE, "--sumber-default", "Tiktok"]));
+  cek("argumen: --sumber-default \"Instagram/TikTok organik\" diterima (20261021140000)",
+    bacaArgumen([FIXTURE, "--sumber-default", "Instagram/TikTok organik"]).sumberDefault === "Instagram/TikTok organik");
   cek("argumen: --aktor non-angka ditolak", salah([FIXTURE, "--aktor", "owner"]));
   cek("argumen: tanpa input ditolak", salah([]));
   const o2 = bacaArgumen([FIXTURE, "--pos", "--qty-default", "2", "--rep-anvil", "riksa"]);
