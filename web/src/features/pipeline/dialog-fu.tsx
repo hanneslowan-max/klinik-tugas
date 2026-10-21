@@ -1,6 +1,7 @@
 "use client";
 
 // Catat follow-up (§5): jenis (chips) + hasil + rencana berikutnya (opsional) → web_pipeline_fu_catat.
+// Rencana kosong pada lead BARU/PENAWARAN → server mengisi hari ini + 2 hari kerja (20261020120000_pipeline_fu_otomatis).
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -29,13 +30,15 @@ export function DialogFu({ buka, ubahBuka, leadId }: { buka: boolean; ubahBuka: 
   const kirim = async () => {
     setGalat(null);
     try {
-      await simpan.mutateAsync({
+      const lead = await simpan.mutateAsync({
         lead_id: leadId,
         jenis,
         hasil: hasil.trim() || undefined,
         rencana_berikutnya: rencana || undefined,
       });
-      toast.success("Follow-up tercatat");
+      toast.success(
+        lead?.fu_berikutnya ? `Follow-up tercatat · FU berikutnya ${fmtTanggal(lead.fu_berikutnya, hariIni)}` : "Follow-up tercatat",
+      );
       ubahBuka(false);
     } catch (e) {
       setGalat(pesanGalat(e));
@@ -58,7 +61,9 @@ export function DialogFu({ buka, ubahBuka, leadId }: { buka: boolean; ubahBuka: 
             Rencana berikutnya <span className="font-normal text-muted-foreground">(opsional)</span>
           </Label>
           <Input id="fu-next" type="date" value={rencana} onChange={(e) => setRencana(e.target.value)} />
-          {rencana ? <p className="text-xs text-muted-foreground">{fmtTanggal(rencana, hariIni)}</p> : null}
+          <p className="text-xs text-muted-foreground">
+            {rencana ? fmtTanggal(rencana, hariIni) : "Kosong = otomatis 2 hari kerja dari hari ini (lead BARU/PENAWARAN)"}
+          </p>
         </div>
         {galat ? <KotakPesan nada="galat">{galat}</KotakPesan> : null}
         <KakiLembar>

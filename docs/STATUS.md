@@ -370,6 +370,20 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   `next start` + Supabase lokal, dan build tiruan Hostinger di container `almalinux:8`); CI merah karena kuota tidak
   menahan merge. Deploy Hostinger (Git) tidak terpengaruh. Hemat kuota (`web.yml`): build-hostinger & e2e hanya di PR /
   manual (tidak diulang saat push ke main), perubahan `.md` saja tidak memicu workflow. Satu run PR penuh ±13 menit.
+- **Jadwal FU otomatis +2 hari kerja (20 Okt, IMP-PIP-261015-1, ACC Hannes, branch `claude/fu-otomatis-2hk`, migrasi
+  `20261020120000_pipeline_fu_otomatis`).** Data 18 Okt: Riksa 0 dari 23 lead aktif punya `fu_berikutnya` (FU dicatat
+  tanpa "Rencana berikutnya"). Kini `inti_pipeline_fu_catat` (tombol Catat FU → `web_pipeline_fu_catat`): rencana DIISI
+  → dipakai apa adanya (manual menang, juga di lead tertutup); KOSONG dan lead BARU/PENAWARAN → `hari_ini_wib()` + 2 hari
+  kerja (pembantu internal baru `pipeline_tambah_hari_kerja`: Senin–Jumat, bukan `hari_libur`, sama dengan definisi
+  `hari_kerja`); KOSONG dan lead ORDER/BATAL/DIALIHKAN → tetap kosong. Tanggal otomatis tersimpan di
+  `lead_aktivitas.rencana_berikutnya` (riwayat menampilkannya), trigger `pipeline_aktivitas_sesudah` tidak diubah (impor,
+  catatan "Data order diubah", "Order dibatalkan", `fu_set` massal tidak terpengaruh). Web: teks bantu di bawah kolom
+  Rencana berikutnya + toast "Follow-up tercatat · FU berikutnya <tgl>". Tes: `uji/db/29_pipeline_fu_otomatis.sql`
+  (26 cek; gagal pada fungsi lama, lulus dengan), e2e `web/tests/e2e/pipeline-fu-otomatis.spec.ts`. Verifikasi lokal
+  20 Okt dari `supabase db reset`: `uji/db` **29/29 berkas, 1.535 cek**; vitest 119; typecheck, lint, build hijau; e2e
+  penuh `next start`: **148 lulus, 14 dilewati sengaja**. **Terapkan migrasi ke produksi SEBELUM/bersamaan merge** (tanpa
+  migrasi, dialog web tetap jalan tetapi jadwal tidak terisi otomatis). Tidak mengisi mundur lead lama: lead aktif
+  tanpa jadwal baru terjadwal saat FU berikutnya dicatat (atau lewat `fu_set` massal).
 - **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md` — **wajib pakai alat impor versi berpenjaga (14 Okt, sesudah Batal order)**; versi lama mengembalikan order yang dibatalkan di Anvil ke ORDER.
 
 ## Notifikasi "Dari tim" / "Dari agent" (revisi #2, 13 Okt 2026, branch `rev2-notif`)
