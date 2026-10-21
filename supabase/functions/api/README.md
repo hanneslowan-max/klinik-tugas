@@ -47,6 +47,9 @@ Bentuk galat `{err, ECODE}` dengan status HTTP:
 | GET | `/x/tenggat?tanggal=&folder=` · `/x/sensus?sumber=` | `x_tenggat` · `x_sensus` |
 | GET | `/x/count?list=&folder=&space=&sumber=` | `x_sensus` disaring; `total` dijumlah ulang, tanpa sha |
 | GET | `/x/export` (scope impor) | `x_export` |
+| GET | `/x/pipeline/leads?tab=&pemilik=&q=` · `/x/pipeline/lead/{id}` · `/x/pipeline/ringkas?dasar=&bulan=` | `x_pipeline_daftar` · `x_pipeline_lead` · `x_pipeline_ringkas` (baris & detail lead memuat `sumber_bukti*`) |
+| POST | `/x/pipeline/fu` (scope tulis) `{items:[{lead_id, tanggal?}]}` | `x_pipeline_fu_set`: rencana FU lead (tab "Follow up hari ini") |
+| POST | `/x/pipeline/sumber-bukti` (scope tulis; aktor owner/bot/admin Pipeline) `{items:[{lead_id, bukti, kode?, chat_pada?}]}` maks 200 | `x_pipeline_sumber_bukti_set`: bukti asal lead dari chat WA (kelas pola tetap, mis. `situs-rh`, `ga-oy` + kode `GA-OY-7K3F`). Tidak menyentuh `sumber` isian sales. Semua-atau-tidak, idempoten; balas `{diproses, diubah, sama, items:[{lead_id, ok, diubah}]}`. Rincian `docs/KONTRAK-DB.md` §11 |
 | POST | `/x/rawat/lampiran` (scope impor, owner/bot; body opsional `{hari?:int, dry?:bool}`) | Perawatan: `x_rawat_lampiran` men-soft-delete lampiran app pada kartu selesai > N hari (setelan `app_settings.rawat_lampiran` `{aktif,hari}`, default 7; hanya `sumber=app`, salinan ClickUp dibiarkan), lalu service role menghapus BERKAS-nya. `dry` → hanya hitung. Balas `{hari, dihapus, berkas_dihapus, berkas_sisa, berkas_gagal}` (atau `{dilewati:true}` bila setelan `aktif=false`). Dipanggil job terjadwal `rawat.yml` |
 | GET | `/x/file/{attachment_id}` | 302 ke signed URL (atau `clickup_url`) |
 | POST | `/x/impor/batch` `{jenis, rows, mode?, at_awal?}` | `impor_batch` |

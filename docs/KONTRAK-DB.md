@@ -209,6 +209,7 @@ List sama → no-op. List tak ada → 404.
 | `x_admin_akun(p_aktor bigint, p_member bigint, p_auth_user uuid, p_email text, p_harus_ganti boolean default true)` | **Tambahan** untuk Edge `/api/x/admin/akun` & `/reset`: menautkan `members.auth_user_id`, `email`, dan `harus_ganti_password`. Hasil `{"id","username","email","auth_user_id","harus_ganti_password"}`. Email/akun sudah dipakai anggota lain → `PT409 KONFLIK_001`. |
 | `x_lampiran_catat(p_aktor bigint, p_task text, p_comment text, p_path text, p_title text, p_mime text, p_size bigint)` | Untuk Edge `POST /v2/task/{id}/attachment` (scope `tulis`): catat baris lampiran setelah berkas ada di Storage. Logika bersama `inti_lampiran_catat` dengan `web_lampiran_catat` (§6); mode cermin & atribusi pengunggah via trigger; idempoten per `storage_path`. Hasil = lampiran web. |
 | `x_rawat_lampiran(p_aktor bigint, p_hari int default null, p_dry boolean default false)` | Untuk Edge `POST /x/rawat/lampiran` (scope `impor`, **owner/bot**). Soft-delete lampiran `sumber=app` pada kartu `sumber=app` yang `status_type in (done,closed)` dan `greatest(done_at,closed_at) < now() − N hari`. `N` = `p_hari`, atau `app_settings.rawat_lampiran.hari` (default 7); `aktif=false` → `{"dilewati":true,…}`. Kembalikan `{"hari","dihapus","dry","storage_paths":[…]}` (Edge yang menghapus berkas fisiknya). `p_dry` → hanya daftar. Trigger mencatat activity `lampiran_hapus`. Bukan owner/bot → `PT403 ACCESS_001`. Rincian di bawah tabel. |
+| `x_pipeline_sumber_bukti_set(p_aktor bigint, p jsonb)` | Untuk Edge `POST /x/pipeline/sumber-bukti` (scope `tulis`, aktor owner/bot/admin Pipeline): bukti sumber lead dari chat WA ke kolom `lead.sumber_bukti*`, tanpa menyentuh `sumber`. Maks 200 item, semua-atau-tidak, idempoten. Rincian §11. |
 
 **`x_search`: pencocokan dan urutan**
 - Cocok dengan ID atau `clickup_id`, URL (`app.clickup.com/t/<id>`, `/t/<team>/<id>`, `<app>/t/<id>`), kode di awal nama (`Y7`, `FX-PM`, `[Claude]`), `name ILIKE`, markdown/teks, atau full-text.
@@ -568,3 +569,74 @@ Pembantu privasi yang dipakai policy RLS/Storage dan bisa dipanggil `authenticat
 | P6 | URL tampilan ClickUp (`/v/l/6-<list>-1`, `/v/b/…`) tidak dikenali | `rujukan_urai` (pengurai bersama) + `rujukan_wadah`; `x_resolve`, `cari_tugas`, `web_cari.rujukan` | `16_poles.sql` P6, kontrak `resolve`/`search` |
 
 Hak: `rujukan_urai`, `rujukan_wadah`, `muat_space_anggota`, `list_diarsip` internal (tanpa EXECUTE role API). Jumlah fungsi publik tetap 29 service_role + 33 authenticated.
+
+## 11. Pipeline: bukti sumber lead dari chat WA (21 Okt 2026)
+
+Migrasi `20261021120000_pipeline_sumber_bukti.sql`, tes `uji/db/30_pipeline_sumber_bukti.sql` (Kapso Fase 1, ACC Hannes 21 Okt).
+Routine agent membaca chat WA 0878 lewat Kapso (baca saja) dengan pola tetap tanpa AI (`tools/kapso-catat.py` rhj-brain)
+lalu menulis BUKTI asal lead. `lead.sumber` (isian sales) tidak pernah disentuh; laporan membandingkan keduanya.
+
+**Kolom `lead`** (nullable, default null; lead tanpa bukti = keempatnya null)
+
+| Kolom | Isi |
+|---|---|
+| `sumber_bukti` | kelas bukti, allowlist `pipeline_sumber_bukti_kelas()` (CHECK `lead_sumber_bukti_sah`) |
+| `sumber_bukti_kode` | kode mentah `^[A-Z0-9-]{2,20}$` (CHECK `lead_sumber_bukti_kode_pola`), mis. `GA-OY-7K3F`, `PM-06` |
+| `sumber_bukti_chat_pada` | waktu pesan pertama pelanggan di chat itu |
+| `sumber_bukti_diisi_pada` | diisi fungsi (`now()`) saat nilainya berubah |
+
+CHECK `lead_sumber_bukti_konsisten`: tanpa kelas → keempatnya null; ada kelas → `diisi_pada` terisi.
+
+**Kelas** (satu tempat: `public.pipeline_sumber_bukti_kelas()`; label web `BUKTI_SUMBER` di `web/src/features/pipeline/konstanta.ts`)
+
+| Kelas | Bukti di chat | `kode` |
+|---|---|---|
+| `situs-rh` / `situs-oy` | template form situs rodahammerindo.com / palletmeshindonesia.com (OYAMA), tanpa Ref | — |
+| `web-rh` / `web-oy` | `Ref: WEB-RH` / `Ref: WEB-OY` (tombol WA situs) | diawali nama kelas, mis. `WEB-RH` |
+| `ga-rh` / `ga-oy` | `Ref: GA-RH-…` / `Ref: GA-OY-…` (situs dari Google Ads) | lengkap, mis. `GA-OY-7K3F` |
+| `meta` | `Ref PM-xx` / `Ref RD-xx` (iklan Meta) | `PM-…` / `RD-…`, mis. `PM-06` |
+| `lastri` | pesan pertama "Halo Bu Lastri" | — |
+| `katalog-wa` | chat dibuka dari produk katalog WhatsApp | — |
+| `xs-pm` / `tidur` | kode XS-PM / TIDUR (huruf besar atau utm_campaign) | — |
+| `tanpa-sinyal` | chat ketemu, tanpa bukti apa pun | wajib kosong |
+
+Menambah kelas = ubah fungsi itu (superset; jangan buang kelas yang terpakai) + label web.
+
+**`x_pipeline_sumber_bukti_set(p_aktor bigint, p jsonb)`**: Edge `POST /x/pipeline/sumber-bukti`, CLI
+`pipeline bukti-set --file <items.json> [--dry-run]` (dry-run tanpa request).
+- `mulai_api(p_aktor, 'api', 'tulis')` → scope `tulis`. Aktor wajib peran Pipeline `admin` (owner, bot routine, atau
+  `pipeline_akses.peran = 'admin'`); rep/baca/tanpa akses → `PT403 ACCESS_001`. Tidak ada `web_*`: sales tidak mengisi bukti.
+- Body `{"items":[{"lead_id","bukti","kode"?,"chat_pada"?}]}`, maks 200 item. Kunci lain di tingkat atas maupun item → `PT400`
+  (salah ketik tidak diabaikan diam-diam).
+- `bukti`: kelas, atau `null` = hapus bukti lead itu. `kode`: null atau teks, dirapikan (trim + huruf besar) lalu wajib
+  `^[A-Z0-9-]{2,20}$`; `web-*`/`ga-*` wajib diawali nama kelasnya, `meta` wajib `PM-`/`RD-`, `tanpa-sinyal` dan `null` wajib
+  tanpa kode. `chat_pada`: null atau ISO **dengan zona** (`Z` / `+07:00`; tanpa zona ditolak supaya tidak bergeser 7 jam),
+  tidak di masa depan (toleransi 5 menit).
+- Item = keadaan bukti LENGKAP lead itu, bukan tambalan. Sama dengan yang tersimpan (waktu dibandingkan sebagai instan) →
+  tidak ditulis (`diubah:false`, `diisi_pada` tetap); beda → keempat kolom ditimpa, `diisi_pada = now()`.
+- Semua-atau-tidak: satu item tidak sah (`PT400 INPUT_001`; lead tak ada `PT404 ITEM_013`; `lead_id` ganda `PT400`) →
+  seluruh panggilan gagal dan tidak ada yang ditulis; pesan menyebut `items[i] (lead_id)`. Karena idempoten, kirim ulang
+  sesudah diperbaiki aman.
+- Hasil (urutan = `items`):
+  `{"diproses":2,"diubah":1,"sama":1,"items":[{"lead_id":"ld…","ok":true,"diubah":true},{"lead_id":"ld…","ok":true,"diubah":false}]}`.
+- Tidak menyentuh kolom lain: `sumber`, `diam_sejak`, `fu_berikutnya`, juga `diperbarui_pada` (dikembalikan trigger).
+  **Tidak dicatat ke `lead_aktivitas`**: itu riwayat yang dilihat sales di detail lead, dan trigger
+  `pipeline_aktivitas_sesudah` menggeser `diam_sejak` serta menimpa `fu_berikutnya`, jadi satu run (sampai 200 lead) akan
+  membuat lead tampak baru di-follow-up. Jejaknya `sumber_bukti_diisi_pada`; penulisnya selalu token agent.
+
+**Jalur lain tidak bisa mengubah kolom bukti**
+- Tabel `lead` hanya SELECT untuk authenticated/service_role (`20261013121000_pipeline_hak_ketat`). Jalur tulis web dan alat
+  impor memakai daftar kolom eksplisit, jadi kunci `sumber_bukti*` di payload `web_pipeline_lead_buat` / `_lead_ubah` /
+  `_tahap` / `_fu_catat` / `_order_ubah` diabaikan.
+- Trigger `pipeline_lead_sumber_bukti` (BEFORE INSERT/UPDATE, sesudah `pipeline_lead_sebelum`): INSERT berisi bukti atau UPDATE
+  yang mengubah bukti tanpa penanda `app.sumber_bukti_tulis = 'ya'` → `PT403 ACCESS_001`. Penanda dinyalakan fungsi tulis di
+  sekitar UPDATE-nya saja (lokal transaksi). Berlaku juga untuk SQL manual sebagai postgres; koreksi manual:
+  `select set_config('app.sumber_bukti_tulis', 'ya', true);` di transaksi yang sama.
+
+**Baca**: `j_pipeline_lead` (detail: `web_pipeline_lead`, `x_pipeline_lead`, hasil mutasi lead) dan baris ringkas
+(`j_pipeline_lead_ringkas` + `_banyak`: `web_pipeline_daftar`, `x_pipeline_daftar`) menambah `sumber_bukti`,
+`sumber_bukti_kode`, `sumber_bukti_chat_pada`, `sumber_bukti_diisi_pada` (waktu ISO UTC). Field lain tidak berubah.
+Tidak disamarkan untuk peran `baca`. Web: baris hanya-baca "Bukti sumber (agent): …" di bawah Sumber pada detail lead.
+
+Hak: `x_pipeline_sumber_bukti_set` → service_role; `inti_pipeline_sumber_bukti_set`, `pipeline_sumber_bukti_kelas`,
+`pipeline_lead_sumber_bukti` internal. Fungsi `api_/x_/impor_` kini 36 (tes 09).
