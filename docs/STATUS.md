@@ -371,6 +371,14 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   menahan merge. Deploy Hostinger (Git) tidak terpengaruh. Hemat kuota (`web.yml`): build-hostinger & e2e hanya di PR /
   manual (tidak diulang saat push ke main), perubahan `.md` saja tidak memicu workflow. Satu run PR penuh ±13 menit.
 - **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md` — **wajib pakai alat impor versi berpenjaga (14 Okt, sesudah Batal order)**; versi lama mengembalikan order yang dibatalkan di Anvil ke ORDER.
+- **Sumber "Instagram/TikTok organik" (21 Okt, permintaan Hannes, branch `claude/sumber-igtt`, migrasi
+  `20261021140000_pipeline_sumber_igtt`).** Pilihan Sumber lead ke-9 untuk chat dari akun organik Instagram/TikTok Bu
+  Lastri (link bio WA, sapaan "Halo Bu Lastri"); iklan Instagram/Facebook tetap "Meta Ads". CHECK `lead.sumber`
+  (`lead_sumber_check`) diganti superset, tanpa ubah data/fungsi; chip baru sesudah "Website organik", teks bantu Sumber
+  menyebutnya; `SumberLead` & `SUMBER_SAH` alat impor ikut. Tes: `uji/db/31_pipeline_sumber_igtt.sql` (20 cek; gagal
+  tanpa migrasi), vitest `features/pipeline/sumber.test.ts` (web = CHECK migrasi = alat impor), e2e
+  `pipeline-sumber-igtt.spec.ts`. **Terapkan migrasi ke produksi SEBELUM merge** (tanpa migrasi, memilih chip baru →
+  galat 23514 saat simpan).
 
 ## Notifikasi "Dari tim" / "Dari agent" (revisi #2, 13 Okt 2026, branch `rev2-notif`)
 

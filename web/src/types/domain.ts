@@ -359,8 +359,8 @@ export type HasilPurgeEdge = HasilPurge & { storage_dihapus?: string[]; storage_
 export type PeranPipeline = "admin" | "rep" | "baca";
 export type TahapLead = "BARU" | "PENAWARAN" | "ORDER" | "BATAL" | "DIALIHKAN";
 export type SumberLead =
-  | "Google Ads" | "Meta Ads" | "Website organik" | "WA langsung"
-  | "Telepon" | "Referral" | "Repeat order" | "Lainnya";
+  | "Google Ads" | "Meta Ads" | "Website organik" | "Instagram/TikTok organik"
+  | "WA langsung" | "Telepon" | "Referral" | "Repeat order" | "Lainnya";
 export type ProdukLead =
   | "Roda" | "Pallet Mesh" | "Airport Trolley" | "Shopping Cart"
   | "Lemari Arsip" | "Material Handling" | "Locker" | "Lainnya";

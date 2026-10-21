@@ -23,9 +23,13 @@ export const PRODUK: ProdukLead[] = [
   "Lemari Arsip", "Material Handling", "Locker", "Lainnya",
 ];
 
+/**
+ * Urutan tampil chip Sumber. Kanal digital berkelompok: iklan (Google/Meta) lalu organik (website, IG/TikTok).
+ * Daftar = CHECK lead.sumber (20261021140000_pipeline_sumber_igtt) = SumberLead = SUMBER_SAH alat/impor-pipeline.mjs.
+ */
 export const SUMBER: SumberLead[] = [
-  "Google Ads", "Meta Ads", "Website organik", "WA langsung",
-  "Telepon", "Referral", "Repeat order", "Lainnya",
+  "Google Ads", "Meta Ads", "Website organik", "Instagram/TikTok organik",
+  "WA langsung", "Telepon", "Referral", "Repeat order", "Lainnya",
 ];
 
 /**
@@ -33,7 +37,7 @@ export const SUMBER: SumberLead[] = [
  * dan 0 "Google Ads" walau iklan Google ±8 konversi/hari — rep mengisi MEDIA chat, bukan ASAL pelanggan.
  */
 export const BANTU_SUMBER =
-  "Tanya pelanggan: dapat kontak kami dari mana? Pilih ASALNYA (Google = Google Ads/Website organik, Instagram/Facebook = Meta Ads). 'WA langsung' hanya bila pelanggan sudah menyimpan nomor kita sebelumnya.";
+  "Tanya pelanggan: dapat kontak kami dari mana? Pilih ASALNYA (Google = Google Ads/Website organik, iklan Instagram/Facebook = Meta Ads, akun Instagram/TikTok Bu Lastri atau sapaan \"Halo Bu Lastri\" = Instagram/TikTok organik). 'WA langsung' hanya bila pelanggan sudah menyimpan nomor kita sebelumnya.";
 
 export const SATUAN: SatuanItem[] = ["unit", "set", "pcs"];
 
