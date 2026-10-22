@@ -513,6 +513,25 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   GAGAL terhadap kode sebelum perbaikan. Typecheck, lint, vitest 89, build produksi hijau; e2e penuh terhadap
   `next start` + Supabase lokal: **100 lulus, 14 dilewati sengaja**.
 
+## Pratinjau lampiran (22 Okt 2026, permintaan Hannes "attachment bisa di-preview dulu sebelum download")
+- Tombol **Lihat** (ikon mata) di tiap lampiran, juga ketuk thumbnail/nama berkas → lembar pratinjau
+  (`features/lampiran/lembar-pratinjau.tsx`; berlaku di lampiran tugas & komentar). Kaki lembar: Buka di tab baru (gambar,
+  TXT, PDF desktop) + Unduh. Signed URL tanpa `download` → browser menampilkan, tidak mengunduh.
+  - Gambar (PNG/JPG/WEBP/GIF; HEIC hanya di Safari, selain itu pesan + Unduh): tampil penuh.
+  - PDF: desktop berpenunjuk mouse → `<iframe>` (CSP baru `frame-src 'self' <Supabase>` di `proxy.ts`; bucket menolak
+    HTML/SVG). Layar sentuh → tombol **Buka PDF** di penampil PDF bawaan HP (Chrome Android baru punya penampil PDF
+    bawaan sejak 2025, tetapi `<iframe>` PDF di HP tidak andal).
+  - DOCX: `mammoth` 1.13.0 (build browser, ±400 KB, dimuat malas hanya saat pratinjau DOCX) → HTML → DOMPurify
+    (`htmlAmanDokumen` di `lib/markdown.ts`, saringan sama dengan markdown).
+  - CSV/TSV → tabel (pemisah `;`/`,`/tab ditebak, kutip RFC 4180, BOM Excel; maks. 200 baris tampil); TXT → teks.
+    Berkas teks > 2 MB tidak dipratinjau.
+  - DOC/XLS/XLSX/PPTX: "Pratinjau belum tersedia" + Unduh (produksi 22 Okt: 0 berkas jenis ini).
+- Produksi 22 Okt: 361 lampiran: PNG 178, PDF 104, DOCX 38, CSV 21, TXT 13, JPEG 6 (semua bisa dipratinjau).
+- Ikut diperbaiki: baris lampiran bisa melebar keluar layar HP (item grid tanpa `min-w-0`; nama berkas panjang tidak
+  terpotong) → kini terpotong "…".
+- Tes: unit `features/lampiran/pratinjau.test.ts`; e2e `tests/e2e/lampiran-pratinjau.spec.ts` (unggah 7 berkas, buka
+  tiap pratinjau, PDF desktop termuat 200 `application/pdf` tanpa `attachment`, tanpa galat CSP, tanpa gulir samping HP).
+
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)
 Prasyarat dari Hannes: project Supabase baru `rhj-tugas` (akun/org baru, Sydney `ap-southeast-2` per keputusan 30/9, Free); env cloud `SUPABASE_ACCESS_TOKEN` (PAT akun baru) + `SUPABASE_PROJECT_REF`; `CLICKUP_API_TOKEN` (sudah ada); sesi baru supaya env terbaca. Semua langkah ke ClickUp **GET saja**. Tidak memakai MCP Supabase (itu ERP).
 

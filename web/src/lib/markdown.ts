@@ -1,7 +1,7 @@
 "use client";
 
 // Markdown → HTML aman: markdown-it (html:false) lalu DOMPurify. Satu-satunya jalur HTML mentah di aplikasi
-// (dipakai komponen <Markdown>), sama dengan web lama (md.js).
+// (dipakai komponen <Markdown>, juga pratinjau DOCX lewat htmlAmanDokumen), sama dengan web lama (md.js).
 import DOMPurify from "dompurify";
 import MarkdownIt from "markdown-it";
 
@@ -33,4 +33,13 @@ const OPSI = {
 export function htmlAman(teks: string | null | undefined): string {
   pasangKait();
   return DOMPurify.sanitize(md.render(teks || ""), OPSI) as string;
+}
+
+/**
+ * HTML dari dokumen (pratinjau DOCX lewat mammoth) → HTML aman, dengan saringan yang sama. Gambar di dalam dokumen
+ * berupa data:image/… (DOMPurify mengizinkan data URI hanya di img src).
+ */
+export function htmlAmanDokumen(html: string): string {
+  pasangKait();
+  return DOMPurify.sanitize(html, OPSI) as string;
 }
