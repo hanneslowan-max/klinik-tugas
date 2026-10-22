@@ -1,9 +1,10 @@
 "use client";
 
 // Daftar lampiran (tugas & komentar) + bagian "Lampiran" di detail tugas (unggah banyak berkas sekaligus).
-// Gambar dipratinjau lewat signed URL; unduh memakai signed URL ber-Content-Disposition (nama asli berkas).
+// Thumbnail gambar lewat signed URL; Lihat (atau ketuk nama berkas) membuka pratinjau (lembar-pratinjau.tsx); unduh
+// memakai signed URL ber-Content-Disposition (nama asli berkas).
 import { useQueryClient } from "@tanstack/react-query";
-import { Download, ExternalLink, Paperclip, Trash2 } from "lucide-react";
+import { Download, Eye, ExternalLink, Paperclip, Trash2 } from "lucide-react";
 import { useId, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import { toast } from "sonner";
 
@@ -11,6 +12,7 @@ import { useKonfirmasi } from "@/components/umum/konfirmasi";
 import { Button } from "@/components/ui/button";
 import { useProfil } from "@/features/profil/penyedia-profil";
 import { SEGAR_URL, kunciUrlLampiran, unggahLampiran, urlLampiran, useUrlLampiran } from "@/features/lampiran/api";
+import { LembarPratinjau } from "@/features/lampiran/lembar-pratinjau";
 import { pesanGalat } from "@/lib/api/galat";
 import { rpc } from "@/lib/api/rpc";
 import { ACCEPT_LAMPIRAN } from "@/lib/konstanta";
@@ -49,6 +51,7 @@ function ItemLampiran({ a, bolehHapus, onHapus }: { a: Lampiran; bolehHapus: boo
   const { hariIni } = useProfil();
   const qc = useQueryClient();
   const unduh = useUrlLampiran(a, true);
+  const [lihat, setLihat] = useState(false);
   const tautanCu = a.storage_path ? null : urlAman(a.clickup_url);
   const judul = a.title || "(tanpa nama)";
   const sub = [
@@ -77,34 +80,63 @@ function ItemLampiran({ a, bolehHapus, onHapus }: { a: Lampiran; bolehHapus: boo
     }
   }
 
-  return (
-    <li className="flex min-h-14 items-center gap-2.5 rounded-xl border bg-card p-2" data-lampiran={a.id}>
+  // labelSelalu: di kaki lembar pratinjau teks "Unduh" tetap tampil di HP (di baris cukup ikon)
+  const tombolUnduh = (labelSelalu = false) => (
+    <Button asChild variant="outline" size={labelSelalu ? "default" : "sm"} className="pointer-coarse:min-w-11">
+      <a
+        href={unduh.data ?? "#"}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={`Unduh ${judul}`}
+        data-uji="unduh-lampiran"
+        onClick={klikUnduh}
+      >
+        <Download aria-hidden />
+        <span className={labelSelalu ? undefined : "max-sm:sr-only"}>Unduh</span>
+      </a>
+    </Button>
+  );
+  const info = (
+    <>
       <JenisLampiran a={a} />
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium" title={judul}>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium" title={judul}>
           {judul}
-        </div>
+        </span>
         {/* sub memuat waktu relatif (bergantung jam saat render: HTML server vs hidrasi) */}
         {sub ? (
-          <div className="text-xs text-muted-foreground" suppressHydrationWarning>
+          <span className="block text-xs text-muted-foreground" suppressHydrationWarning>
             {sub}
-          </div>
+          </span>
         ) : null}
-      </div>
+      </span>
+    </>
+  );
+
+  return (
+    <li className="flex min-h-14 min-w-0 items-center gap-2.5 rounded-xl border bg-card p-2" data-lampiran={a.id}>
       {a.storage_path ? (
-        <Button asChild variant="outline" size="sm" className="pointer-coarse:min-w-11">
-          <a
-            href={unduh.data ?? "#"}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={`Unduh ${judul}`}
-            data-uji="unduh-lampiran"
-            onClick={klikUnduh}
-          >
-            <Download aria-hidden />
-            <span className="max-sm:sr-only">Unduh</span>
-          </a>
-        </Button>
+        // ketuk thumbnail / nama = pratinjau (sama dengan tombol Lihat)
+        <button
+          type="button"
+          onClick={() => setLihat(true)}
+          aria-label={`Lihat ${judul}`}
+          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          {info}
+        </button>
+      ) : (
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">{info}</div>
+      )}
+      {a.storage_path ? (
+        <>
+          <Button variant="outline" size="sm" className="pointer-coarse:min-w-11" onClick={() => setLihat(true)} data-uji="lihat-lampiran">
+            <Eye aria-hidden />
+            <span className="max-sm:sr-only">Lihat</span>
+          </Button>
+          {tombolUnduh()}
+          <LembarPratinjau a={a} buka={lihat} ubahBuka={setLihat} unduh={tombolUnduh(true)} />
+        </>
       ) : null}
       {tautanCu ? (
         <Button asChild variant="outline" size="sm" className="pointer-coarse:min-w-11">

@@ -4,7 +4,7 @@
 // Batalkan order / Ubah), riwayat pelanggan (order & lead lain pelanggan yang sama → repeat order, tautan ke log
 // lengkap di /pipeline/pelanggan/[id]), dan log gabungan aktivitas + riwayat tahap. 'baca' (Yosie) melihat tanpa
 // telepon/PIC & tanpa tombol tulis (§6). Order yang dibatalkan (BATAL, alasan "Order dibatalkan") tetap menampilkan data
-// ordernya (riwayat).
+// ordernya (riwayat). Di bawah Sumber: bukti sumber dari chat WA (diisi agent, hanya-baca; semua peran melihatnya).
 import { ArrowRightLeft, FileText, Hand, Pencil, PhoneCall, ReceiptText, ShoppingCart, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
@@ -23,7 +23,7 @@ import { DialogOrder } from "@/features/pipeline/dialog-order";
 import { DialogTahap, type AksiTahap } from "@/features/pipeline/dialog-tahap";
 import { DialogUbah } from "@/features/pipeline/dialog-ubah";
 import { GerbangPipeline, type AksesPipeline } from "@/features/pipeline/gerbang";
-import { ALASAN_BATAL_ORDER, BAYAR, BAYAR_BELUM_DICATAT, rupiah } from "@/features/pipeline/konstanta";
+import { ALASAN_BATAL_ORDER, BAYAR, BAYAR_BELUM_DICATAT, rupiah, teksBuktiSumber } from "@/features/pipeline/konstanta";
 import { PilTahap } from "@/features/pipeline/pil-tahap";
 import { RiwayatPelanggan } from "@/features/pipeline/riwayat-pelanggan";
 import { useLeadUbah } from "@/features/pipeline/mutasi";
@@ -130,7 +130,10 @@ function IsiDetail({ lead, akses }: { lead: LeadDetail; akses: AksesPipeline }) 
             <span className="text-muted-foreground"> sejak {fmtTanggal(lead.tanggal_penawaran)}</span>
           ) : null}
         </Baris>
-        <Baris dt="Sumber">{lead.sumber}</Baris>
+        <Baris dt="Sumber">
+          {lead.sumber}
+          <BuktiSumber lead={lead} />
+        </Baris>
         <Baris dt="Masuk">{fmtTanggal(lead.tanggal_masuk)}</Baris>
         <Baris dt="Pemilik">{lead.pemilik_nama || <span className="text-muted-foreground">tanpa pemilik</span>}</Baris>
         {lead.nilai_penawaran != null ? <Baris dt="Penawaran">{rupiah(lead.nilai_penawaran)}</Baris> : null}
@@ -264,6 +267,24 @@ function IsiDetail({ lead, akses }: { lead: LeadDetail; akses: AksesPipeline }) 
         </>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Bukti sumber dari chat WA 0878 (agent, x_pipeline_sumber_bukti_set): baris kecil hanya-baca di bawah Sumber isian sales.
+ * Tidak tampil bila belum ada bukti. Boleh berbeda dengan Sumber; laporan membandingkan keduanya.
+ */
+function BuktiSumber({ lead }: { lead: LeadDetail }) {
+  const teks = teksBuktiSumber(lead);
+  if (!teks) return null;
+  return (
+    <p
+      className="text-xs text-muted-foreground break-words"
+      data-uji="detail-bukti-sumber"
+      title={lead.sumber_bukti_diisi_pada ? `Dari chat WA, dicatat agent ${fmtWaktu(lead.sumber_bukti_diisi_pada)}` : undefined}
+    >
+      Bukti sumber (agent): {teks}
+    </p>
   );
 }
 

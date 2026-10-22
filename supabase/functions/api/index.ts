@@ -678,11 +678,17 @@ const RUTE: Rute[] = [
     },
   },
   { m: "GET", p: /^\/x\/export$/, perlu: "impor", h: (c) => rpc("x_export", { p_aktor: A(c) }, T(c)) },
-  // ---- Pipeline. Baca (scope baca) untuk routine/agent. Satu-satunya tulis: fu (set rencana FU; scope tulis),
-  // dipakai routine Arahan Pipeline untuk menandai lead yang harus di-follow-up (tab "Follow up hari ini").
+  // ---- Pipeline. Baca (scope baca) untuk routine/agent. Tulis (scope tulis): fu (set rencana FU) dipakai routine
+  // Arahan Pipeline untuk menandai lead yang harus di-follow-up (tab "Follow up hari ini"); sumber-bukti (bukti asal
+  // lead dari chat WA 0878, Kapso) dipakai routine agent — TIDAK menyentuh `sumber` isian sales, hanya kolom
+  // sumber_bukti*. Body {items:[{lead_id, bukti, kode?, chat_pada?}]} maks 200; aktor wajib owner/bot/admin Pipeline.
   {
     m: "POST", p: /^\/x\/pipeline\/fu$/, perlu: "tulis",
     h: async (c) => rpc("x_pipeline_fu_set", { p_aktor: A(c), p: await c.body() }, T(c)),
+  },
+  {
+    m: "POST", p: /^\/x\/pipeline\/sumber-bukti$/, perlu: "tulis",
+    h: async (c) => rpc("x_pipeline_sumber_bukti_set", { p_aktor: A(c), p: await c.body() }, T(c)),
   },
   {
     m: "GET", p: /^\/x\/pipeline\/leads$/, perlu: "baca",

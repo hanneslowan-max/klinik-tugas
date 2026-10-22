@@ -365,13 +365,55 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   daftar memuat semua pemilik (admin/baca, atau rep di "Semua"); rep di "Lead saya" sudah disaring server (`?m=`), dan
   pindah ke "Lead saya" membuang `sales`. Disaring di web; tanpa perubahan DB. Produksi 19 Okt: Michael Eppy 705 lead,
   Riksa Sri Gustiana 528, tanpa pemilik 842.
+- **Sumber "Instagram/TikTok organik" (21 Okt, permintaan Hannes, branch `claude/sumber-igtt`, migrasi
+  `20261021140000_pipeline_sumber_igtt`).** Pilihan Sumber lead ke-9 untuk chat dari akun organik Instagram/TikTok Bu
+  Lastri (link bio WA, sapaan "Halo Bu Lastri"); iklan Instagram/Facebook tetap "Meta Ads". CHECK `lead.sumber`
+  (`lead_sumber_check`) diganti superset, tanpa ubah data/fungsi; chip baru sesudah "Website organik", teks bantu Sumber
+  menyebutnya; `SumberLead` & `SUMBER_SAH` alat impor ikut. Tes: `uji/db/31_pipeline_sumber_igtt.sql` (20 cek; gagal
+  tanpa migrasi), vitest `features/pipeline/sumber.test.ts` (web = CHECK migrasi = alat impor), e2e
+  `pipeline-sumber-igtt.spec.ts`. **Terapkan migrasi ke produksi SEBELUM merge** (tanpa migrasi, memilih chip baru →
+  galat 23514 saat simpan).
 - **Kuota GitHub Actions habis (19 Okt):** 2.000 menit/bulan akun `hanneslowan-max` terpakai 100% (email GitHub 11:19
   WIB; budget $0 → job tidak diberi runner, gagal ±4 dtk tanpa log). Reset 1 Nov 2026. Keputusan Hannes: sampai reset,
   **gerbang merge = verifikasi lokal** di sesi (lint, typecheck, vitest, build produksi, e2e lengkap HP+desktop terhadap
   `next start` + Supabase lokal, dan build tiruan Hostinger di container `almalinux:8`); CI merah karena kuota tidak
   menahan merge. Deploy Hostinger (Git) tidak terpengaruh. Hemat kuota (`web.yml`): build-hostinger & e2e hanya di PR /
   manual (tidak diulang saat push ke main), perubahan `.md` saja tidak memicu workflow. Satu run PR penuh ±13 menit.
+- **Jadwal FU otomatis +2 hari kerja (20 Okt, IMP-PIP-261015-1, ACC Hannes, branch `claude/fu-otomatis-2hk`, migrasi
+  `20261020120000_pipeline_fu_otomatis`).** Data 18 Okt: Riksa 0 dari 23 lead aktif punya `fu_berikutnya` (FU dicatat
+  tanpa "Rencana berikutnya"). Kini `inti_pipeline_fu_catat` (tombol Catat FU → `web_pipeline_fu_catat`): rencana DIISI
+  → dipakai apa adanya (manual menang, juga di lead tertutup); KOSONG dan lead BARU/PENAWARAN → `hari_ini_wib()` + 2 hari
+  kerja (pembantu internal baru `pipeline_tambah_hari_kerja`: Senin–Jumat, bukan `hari_libur`, sama dengan definisi
+  `hari_kerja`); KOSONG dan lead ORDER/BATAL/DIALIHKAN → tetap kosong. Tanggal otomatis tersimpan di
+  `lead_aktivitas.rencana_berikutnya` (riwayat menampilkannya), trigger `pipeline_aktivitas_sesudah` tidak diubah (impor,
+  catatan "Data order diubah", "Order dibatalkan", `fu_set` massal tidak terpengaruh). Web: teks bantu di bawah kolom
+  Rencana berikutnya + toast "Follow-up tercatat · FU berikutnya <tgl>". Tes: `uji/db/29_pipeline_fu_otomatis.sql`
+  (26 cek; gagal pada fungsi lama, lulus dengan), e2e `web/tests/e2e/pipeline-fu-otomatis.spec.ts`. Verifikasi lokal
+  20 Okt dari `supabase db reset`: `uji/db` **29/29 berkas, 1.535 cek**; vitest 119; typecheck, lint, build hijau; e2e
+  penuh `next start`: **148 lulus, 14 dilewati sengaja**. **Terapkan migrasi ke produksi SEBELUM/bersamaan merge** (tanpa
+  migrasi, dialog web tetap jalan tetapi jadwal tidak terisi otomatis). Tidak mengisi mundur lead lama: lead aktif
+  tanpa jadwal baru terjadwal saat FU berikutnya dicatat (atau lewat `fu_set` massal).
 - **Belum:** hari pindah (sheet dikunci, routine rhj-brain beralih lewat `routines/cloud/PIPELINE-SUMBER.md`). Urutan: rhj-brain `deliverables/pipeline-anvil/HARI-PINDAH.md`. Impor ulang di hari pindah: `docs/IMPOR-PIPELINE.md` — **wajib pakai alat impor versi berpenjaga (14 Okt, sesudah Batal order)**; versi lama mengembalikan order yang dibatalkan di Anvil ke ORDER.
+- **Bukti sumber lead dari chat WA (21 Okt, Kapso Fase 1, ACC Hannes, branch `claude/fase-1-kapso-sg6o0q`, migrasi
+  `20261021120000_pipeline_sumber_bukti`).** Chat WA 0878 kini terbaca lewat Kapso (baca saja); routine agent mencari bukti
+  asal lead dengan pola tetap tanpa AI (template form situs, Ref WEB/GA-RH/OY, Ref PM/RD, XS-PM/TIDUR, "Halo Bu Lastri",
+  katalog WA). Label `sumber` sales tidak bisa dipegang (contoh: 28 lead form situs berlabel "WA langsung"), tetapi agent
+  TIDAK menimpanya: bukti ditulis ke 4 kolom baru `lead.sumber_bukti` (kelas, allowlist `pipeline_sumber_bukti_kelas()`),
+  `_kode` (mis. `GA-OY-7K3F`), `_chat_pada`, `_diisi_pada`, satu-satunya lewat `x_pipeline_sumber_bukti_set` (Edge
+  `POST /x/pipeline/sumber-bukti`, scope tulis, aktor owner/bot/admin Pipeline; CLI `pipeline bukti-set --file <items.json>
+  [--dry-run]`, juga di salinan `tools/tugas.mjs` rhj-brain). Maks 200 item, semua-atau-tidak, idempoten; tidak dicatat ke
+  riwayat lead (`lead_aktivitas` menggeser diam & menimpa rencana FU). Jalur web/sales tidak bisa mengubah kolom bukti
+  (payload diabaikan, tabel SELECT saja, penjaga trigger `pipeline_lead_sumber_bukti` → PT403). Detail & daftar lead
+  (web dan `/x`) memuat 4 field; detail web menampilkan baris hanya-baca "Bukti sumber (agent): Form situs RH · chat …" di
+  bawah Sumber. Kontrak: `docs/KONTRAK-DB.md` §11. Tes: `uji/db/30_pipeline_sumber_bukti.sql` (100 cek; dinomori 30 karena
+  29 dipakai PR #22), 09 (`api_/x_/impor_` 35 → 36), unit `web/src/features/pipeline/bukti-sumber.test.ts`, e2e
+  `web/tests/e2e/pipeline-bukti-sumber.spec.ts`. Verifikasi lokal 21 Okt dari `supabase db reset` (CLI 2.120.0): `uji/db`
+  **29/29 berkas, 1.609 cek**; kontrak API lokal 492 lulus, 1 gagal (snapshot `clickup.mjs` rhj-brain sudah bergeser, tidak
+  terkait); vitest 124; typecheck, lint, build hijau; e2e penuh `next start`: **148 lulus, 14 dilewati sengaja**; gabungan
+  uji dengan PR #22: lihat catatan PR.
+  **Hannes: terapkan migrasi ke produksi lalu merge** (web baru di DB lama: baris bukti tidak tampil, tanpa galat; route &
+  CLI `bukti-set` galat sampai migrasi terpasang). Tidak bergantung pada PR #22 (`20261020120000_pipeline_fu_otomatis`);
+  urutan merge bebas.
 
 ## Notifikasi "Dari tim" / "Dari agent" (revisi #2, 13 Okt 2026, branch `rev2-notif`)
 
@@ -501,6 +543,25 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
   kontainer edge lokal (kontrak, 2×); di putaran web, Chromium sendiri membuka koneksi latar (DNS, `mtalk.google.com`),
   bukan request uji. Catatan: `uji/db/13_web.sql` gagal bila dijalankan SESUDAH suite kontrak (lampiran tugas seed
   `rtujib0003` berubah); sudah begitu sebelum perubahan ini, urutan baku (`uji/db` dulu) lulus.
+
+## Pratinjau lampiran (22 Okt 2026, permintaan Hannes "attachment bisa di-preview dulu sebelum download")
+- Tombol **Lihat** (ikon mata) di tiap lampiran, juga ketuk thumbnail/nama berkas → lembar pratinjau
+  (`features/lampiran/lembar-pratinjau.tsx`; berlaku di lampiran tugas & komentar). Kaki lembar: Buka di tab baru (gambar,
+  TXT, PDF desktop) + Unduh. Signed URL tanpa `download` → browser menampilkan, tidak mengunduh.
+  - Gambar (PNG/JPG/WEBP/GIF; HEIC hanya di Safari, selain itu pesan + Unduh): tampil penuh.
+  - PDF: desktop berpenunjuk mouse → `<iframe>` (CSP baru `frame-src 'self' <Supabase>` di `proxy.ts`; bucket menolak
+    HTML/SVG). Layar sentuh → tombol **Buka PDF** di penampil PDF bawaan HP (Chrome Android baru punya penampil PDF
+    bawaan sejak 2025, tetapi `<iframe>` PDF di HP tidak andal).
+  - DOCX: `mammoth` 1.13.0 (build browser, ±400 KB, dimuat malas hanya saat pratinjau DOCX) → HTML → DOMPurify
+    (`htmlAmanDokumen` di `lib/markdown.ts`, saringan sama dengan markdown).
+  - CSV/TSV → tabel (pemisah `;`/`,`/tab ditebak, kutip RFC 4180, BOM Excel; maks. 200 baris tampil); TXT → teks.
+    Berkas teks > 2 MB tidak dipratinjau.
+  - DOC/XLS/XLSX/PPTX: "Pratinjau belum tersedia" + Unduh (produksi 22 Okt: 0 berkas jenis ini).
+- Produksi 22 Okt: 361 lampiran: PNG 178, PDF 104, DOCX 38, CSV 21, TXT 13, JPEG 6 (semua bisa dipratinjau).
+- Ikut diperbaiki: baris lampiran bisa melebar keluar layar HP (item grid tanpa `min-w-0`; nama berkas panjang tidak
+  terpotong) → kini terpotong "…".
+- Tes: unit `features/lampiran/pratinjau.test.ts`; e2e `tests/e2e/lampiran-pratinjau.spec.ts` (unggah 7 berkas, buka
+  tiap pratinjau, PDF desktop termuat 200 `application/pdf` tanpa `attachment`, tanpa galat CSP, tanpa gulir samping HP).
 
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)
 Prasyarat dari Hannes: project Supabase baru `rhj-tugas` (akun/org baru, Sydney `ap-southeast-2` per keputusan 30/9, Free); env cloud `SUPABASE_ACCESS_TOKEN` (PAT akun baru) + `SUPABASE_PROJECT_REF`; `CLICKUP_API_TOKEN` (sudah ada); sesi baru supaya env terbaca. Semua langkah ke ClickUp **GET saja**. Tidak memakai MCP Supabase (itu ERP).

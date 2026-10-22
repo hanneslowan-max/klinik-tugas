@@ -36,7 +36,8 @@ import { pathToFileURL } from "node:url";
 
 // ============================================================ konstanta enum (ikut migrasi 20261011120000)
 export const PRODUK_SAH = ["Roda", "Pallet Mesh", "Airport Trolley", "Shopping Cart", "Lemari Arsip", "Material Handling", "Locker", "Lainnya"];
-export const SUMBER_SAH = ["Google Ads", "Meta Ads", "Website organik", "WA langsung", "Telepon", "Referral", "Repeat order", "Lainnya"];
+// = CHECK lead.sumber (supabase/migrations/20261021140000_pipeline_sumber_igtt.sql) = SUMBER web (features/pipeline/konstanta.ts)
+export const SUMBER_SAH = ["Google Ads", "Meta Ads", "Website organik", "Instagram/TikTok organik", "WA langsung", "Telepon", "Referral", "Repeat order", "Lainnya"];
 export const TAHAP_SAH = ["BARU", "PENAWARAN", "ORDER", "BATAL", "DIALIHKAN"];
 // alasan_batal khusus tombol "Batalkan order" (migrasi 20261014130000_pipeline_batal_order). Lead BATAL dengan alasan ini =
 // order yang DIBATALKAN di Anvil → impor ulang melewatinya (sheet masih menulis "Order"; tanpa penjaga lead kembali ORDER).
