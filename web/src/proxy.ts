@@ -20,6 +20,8 @@ function kebijakanKeamanan(nonce: string) {
     `img-src 'self' blob: data: ${asalSupa}`.trim(),
     "font-src 'self'",
     `connect-src 'self' ${asalSupa} ${wsSupa}`.trim(),
+    // pratinjau PDF lampiran (<iframe> signed URL Storage, desktop); bucket menolak HTML/SVG
+    `frame-src 'self' ${asalSupa}`.trim(),
     "worker-src 'self'",
     "manifest-src 'self'",
     "object-src 'none'",
