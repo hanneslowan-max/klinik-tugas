@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 // Uji kontrak Edge API + CLI mode tugas terhadap stack Supabase LOKAL (`supabase functions serve` wajib jalan).
-//   node uji/kontrak/jalankan.mjs            (UJI_VERBOSE=1 untuk mencetak semua cek)
-// Exit 0 = semua lulus; 1 = ada cek gagal; 2 = prasyarat (Edge/kunci) tidak ada.
+//   node uji/kontrak/jalankan.mjs [--izinkan-remote]   (UJI_VERBOSE=1 untuk mencetak semua cek)
+// Target: TUGAS_API_URL, default http://127.0.0.1:54321/functions/v1/api/v2 (dari SUPABASE_URL / `supabase status`).
+// Penjaga (uji/penjaga.mjs): host API/Supabase/DB_URL selain 127.0.0.1/localhost ditolak sebelum request apa pun,
+// kecuali --izinkan-remote atau UJI_IZINKAN_REMOTE=1; project produksi selalu ditolak.
+// Exit 0 = semua lulus; 1 = ada cek gagal; 2 = prasyarat (Edge/kunci) tidak ada; 3 = target bukan lokal (ditolak).
 //
 // Data uji SINTETIS milik sendiri, berawalan "uji-b1": space/folder/list "uji-b1 …" (dibuat sekali lalu dipakai
 // ulang), token "uji-b1 … <run>" (dicabut di akhir), tugas uji (dihapus + purge di akhir), anggota "uji-b1 akun"
@@ -55,7 +58,7 @@ const LAMPIRAN_API_KEYS = [
   "created_at", "deleted_at", "url",
 ];
 
-const DB_URL = process.env.DB_URL || "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+const DB_URL = cfg.db;
 const LIST_CU = "1100340000900101"; // list seed asal ClickUp ("Fase Uji 1"), wadah kartu ClickUp sementara
 
 const st = { tok: {}, tokId: {}, dicabut: new Set(), T: {}, L: {}, jwt: {}, storage: new Set(), akun: null, cu: null };

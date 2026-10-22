@@ -5,6 +5,7 @@ import { execFile, execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { jagaLokal } from "../../uji/penjaga.mjs";
 
 export const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(HERE, "..", "..");
@@ -38,6 +39,12 @@ export function konfigurasi() {
     url, anon: process.env.SUPABASE_ANON_KEY || st.ANON_KEY || "",
     api: (process.env.TUGAS_API_URL || `${url}/functions/v1/api/v2`).replace(/\/+$/, ""),
   };
+  // Penjaga: target harus lokal SEBELUM request apa pun (uji/penjaga.mjs; --izinkan-remote untuk sengaja remote).
+  jagaLokal(`node ${path.relative(ROOT, process.argv[1] || "")}`, [
+    { nama: "SUPABASE_URL", nilai: cfg.url, env: "SUPABASE_URL" },
+    { nama: "TUGAS_API_URL", nilai: cfg.api, env: "TUGAS_API_URL" },
+    { nama: "UJI_DB_URL", nilai: DB_URL, jenis: "db", env: "UJI_DB_URL" },
+  ]);
   if (!cfg.anon) throw new Error("Kunci anon lokal tidak ditemukan (supabase status)");
   return cfg;
 }
