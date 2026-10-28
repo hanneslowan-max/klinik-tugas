@@ -150,7 +150,7 @@ test.describe("URL dangkal tanpa RSC (P7)", () => {
     await expect(page).toHaveURL(new RegExp(`/saya\\?m=${AKUN.citra.id}$`));
   });
 
-  test("list Daftar↔Papan (pushState), arsip Jelajah, Cari tanpa RSC; Kembali/Maju memulihkan tampilan", async ({ page }) => {
+  test("list Daftar↔Papan (pushState), selesai Jelajah, Cari tanpa RSC; Kembali/Maju memulihkan tampilan", async ({ page }) => {
     await masuk(page, AKUN.owner.email);
     await page.goto(`/l/${SEED.listApp}`);
     await expect(page.getByTestId("isi-list")).toBeVisible();
@@ -173,13 +173,13 @@ test.describe("URL dangkal tanpa RSC (P7)", () => {
     await expect(page.getByTestId("tab-daftar")).toHaveAttribute("aria-selected", "true");
     expect(rsc, "toggle list tidak boleh memicu RSC").toEqual([]);
 
-    await page.goto("/jelajah");
-    await expect(page.getByRole("link", { name: "Tampilkan arsip" })).toBeVisible();
+    await page.goto("/jelajah/tanpa");
+    await expect(page.getByTestId("alih-selesai")).toHaveText(/Tampilkan selesai/);
     await page.waitForLoadState("networkidle");
     rsc.length = 0;
-    await page.getByRole("link", { name: "Tampilkan arsip" }).click();
-    await expect(page).toHaveURL(/\/jelajah\?arsip=1$/);
-    await expect(page.getByRole("link", { name: "Sembunyikan arsip" })).toBeVisible();
+    await page.getByTestId("alih-selesai").click();
+    await expect(page).toHaveURL(/\/jelajah\/tanpa\?selesai=1$/);
+    await expect(page.getByTestId("alih-selesai")).toHaveText("Sembunyikan selesai");
 
     await page.goto("/cari");
     await page.waitForLoadState("networkidle");
@@ -188,7 +188,7 @@ test.describe("URL dangkal tanpa RSC (P7)", () => {
     await page.getByTestId("tombol-cari").click();
     await expect(page).toHaveURL(/\/cari\?q=Latihan$/);
     await expect(page.getByTestId("baris-tugas").first()).toBeVisible();
-    expect(rsc, "arsip & cari tidak boleh memicu RSC").toEqual([]);
+    expect(rsc, "selesai & cari tidak boleh memicu RSC").toEqual([]);
   });
 
   test("Pipeline: tab & tampilan tanpa RSC", async ({ page }) => {
@@ -363,8 +363,8 @@ test.describe("URL dangkal tanpa RSC (P7)", () => {
     await page.goto(`/saya?m=${AKUN.citra.id}&v=board`);
     await expect(page.getByTestId("judul-halaman")).toHaveText(`Tugas ${AKUN.citra.username}`);
     await expect(page.getByTestId("papan-saya")).toBeVisible();
-    await page.goto("/jelajah?arsip=1");
-    await expect(page.getByRole("link", { name: "Sembunyikan arsip" })).toBeVisible();
+    await page.goto("/jelajah/tanpa?selesai=1");
+    await expect(page.getByTestId("alih-selesai")).toHaveText("Sembunyikan selesai");
     await page.goto("/cari?q=Latihan");
     await expect(page.getByLabel("Kata kunci")).toHaveValue("Latihan");
     await expect(page.getByTestId("baris-tugas").first()).toBeVisible();

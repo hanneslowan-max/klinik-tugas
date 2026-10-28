@@ -1,7 +1,7 @@
 "use client";
 
 // Dialog "Tugas baru" / "Sub-tugas baru" (web_buat_tugas). Default assignee = diri sendiri. Peringatan due jatuh
-// di akhir pekan / hari libur tidak memblokir. Isi form (zod + react-hook-form) dimuat MALAS (next/dynamic,
+// di akhir pekan / hari libur tidak memblokir. Tanpa `list` (Jelajah per kategori) form meminta pilih list dulu. Isi form (zod + react-hook-form) dimuat MALAS (next/dynamic,
 // form-buat-tugas.tsx); Lembar/Dialog & pola `{buka ? <Form/> : null}` tetap statis (animasi, reset form, data-uji).
 // Pramuat chunk form: saat browser senggang sesudah layar siap (usePramuatFormBuatTugas) dan saat tombol pembuka
 // disentuh/difokus (pramuatFormBuatTugas) — jadi saat diklik form praktis langsung tampil. Gagal memuat (sinyal putus)
@@ -39,21 +39,35 @@ export function usePramuatFormBuatTugas(aktif: boolean) {
 type Props = {
   buka: boolean;
   ubahBuka: (b: boolean) => void;
-  list: { id: string; name: string; statuses: StatusList[] };
+  /** list tujuan; tanpa list (mis. dari Jelajah per kategori) → form menampilkan pilihan list */
+  list?: { id: string; name: string; statuses: StatusList[] };
   parentId?: string;
+  /** kategori pekerjaan terpilih awal (id); null/undefined = tanpa kategori */
+  kategoriAwal?: string | null;
   judul?: string;
   onDibuat?: (t: Tugas) => void;
 };
 
-export function DialogBuatTugas({ buka, ubahBuka, list, parentId, judul, onDibuat }: Props) {
+export function DialogBuatTugas({ buka, ubahBuka, list, parentId, kategoriAwal, judul, onDibuat }: Props) {
   return (
     <Lembar
       buka={buka}
       ubahBuka={ubahBuka}
-      judul={judul ?? (parentId ? "Sub-tugas baru" : `Tugas baru · ${list.name}`)}
+      judul={judul ?? (parentId ? "Sub-tugas baru" : list ? `Tugas baru · ${list.name}` : "Tugas baru")}
       data-uji="dialog-buat-tugas"
     >
-      {buka ? <FormBuatTugas list={list} parentId={parentId} onBatal={() => ubahBuka(false)} onDibuat={(t) => { ubahBuka(false); onDibuat?.(t); }} /> : null}
+      {buka ? (
+        <FormBuatTugas
+          list={list}
+          parentId={parentId}
+          kategoriAwal={kategoriAwal}
+          onBatal={() => ubahBuka(false)}
+          onDibuat={(t) => {
+            ubahBuka(false);
+            onDibuat?.(t);
+          }}
+        />
+      ) : null}
     </Lembar>
   );
 }

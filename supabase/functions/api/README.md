@@ -38,6 +38,12 @@ Bentuk galat `{err, ECODE}` dengan status HTTP:
 | POST | `/v2/list/{id}/task` (header `x-rhj-idem` / `Idempotency-Key` opsional) | `api_create_task` |
 | GET | `/v2/list/{id}/field` | `{fields:[]}` (404 bila list tak ada) |
 | GET / PUT / DELETE | `/v2/task/{id}` (`?include_markdown_description=true`) | `api_task` (lampiran → signed URL 24 jam) / `api_update_task` / `api_delete_task` |
+
+Kunci body tambahan (bukan ClickUp) di POST `/v2/list/{id}/task` & PUT `/v2/task/{id}`: `kategori` = nama kategori pekerjaan
+(tanpa beda huruf besar/kecil, mis. `"Ads"`, `"konten"`) atau id-nya (`kk…`); `null`/`""` = tanpa kategori; kunci tidak
+dikirim = kategori tidak berubah. Nama tak dikenal → 400 `INPUT_001` (pesan menyebut pilihan yang ada). Kategori tampil di
+Jelajah web; daftar kategori diatur owner di Admin → Kategori.
+
 | GET / POST | `/v2/task/{id}/comment` (`?start&start_id`) | `api_task_comments` (semua komentar; `start` menyaring yang lebih tua) / `api_create_comment` |
 | GET / POST | `/v2/comment/{id}/reply` | `api_comment_replies` / `api_create_reply` |
 | POST | `/v2/task/{id}/attachment` (scope `tulis`, `multipart/form-data`: `file` wajib, `title`/`comment_id` opsional) | Unggah SATU berkas: service role menaruh ke Storage `t/<task>/<rand>-<nama>` lalu `x_lampiran_catat`. Allowlist MIME + 25 MB (bucket); kartu ClickUp saat mode cermin → ditolak trigger (`CERMIN_001`); tugas tak terlihat → 404. Balas objek lampiran + `url` (signed 24 jam). Kirim `Content-Type` berkas yang benar (tanpa itu jadi `application/octet-stream` → ditolak allowlist) |

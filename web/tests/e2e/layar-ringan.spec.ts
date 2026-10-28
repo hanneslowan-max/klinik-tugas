@@ -18,16 +18,15 @@ test.describe("Tugas Saya", () => {
 });
 
 test.describe("Jelajah", () => {
-  test("space → folder → list dengan hitungan; arsip bisa ditampilkan", async ({ page }) => {
+  test("kartu kategori pekerjaan dengan hitungan → isi kategori lintas list", async ({ page }) => {
     await masuk(page, AKUN.citra.email);
     await page.goto("/jelajah");
-    const list = page.locator(`[data-list="${SEED.listClickUp}"]`);
-    await expect(list).toContainText("Fase Uji 1");
-    await expect(list).toContainText(/\d+ terbuka/);
-    await page.getByRole("link", { name: "Tampilkan arsip" }).click();
-    await expect(page).toHaveURL(/\/jelajah\?arsip=1$/);
-    await list.click();
-    await expect(page).toHaveURL(new RegExp(`/l/${SEED.listClickUp}`));
+    const ads = page.locator("[data-kategori]", { hasText: "Ads" });
+    await expect(ads).toContainText(/\d+ terbuka/);
+    await ads.click();
+    await expect(page).toHaveURL(/\/jelajah\/kk[0-9a-z]+$/);
+    await expect(page.getByTestId("judul-halaman")).toHaveText("Ads");
+    await expect(page.locator("[data-grup=telat]")).toContainText("Y7 · Uji ringkasan kampanye iklan");
   });
 });
 

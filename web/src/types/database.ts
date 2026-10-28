@@ -815,6 +815,7 @@ export type Database = {
           extra: NonNullable<Json>;
           first_closed_at: string | null;
           id: string;
+          kategori_id: string | null;
           last_comment_at: string | null;
           list_id: string;
           markdown: string | null;
@@ -855,6 +856,7 @@ export type Database = {
           extra?: NonNullable<Json>;
           first_closed_at?: string | null;
           id?: string;
+          kategori_id?: string | null;
           last_comment_at?: string | null;
           list_id: string;
           markdown?: string | null;
@@ -894,6 +896,7 @@ export type Database = {
           extra?: NonNullable<Json>;
           first_closed_at?: string | null;
           id?: string;
+          kategori_id?: string | null;
           last_comment_at?: string | null;
           list_id?: string;
           markdown?: string | null;
@@ -1309,6 +1312,8 @@ export type Database = {
         Returns: undefined;
       };
       web_admin_anggota_simpan: { Args: { p: Json }; Returns: Json };
+      web_admin_kategori: { Args: Record<PropertyKey, never>; Returns: Json };
+      web_admin_kategori_simpan: { Args: { p: Json }; Returns: Json };
       web_admin_libur_simpan: { Args: { p: Json }; Returns: Json };
       web_admin_mode: { Args: { p_mode: string }; Returns: Json };
       web_admin_sinkron: { Args: Record<PropertyKey, never>; Returns: Json };
@@ -1325,6 +1330,7 @@ export type Database = {
       web_admin_tokens: { Args: Record<PropertyKey, never>; Returns: Json };
       web_anggota: { Args: Record<PropertyKey, never>; Returns: Json };
       web_arsip: { Args: { p_arsip: boolean; p_task: string }; Returns: Json };
+      web_atur_kategori: { Args: { p_kategori: string | null; p_task: string }; Returns: Json };
       web_buat_tugas: { Args: { p_body: Json; p_list: string }; Returns: Json };
       web_cari: { Args: { p_q: string; p_space?: string }; Returns: Json };
       web_daftar: {
@@ -1333,6 +1339,7 @@ export type Database = {
       };
       web_detail: { Args: { p_task: string }; Returns: Json };
       web_hapus: { Args: { p_task: string }; Returns: Json };
+      web_kategori_kerja: { Args: Record<PropertyKey, never>; Returns: Json };
       web_komentar: {
         Args: {
           p_mentions?: number[];
@@ -1397,6 +1404,7 @@ export type Database = {
         Returns: Json;
       };
       web_tenggat: { Args: { p_tanggal?: string }; Returns: Json };
+      web_tugas_kategori: { Args: { p_kategori?: string | null; p_selesai?: boolean }; Returns: Json };
       web_tugas_saya: { Args: { p_member?: number }; Returns: Json };
       web_ubah_tugas: {
         Args: { p_body: Json; p_task: string; p_versi: number };

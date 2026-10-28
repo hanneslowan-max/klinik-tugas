@@ -44,6 +44,7 @@ export function Subtugas() {
           ubahBuka={setBuka}
           list={{ id: t.list.id, name: t.list.name, statuses: t.statuses }}
           parentId={t.id}
+          kategoriAwal={t.kategori_kerja?.id}
           onDibuat={() => void muat()}
         />
       ) : null}

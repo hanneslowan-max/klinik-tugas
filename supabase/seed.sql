@@ -259,6 +259,18 @@ insert into public.sync_runs (mode, started_at, finished_at, counts, census, dif
   ('uji', now() - interval '1 hour', now() - interval '55 minutes',
    '{"tasks":{"inserted":20,"updated":0,"unchanged":0}}', '{"lists":5}', '[]', '[]');
 
+-- Kategori pekerjaan (28 Okt 2026): contoh pengelompokan Jelajah. Trigger riwayat dimatikan sebentar supaya seed
+-- tidak menambah baris activity (tes riwayat lain tetap sama). ALTER butuh antrean trigger tertunda kosong.
+set constraints all immediate;
+alter table public.tasks disable trigger tasks_kategori_sesudah;
+update public.tasks t set kategori_id = k.id
+  from (values ('z8r3uj0001', 'Ads'), ('z8r3uj0005', 'Ads'), ('z8r3uj0006', 'Ads'),
+               ('z8r3uj0002', 'SEO'), ('z8r3uj0004', 'SEO'), ('z8r3uj0010', 'SEO'),
+               ('rtujib0001', 'Konten')) as v(id, nama)
+  join public.kategori_kerja k on k.nama = v.nama
+ where t.id = v.id;
+alter table public.tasks enable trigger tasks_kategori_sesudah;
+
 -- bersihkan konteks sesi
 select set_config('app.sumber', '', false);
 select set_config('app.actor_id', '', false);

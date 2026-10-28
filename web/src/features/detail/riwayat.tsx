@@ -62,6 +62,13 @@ function Kalimat({ a, statuses }: { a: Aktivitas; statuses: StatusList[] }) {
     case "induk":
       isi = `mengubah induk: ${dr || "tanpa"} → ${ke || "tanpa"}`;
       break;
+    case "kategori":
+      isi = ke
+        ? dr
+          ? `mengubah kategori "${dr.nama}" → "${ke.nama}"`
+          : `mengatur kategori "${ke.nama}"`
+        : `mengosongkan kategori "${dr?.nama ?? "?"}"`;
+      break;
     case "prioritas":
       isi = `mengubah prioritas: ${namaPrio(dr)} → ${namaPrio(ke)}`;
       break;

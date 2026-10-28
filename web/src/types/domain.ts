@@ -63,6 +63,9 @@ export type StatusList = {
   orderindex: number;
 };
 
+/** Kategori pekerjaan (daftar bersama, diatur owner di Admin → Kategori). */
+export type KategoriKerja = { id: string; nama: string };
+
 /** Baris tugas (daftar, Tugas Saya, cari, sub-tugas, hasil mutasi) = public.j_baris. */
 export type Tugas = {
   id: string;
@@ -84,6 +87,8 @@ export type Tugas = {
   due_has_time: boolean;
   start_at: string | null;
   kategori_due: KategoriDue | null;
+  /** kategori pekerjaan (Ads, Konten, …); null = tanpa kategori */
+  kategori_kerja: KategoriKerja | null;
   assignees: AnggotaRingkas[];
   comment_count: number;
   last_comment_at: string | null;
@@ -668,11 +673,35 @@ export type KategoriPipeline = { id: string; nama: string; urutan: number };
 /** Hasil web_pipeline_kategori / _simpan: kategori urut + penempatan {lead_id: kategori_id}. Lead tanpa entri = "Tanpa kategori". */
 export type PapanKategori = { kategori: KategoriPipeline[]; posisi: Record<string, string> };
 
+// -------------------------------------------------------------------- kategori pekerjaan (Jelajah)
+export type HitunganKategori = { terbuka: number; telat: number; selesai: number };
+/** web_kategori_kerja: kategori urut + hitungan tugas terlihat; `tanpa` = tugas tanpa kategori. */
+export type DaftarKategoriKerja = {
+  hari_ini: string;
+  kategori: (KategoriKerja & { urutan: number; hitungan: HitunganKategori })[];
+  tanpa: HitunganKategori;
+};
+/** web_tugas_kategori: tugas terbuka satu kategori lintas list (+ yang terakhir selesai bila diminta). */
+export type IsiKategori = {
+  kategori: KategoriKerja | null;
+  tanggal: string;
+  tasks: Tugas[];
+  jumlah_selesai: number;
+  selesai: Tugas[] | null;
+};
+/** web_admin_kategori(_simpan): kategori + jumlah tugas (tidak terhapus). */
+export type KategoriAdmin = KategoriKerja & { urutan: number; jumlah: number };
+
 /** Peta nama fungsi web_* → bentuk hasilnya. */
 export type HasilRpc = {
   web_saya: Profil;
   web_struktur: Struktur;
   web_tugas_saya: TugasSaya;
+  web_kategori_kerja: DaftarKategoriKerja;
+  web_tugas_kategori: IsiKategori;
+  web_atur_kategori: Tugas;
+  web_admin_kategori: KategoriAdmin[];
+  web_admin_kategori_simpan: KategoriAdmin[];
   web_daftar: DaftarList;
   web_detail: DetailTugas;
   web_cari: HasilCari;

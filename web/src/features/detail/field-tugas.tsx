@@ -1,7 +1,8 @@
 "use client";
 
-// Kolom field tugas: Status, Assignee (beban due + nonaktif), Due, Mulai, Prioritas, Induk, Label (tag ClickUp),
-// Dibuat / Diubah / Ditutup. Bisa diubah hanya bila boleh.ubah; selain itu tampil hanya-baca.
+// Kolom field tugas: Status, Kategori, Assignee (beban due + nonaktif), Due, Mulai, Prioritas, Induk, Label (tag
+// ClickUp), Dibuat / Diubah / Ditutup. Bisa diubah hanya bila boleh.ubah; selain itu tampil hanya-baca. Kategori
+// pekerjaan (metadata app) tetap bisa diatur di mode cermin; hanya kartu di Sampah yang hanya-baca.
 import { Flag } from "lucide-react";
 import Link from "next/link";
 import { useState, type CSSProperties, type ReactNode } from "react";
@@ -16,8 +17,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PemilihAnggota } from "@/features/anggota/pemilih-anggota";
 import { InputTanggal } from "@/features/detail/input-tanggal";
 import { useDetail } from "@/features/detail/konteks";
+import { useKategoriKerja } from "@/features/kategori/queries";
 import { useProfil } from "@/features/profil/penyedia-profil";
+import { useAturKategori } from "@/features/tugas/mutasi";
 import { selisihAssignee } from "@/features/tugas/util";
+import { pesanGalat } from "@/lib/api/galat";
 import { PRIORITAS } from "@/lib/konstanta";
 import { fmtJamWib, fmtTanggal, fmtWaktu, peringatanTanggal, tanggalWib } from "@/lib/tanggal";
 import { warnaAman } from "@/lib/teks";
@@ -203,6 +207,52 @@ function FieldPrioritas() {
   );
 }
 
+/** Kategori pekerjaan (Jelajah). Disimpan lewat web_atur_kategori (tanpa cek versi; boleh di mode cermin). */
+function FieldKategori() {
+  const { d } = useDetail();
+  const daftar = useKategoriKerja();
+  const atur = useAturKategori();
+  const [tertunda, setTertunda] = useState<string | null>(null);
+  const k = d.task.kategori_kerja;
+
+  if (d.task.deleted_at) {
+    return <Baris label="Kategori" uji="kategori">{k ? <span>{k.nama}</span> : <Redup>—</Redup>}</Baris>;
+  }
+  const asli = k?.id ?? TANPA;
+  const pilihan = daftar.data?.kategori ?? (k ? [k] : []);
+  return (
+    <Baris label="Kategori" uji="kategori">
+      <Select
+        value={tertunda ?? asli}
+        onValueChange={async (v) => {
+          if (v === asli) return;
+          setTertunda(v);
+          try {
+            await atur.mutateAsync({ id: d.task.id, kategori: v === TANPA ? null : v });
+            toast.success("Kategori disimpan");
+          } catch (e) {
+            toast.error(pesanGalat(e));
+          } finally {
+            setTertunda(null);
+          }
+        }}
+      >
+        <SelectTrigger className="w-full" aria-label="Kategori" data-uji="pilih-kategori">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={TANPA}>— tanpa kategori —</SelectItem>
+          {pilihan.map((x) => (
+            <SelectItem key={x.id} value={x.id}>
+              {x.nama}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </Baris>
+  );
+}
+
 /** Label dari ClickUp (tasks.extra.tags, hanya-baca): warna latar dari tag_bg. */
 function FieldTag() {
   const { d } = useDetail();
@@ -234,6 +284,7 @@ export function FieldTugas() {
     <section aria-label="Field tugas" className="rounded-xl border bg-card px-3">
       <dl>
         <FieldStatus />
+        <FieldKategori />
         <FieldAssignee />
         <FieldTanggal jenis="due" />
         <FieldTanggal jenis="mulai" />

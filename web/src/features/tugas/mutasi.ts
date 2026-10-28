@@ -9,7 +9,7 @@ import { klienBrowser } from "@/lib/supabase/client";
 import type { Json } from "@/types/database";
 
 /**
- * Segarkan semua tampilan tugas (daftar, Tugas Saya, cari, hitungan struktur) + detail kartu tertentu.
+ * Segarkan semua tampilan tugas (daftar, Tugas Saya, cari, hitungan struktur & kategori) + detail kartu tertentu.
  * Promise selesai setelah data segar termuat (pemanggil boleh menunggu, boleh juga tidak).
  */
 export function segarkanTugas(qc: QueryClient, id?: string) {
@@ -18,6 +18,8 @@ export function segarkanTugas(qc: QueryClient, id?: string) {
     qc.invalidateQueries({ queryKey: kunci.semuaTugasSaya }),
     qc.invalidateQueries({ queryKey: kunci.semuaCari }),
     qc.invalidateQueries({ queryKey: kunci.struktur }),
+    qc.invalidateQueries({ queryKey: kunci.kategoriKerja }),
+    qc.invalidateQueries({ queryKey: kunci.semuaIsiKategori }),
     id ? qc.invalidateQueries({ queryKey: kunci.detail(id) }) : null,
   ]);
 }
@@ -50,6 +52,8 @@ export type BodyBuatTugas = {
   priority?: number;
   assignees?: number[];
   parent_id?: string;
+  /** id kategori pekerjaan (null/tanpa = tanpa kategori) */
+  kategori?: string | null;
 };
 
 export function useBuatTugas() {
@@ -58,5 +62,15 @@ export function useBuatTugas() {
     mutationFn: (v: { list: string; body: BodyBuatTugas }) =>
       rpc(klienBrowser(), "web_buat_tugas", { p_list: v.list, p_body: v.body as Json }),
     onSuccess: (t) => segarkanTugas(qc, t.parent_id ?? undefined),
+  });
+}
+
+/** Atur kategori pekerjaan satu tugas (web_atur_kategori; tanpa cek versi, boleh di mode cermin). null = tanpa. */
+export function useAturKategori() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: string; kategori: string | null }) =>
+      rpc(klienBrowser(), "web_atur_kategori", { p_task: v.id, p_kategori: v.kategori }),
+    onSettled: (_d, _e, v) => segarkanTugas(qc, v.id),
   });
 }

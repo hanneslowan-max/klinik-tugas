@@ -115,8 +115,9 @@ select uji.cek(uji.ambil('saya2') -> 'nanti' @> '[{"id":"rtujisaya4"}]' and uji.
 select uji.cek(not uji.ambil('saya2')::text like '%rtujisaya6%', 'Tugas Saya: kartu selesai tidak tampil');
 select uji.sama(uji.kunci(uji.ambil('saya2') #> '{hari_ini,0}'),
   array['archived','assignees','closed_at','comment_count','created_at','deleted_at','due_at','due_has_time','due_wib','folder_id','id',
-        'kategori_due','last_comment_at','list','menunggu_keputusan','name','orderindex','parent_id','priority','selesai','space_id',
-        'start_at','status','status_color','status_type','sumber','updated_at','url','versi'], 'baris web: kunci (+ kategori_due R5)');
+        'kategori_due','kategori_kerja','last_comment_at','list','menunggu_keputusan','name','orderindex','parent_id','priority','selesai',
+        'space_id','start_at','status','status_color','status_type','sumber','updated_at','url','versi'],
+  'baris web: kunci (+ kategori_due R5, + kategori_kerja 28 Okt)');
 select uji.sama(public.web_tugas_saya(100000003) -> 'telat', uji.ambil('saya2') -> 'telat', 'web_tugas_saya(p_member) = milik anggota itu');
 select uji.galat($$select public.web_tugas_saya(424242)$$, 'PT404', 'web_tugas_saya anggota tak ada → 404');
 select set_config('app.hari_ini', '', true);
