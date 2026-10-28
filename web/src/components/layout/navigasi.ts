@@ -1,4 +1,4 @@
-import { Bell, CheckSquare, FolderTree, Search, Settings, Target, Trash2, type LucideIcon } from "lucide-react";
+import { Bell, CheckSquare, LayoutGrid, Search, Settings, Target, Trash2, type LucideIcon } from "lucide-react";
 
 export type ItemNav = {
   href: string;
@@ -13,7 +13,7 @@ export type ItemNav = {
 /** Navigasi utama (urutan sama di sidebar desktop & nav bawah HP). */
 export const NAV_UTAMA: ItemNav[] = [
   { href: "/saya", label: "Tugas Saya", Ikon: CheckSquare, cocok: (p) => p === "/" || p.startsWith("/saya") },
-  { href: "/jelajah", label: "Jelajah", Ikon: FolderTree, cocok: (p) => p.startsWith("/jelajah") || p.startsWith("/l/") },
+  { href: "/jelajah", label: "Jelajah", Ikon: LayoutGrid, cocok: (p) => p.startsWith("/jelajah") || p.startsWith("/l/") },
   { href: "/cari", label: "Cari", Ikon: Search, cocok: (p) => p.startsWith("/cari") },
   { href: "/pipeline", label: "Pipeline", Ikon: Target, pipelineSaja: true, cocok: (p) => p.startsWith("/pipeline") },
 ];

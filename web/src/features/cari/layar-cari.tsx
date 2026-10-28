@@ -172,7 +172,7 @@ export function LayarCari() {
             {ruj && ruj.type in NAMA_WADAH ? (
               <KotakPesan nada="info" data-uji="rujukan-wadah">
                 Tautan {NAMA_WADAH[ruj.type as keyof typeof NAMA_WADAH]} ClickUp: kartu di {NAMA_WADAH[ruj.type as keyof typeof NAMA_WADAH]} itu ada di
-                bawah. <Link href="/jelajah">Buka Jelajah</Link>
+                bawah.
               </KotakPesan>
             ) : null}
             {ruj?.type === "list" ? (

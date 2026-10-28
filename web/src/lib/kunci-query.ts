@@ -9,7 +9,14 @@ export const kunci = {
   daftar: (list: string, termasukSelesai: boolean) => ["daftar", list, termasukSelesai] as const,
   semuaDaftar: ["daftar"] as const,
   detail: (id: string) => ["detail", id] as const,
+  /** akar semua detail kartu (nama kategori berganti / kategori dihapus) */
+  semuaDetail: ["detail"] as const,
   semuaCari: ["cari"] as const,
+  /** kategori pekerjaan + hitungan (Jelajah, pemilih kategori) */
+  kategoriKerja: ["kategori-kerja"] as const,
+  /** isi satu kategori (null = tanpa kategori) */
+  isiKategori: (id: string | null, selesai: boolean) => ["isi-kategori", id ?? "tanpa", selesai] as const,
+  semuaIsiKategori: ["isi-kategori"] as const,
   cari: (q: string, space: string) => ["cari", q, space] as const,
   /** akar invalidasi semua tab notifikasi (realtime, sesudah tandai dibaca) */
   notif: ["notif"] as const,
@@ -19,6 +26,7 @@ export const kunci = {
   adminTokens: ["admin", "tokens"] as const,
   adminSinkron: ["admin", "sinkron"] as const,
   adminLibur: ["admin", "libur"] as const,
+  adminKategori: ["admin", "kategori"] as const,
   // Pipeline (sales)
   pipelineSaya: ["pipeline", "saya"] as const,
   pipelineDaftar: (tab: string, pemilik: number | null, q: string) =>

@@ -4,6 +4,7 @@ export const TAB_ADMIN = [
   { kunci: "anggota", label: "Anggota" },
   { kunci: "status", label: "Status list" },
   { kunci: "struktur", label: "Struktur" },
+  { kunci: "kategori", label: "Kategori" },
   { kunci: "libur", label: "Hari libur" },
   { kunci: "token", label: "Token API" },
   { kunci: "pipeline", label: "Akses Pipeline" },

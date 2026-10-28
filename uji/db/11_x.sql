@@ -196,9 +196,10 @@ insert into public.api_tokens (id, member_id, nama, prefix, token_hash, scope) v
 select uji.jadi_service();
 select uji.simpan('exp', public.x_export(900000000002));
 select uji.sama(uji.kunci(uji.ambil('exp')),
-  array['activity','api_tokens','app_settings','attachments','comment_mentions','comments','folders','hari_libur','list_statuses',
-        'lists','members','meta','notifications','space_anggota','spaces','sync_raw','sync_runs','task_assignees','tasks','workspace'],
-  'x_export: semua tabel data (tanpa idem; + space_anggota review R2)');
+  array['activity','api_tokens','app_settings','attachments','comment_mentions','comments','folders','hari_libur',
+        'kategori_kerja','list_statuses','lists','members','meta','notifications','space_anggota','spaces','sync_raw','sync_runs',
+        'task_assignees','tasks','workspace'],
+  'x_export: semua tabel data (tanpa idem; + space_anggota review R2; + kategori_kerja 28 Okt)');
 select uji.galat($$select public.x_export(100000002)$$, 'PT403', 'x_export oleh member (bukan owner/bot) → 403 (review R2)',
   null, 'ACCESS_001');
 select uji.cek(not uji.ambil('exp')::text like '%token_hash%', 'x_export: tanpa token_hash');

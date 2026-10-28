@@ -42,9 +42,11 @@ export function PenyimakRealtime() {
     function siram() {
       timer = undefined;
       if (antre.daftar) {
-        // Tugas Saya, cari, hitungan list: selalu langsung; List/Papan ditunda selama kartu diseret
+        // Tugas Saya, cari, hitungan list & kategori: selalu langsung; List/Papan ditunda selama kartu diseret
         void qc.invalidateQueries({ queryKey: kunci.semuaTugasSaya });
         void qc.invalidateQueries({ queryKey: kunci.semuaCari });
+        void qc.invalidateQueries({ queryKey: kunci.kategoriKerja });
+        void qc.invalidateQueries({ queryKey: kunci.semuaIsiKategori });
         jalankanAtauTunda("daftar", () => void qc.invalidateQueries({ queryKey: kunci.semuaDaftar }));
       }
       if (antre.struktur || antre.daftar) void qc.invalidateQueries({ queryKey: kunci.struktur });

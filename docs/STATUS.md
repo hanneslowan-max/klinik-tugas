@@ -563,6 +563,27 @@ Daftar lengkap 17 butir di `docs/KONTRAK-DB.md` §8, tabel review R1–R5 §9, d
 - Tes: unit `features/lampiran/pratinjau.test.ts`; e2e `tests/e2e/lampiran-pratinjau.spec.ts` (unggah 7 berkas, buka
   tiap pratinjau, PDF desktop termuat 200 `application/pdf` tanpa `attachment`, tanpa galat CSP, tanpa gulir samping HP).
 
+## Jelajah per kategori pekerjaan (28 Okt 2026, permintaan Hannes "dikelompokkan sesuai pekerjaannya: ads, konten, seo, pipeline")
+Keputusan Hannes: kategori **per tugas** (list Fase 1–4 berisi campuran pekerjaan), daftar kategori **bisa diatur
+owner**, isi awal **otomatis lalu dicek dulu**, Jelajah **diganti seluruhnya** (Space → Folder → List tidak tampil lagi;
+list tetap bisa dibuka dari detail tugas / Cari).
+- DB `20261028120000_kategori_kerja.sql`: tabel `kategori_kerja` (awal Ads, Konten, SEO, Pipeline; maks. 30) +
+  `tasks.kategori_id` (FK on delete set null). Kategori = metadata app: tidak ditimpa sinkron ClickUp (`muat_tasks` kolom
+  eksplisit), boleh diubah di mode cermin (`tasks_sebelum.v_abaikan`), tidak menaikkan versi. Riwayat: activity jenis
+  baru `kategori` (dari/ke `{id, nama}`; trigger `tasks_kategori_sesudah`). Fungsi: `web_kategori_kerja` (hitungan
+  terbuka/telat/selesai per kategori + tanpa), `web_tugas_kategori` (isi lintas list, privasi space dihormati),
+  `web_atur_kategori`, `web_admin_kategori(_simpan)` (owner: buat/ganti nama/hapus/urut). `j_baris` + `kategori_kerja`;
+  `x_export` + tabel `kategori_kerja`. Kunci body `kategori` (nama/id) di `web_buat_tugas`, `api_create_task`,
+  `api_update_task` → agent bisa mengisi kategori saat membuat tugas.
+- Web: `/jelajah` = kartu kategori + "Tanpa kategori" (hitungan terbuka/telat; owner: tautan Atur kategori);
+  `/jelajah/<id|tanpa>` = tugas lintas list per tenggat (Telat … Tidak ditagih), saring orang `?m`, `?selesai=1`, tombol
+  **Tugas** (form dengan pilihan list + kategori terisi). Detail tugas: field **Kategori**. Form Tugas baru (list &
+  sub-tugas): field Kategori. Admin → **Kategori**. Ikon nav Jelajah → kisi.
+- Tes: `uji/db/32_kategori_kerja.sql` (67 cek), 09/11/13 disesuaikan (61 `web_*`, kunci export & baris);
+  e2e `tests/e2e/jelajah-kategori.spec.ts` (4 skenario × HP/desktop) + layar-ringan & performa disesuaikan.
+- Isi awal produksi: usulan otomatis 369 tugas (dari kode/nama/list/assignee) dikirim ke Hannes untuk dicek; diterapkan
+  ke produksi hanya sesudah disetujui.
+
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)
 Prasyarat dari Hannes: project Supabase baru `rhj-tugas` (akun/org baru, Sydney `ap-southeast-2` per keputusan 30/9, Free); env cloud `SUPABASE_ACCESS_TOKEN` (PAT akun baru) + `SUPABASE_PROJECT_REF`; `CLICKUP_API_TOKEN` (sudah ada); sesi baru supaya env terbaca. Semua langkah ke ClickUp **GET saja**. Tidak memakai MCP Supabase (itu ERP).
 

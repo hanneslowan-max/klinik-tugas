@@ -135,6 +135,30 @@ export function useSimpanLibur() {
   });
 }
 
+// ------------------------------------------------------------------ kategori pekerjaan (Jelajah)
+
+export function useKategoriAdmin() {
+  return useQuery({ queryKey: kunci.adminKategori, queryFn: () => rpc(klienBrowser(), "web_admin_kategori"), staleTime: 0 });
+}
+
+export type AksiKategori =
+  | { aksi: "buat"; nama: string }
+  | { aksi: "ganti_nama"; id: string; nama: string }
+  | { aksi: "hapus"; id: string }
+  | { aksi: "urut"; ids: string[] };
+
+export function useSimpanKategori() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (p: AksiKategori) => rpc(klienBrowser(), "web_admin_kategori_simpan", { p: p as Json }),
+    onSuccess: (data) => {
+      qc.setQueryData(kunci.adminKategori, data);
+      // nama/urutan kategori tampil di Jelajah, pemilih kategori, dan baris tugas (hapus → tanpa kategori)
+      return segarkan(qc, kunci.kategoriKerja, kunci.semuaIsiKategori, ...KUNCI_TUGAS, kunci.semuaDetail);
+    },
+  });
+}
+
 // ------------------------------------------------------------------ token API
 
 export function useBuatToken() {
