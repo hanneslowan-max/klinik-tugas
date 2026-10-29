@@ -5,6 +5,11 @@
 @custom-variant dark (@media (prefers-color-scheme: dark));
 
 @theme inline {
+  --color-grafik-order: var(--grafik-order);
+  --color-grafik-baru: var(--grafik-baru);
+  --color-grafik-penawaran: var(--grafik-penawaran);
+  --color-grafik-dialihkan: var(--grafik-dialihkan);
+  --color-grafik-batal: var(--grafik-batal);
   --color-telat: var(--telat);
   --color-telat-lembut: var(--telat-lembut);
   --color-hari-ini: var(--hari-ini);
@@ -64,6 +69,13 @@
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Ubuntu, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   /* warna semantik tugas (sama maknanya dengan web lama: telat/hari ini/≤3 hk/selesai/mode cermin) */
+  /* corong dasbor Pipeline: hue tahap sama dengan pil tahap; urutan tumpukan ORDER·BARU·PENAWARAN·DIALIHKAN·BATAL
+     lolos uji CVD (validator dataviz). DIALIHKAN sengaja abu-abu netral; kontras rendah → angka tertulis di legenda. */
+  --grafik-order: #1f7a3d;
+  --grafik-baru: #4f46e5;
+  --grafik-penawaran: #b25e00;
+  --grafik-dialihkan: #a3a3a3;
+  --grafik-batal: #c62828;
   --telat: #c62828;
   --telat-lembut: #fdecec;
   --hari-ini: #b25e00;
@@ -112,6 +124,11 @@
 
 @media (prefers-color-scheme: dark) {
 :root {
+  --grafik-order: #3fa865;
+  --grafik-baru: #7b74f0;
+  --grafik-penawaran: #c98322;
+  --grafik-dialihkan: #5a5a5a;
+  --grafik-batal: #e25d5d;
   --telat: #ff7b7b;
   --telat-lembut: #3a1f22;
   --hari-ini: #ffb45c;

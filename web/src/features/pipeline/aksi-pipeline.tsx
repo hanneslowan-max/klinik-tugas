@@ -1,9 +1,9 @@
 "use client";
 
-// Navigasi sekunder modul Pipeline di kepala halaman: Pelanggan (semua peran), Ringkasan (admin/baca), Kelola akses
-// (owner). Desktop (lg): tombol berlabel. HP/tablet: satu tombol ⋯ berisi tautan yang sama (pola menu ⋯ detail tugas),
-// supaya baris alat di bawah judul tidak pecah jadi dua-tiga baris tombol.
-import { BarChart3, Building2, MoreHorizontal, ShieldCheck } from "lucide-react";
+// Navigasi sekunder modul Pipeline di kepala halaman: Dasbor & Pelanggan (semua peran; dasbor sales = "milik saya"),
+// Ringkasan (admin/baca), Kelola akses (owner). Desktop (lg): tombol berlabel. HP/tablet: satu tombol ⋯ berisi tautan
+// yang sama (pola menu ⋯ detail tugas), supaya baris alat di bawah judul tidak pecah jadi dua-tiga baris tombol.
+import { BarChart3, Building2, LayoutDashboard, MoreHorizontal, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ export function AksiPipeline() {
   const { owner } = useProfil();
   if (!saya.data?.peran) return null;
   const tautan = [
+    { href: "/pipeline/dasbor", label: "Dasbor", Ikon: LayoutDashboard, uji: "tautan-dasbor" },
     { href: "/pipeline/pelanggan", label: "Pelanggan", Ikon: Building2, uji: "tautan-pelanggan" },
     ...(saya.data.boleh_ringkas ? [{ href: "/pipeline/ringkasan", label: "Ringkasan", Ikon: BarChart3, uji: "tautan-ringkasan" }] : []),
     ...(owner ? [{ href: "/admin/pipeline", label: "Kelola akses", Ikon: ShieldCheck, uji: "tautan-akses-pipeline" }] : []),
