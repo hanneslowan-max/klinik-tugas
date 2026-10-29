@@ -596,6 +596,30 @@ Sebelumnya pemilik (sales) lead hanya terisi otomatis (pembuat, Klaim, klaim saa
 - Tes: `uji/db/33_pipeline_ganti_sales.sql` (38 cek), 09 (63 `web_*`) & 30 (kunci detail lead) disesuaikan;
   e2e `tests/e2e/pipeline-ganti-sales.spec.ts` (3 skenario × HP/desktop).
 
+## Dasbor Pipeline Tahap 1 (29 Okt 2026, brief ACC Hannes; PR terbuka, BELUM merge/deploy — deploy oleh Felix)
+Bagian 1–4 mockup "Dashboard Pipeline Anvil" (admin) + tampilan sales "milik saya". Bagian 5–10 = Tahap 2.
+- DB `20261029130000_pipeline_dasbor.sql` (aditif, fungsi baru saja): `web_pipeline_dasbor({bulan?})` dan
+  `web_pipeline_dasbor_ids({metrik, pemilik?, bulan?})` (id lead di balik angka bagian 2; predikat sama dengan angkanya,
+  `pipeline_dasbor_lead`). Akses DI SERVER: admin/baca → penuh; rep → semua angka hanya lead/order miliknya + omzet tim
+  (progres target Rp300 jt); kunci bagian penuh tidak dikirim; `_ids` memaksa pemilik = rep itu sendiri.
+- Definisi (WIB; hari kerja Senin–Sabtu tanpa libur): omzet = nilai_transaksi ORDER menurut tanggal SP; terbuka =
+  BARU/PENAWARAN; basis kesehatan = terbuka, masuk > hari ini − 90; disentuh ≤1 hk = lead masuk bulan itu (umur ≥1 hk)
+  dengan aktivitas non-"Catatan impor" atau perubahan tahap (dari ≠ null) paling lambat hari kerja berikut tanggal
+  masuk; win rate PM = order ÷ lead PM masuk ≥90 hari lalu; siklus = median dari riwayat tahap (sampel <10 → "belum
+  bisa dihitung"); ambang tampil: nilai penawaran PM ≥50% terisi, split qty PM ≥30% ber-qty >1. Bulan selesai
+  dibandingkan dengan bulan lalu penuh; bulan berjalan dengan tgl 1 s/d tanggal yang sama bulan lalu.
+- Web: `/pipeline/dasbor` (menu Pipeline → Dasbor, semua peran). Target di `features/pipeline/dasbor.ts`
+  (`TARGET_OMZET`: tim 300 jt, per sales 150 jt; `perSales` untuk pengecualian) + fungsi hitung (hari kerja, proyeksi,
+  ambang). Angka bergaris titik → `/pipeline?kes=<metrik>&kp=<id|tanpa>&kb=<bulan>` (spanduk "Dari dasbor" + ×).
+- Cek angka (snapshot produksi 29 Okt pagi, baca saja, dimuat ke DB lokal lalu dihapus): omzet Okt Rp243.308.307 /
+  51 order (Riksa 20 / Michael 31), PM Rp92.174.050 / 5 order, 335 lead, win PM 27/127, Riksa 356 · 31/124 · 21 · 0 ·
+  319 · 308 · 22/41/250 (sama persis dengan brief); Michael beda ±1 (FU dicatat pagi itu); PM terbuka 90 (34/17/39).
+  Selisih dengan mockup: "FU tercatat sepanjang Oktober" (mockup 84/98) dihitung = aktivitas non-impor oleh sales itu
+  di bulan itu (102/105 per 07.12); 10 PM teratas urut qty lalu diam TERLAMA sesuai label (baris contoh mockup urut
+  diam tersingkat); urutan tumpukan corong ORDER·BARU·PENAWARAN·DIALIHKAN·BATAL (lolos uji buta warna).
+- Tes: `uji/db/34_pipeline_dasbor.sql` (54 cek, termasuk akses rep), 09 (65 `web_*`); vitest
+  `features/pipeline/dasbor.test.ts`; e2e `tests/e2e/pipeline-dasbor.spec.ts` (3 skenario × HP/desktop).
+
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)
 Prasyarat dari Hannes: project Supabase baru `rhj-tugas` (akun/org baru, Sydney `ap-southeast-2` per keputusan 30/9, Free); env cloud `SUPABASE_ACCESS_TOKEN` (PAT akun baru) + `SUPABASE_PROJECT_REF`; `CLICKUP_API_TOKEN` (sudah ada); sesi baru supaya env terbaca. Semua langkah ke ClickUp **GET saja**. Tidak memakai MCP Supabase (itu ERP).
 

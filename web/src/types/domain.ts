@@ -707,6 +707,84 @@ export type IsiKategori = {
 /** web_admin_kategori(_simpan): kategori + jumlah tugas (tidak terhapus). */
 export type KategoriAdmin = KategoriKerja & { urutan: number; jumlah: number };
 
+// -------------------------------------------------------------------- dasbor pipeline (Tahap 1, 20261029130000)
+/** Skor bulan dipilih (cakupan peran: penuh = semua, sales = miliknya). `_lalu` = tgl 1 s/d tanggal yang sama bulan lalu. */
+export type SkorDasbor = {
+  omzet: number;
+  order: number;
+  omzet_pm: number;
+  order_pm: number;
+  omzet_lalu: number;
+  order_lalu: number;
+  lead_masuk: number;
+  lead_masuk_lalu: number;
+  /** lead masuk bulan itu (umur ≥ 1 hari kerja) yang disentuh ≤ 1 hari kerja / basisnya */
+  sentuh_cepat: number;
+  sentuh_basis: number;
+};
+/** Metrik bagian 2 yang bisa diklik → web_pipeline_dasbor_ids. */
+export type MetrikDasbor =
+  | "terbuka90" | "lama" | "sentuh_basis" | "sentuh_cepat" | "fu_hari_ini" | "fu_telat" | "tanpa_jadwal"
+  | "baru_tanpa_catatan" | "diam_0_7" | "diam_8_14" | "diam_15_30" | "diam_31" | "pm_terbuka";
+/** Satu baris kesehatan follow-up (basis lead terbuka ≤ 90 hari). pemilik null = tanpa pemilik. */
+export type KesehatanSales = {
+  pemilik: IdAnggota | null;
+  nama: string | null;
+  terbuka90: number;
+  sentuh_cepat: number;
+  sentuh_basis: number;
+  fu_hari_ini: number;
+  fu_telat: number;
+  tanpa_jadwal: number;
+  baru_tanpa_catatan: number;
+  diam_0_7: number;
+  diam_8_14: number;
+  diam_15_30: number;
+  diam_31: number;
+  /** lead terbuka > 90 hari (catatan di bawah tabel) */
+  lama: number;
+  /** aktivitas selain 'Catatan impor' oleh sales ini di bulan itu (null untuk tanpa pemilik) */
+  fu_tercatat: number | null;
+};
+export type JumlahMenang = { order: number; lead: number };
+export type BulanCorong = { bulan: string; total: number } & Record<"ORDER" | "PENAWARAN" | "BARU" | "DIALIHKAN" | "BATAL", number>;
+export type SampelSiklus = { n: number; median: number | null };
+export type PmSales = { pemilik: IdAnggota | null; nama: string | null; terbuka: number; qty: number; diam30: number; bernilai: number; nilai: number };
+export type PmTeratas = {
+  id: string; kode: string; pelanggan: string; qty: number; tahap: TahapLead; sales: string | null; diam: number; fu_berikutnya: string | null;
+};
+/**
+ * Hasil web_pipeline_dasbor. Bagian penuh (per_sales … pm_qty_terisi) hanya dikirim untuk admin/baca; sales hanya
+ * menerima angka miliknya + omzet_tim (progres target tim) + fu_hari_ini.
+ */
+export type DasborPipeline = {
+  peran: "penuh" | "sales";
+  saya: IdAnggota | null;
+  hari_ini: string;
+  bulan: string;
+  /** hari terakhir yang dihitung di bulan itu (hari ini untuk bulan berjalan) */
+  batas: string;
+  /** tanggal yang sama bulan lalu (pembanding) */
+  batas_lalu: string;
+  skor: SkorDasbor;
+  omzet_tim: number;
+  kesehatan: KesehatanSales[];
+  /** lead PM terbuka (semua umur) dalam cakupan peran; nilai = jumlah nilai penawaran yang terisi */
+  pm: { terbuka: number; qty: number; diam30: number; terbuka_bernilai: number; nilai: number; terbesar: { id: string; kode: string; qty: number } | null };
+  per_sales?: { pemilik: IdAnggota | null; nama: string | null; omzet: number; order: number }[];
+  win_pm?: JumlahMenang;
+  corong?: BulanCorong[];
+  siklus?: { sejak: string; lead_penawaran: SampelSiklus; penawaran_order: SampelSiklus };
+  pm_sales?: PmSales[];
+  pm_teratas?: PmTeratas[];
+  pm_win_qty?: { kecil: JumlahMenang; besar: JumlahMenang };
+  pm_qty_terisi?: { lebih_1: number; lead: number };
+  /** sales saja: FU hari ini (basis 90 hari), PM dulu lalu paling lama diam */
+  fu_hari_ini?: LeadRingkas[];
+};
+/** Hasil web_pipeline_dasbor_ids: id lead di balik satu angka bagian 2 (urut paling lama diam). */
+export type IdsDasbor = { metrik: MetrikDasbor; total: number; ids: string[] };
+
 /** Peta nama fungsi web_* → bentuk hasilnya. */
 export type HasilRpc = {
   web_saya: Profil;
@@ -773,4 +851,6 @@ export type HasilRpc = {
   web_pipeline_kategori_pindah: { lead_id: string; kategori_id: string | null };
   web_pipeline_sales: SalesPipeline[];
   web_pipeline_ganti_sales: HasilGantiSales;
+  web_pipeline_dasbor: DasborPipeline;
+  web_pipeline_dasbor_ids: IdsDasbor;
 };

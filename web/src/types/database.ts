@@ -1376,6 +1376,8 @@ export type Database = {
       web_pipeline_akses_simpan: { Args: { p: Json }; Returns: Json };
       web_pipeline_cek_duplikat: { Args: { p_telepon: string }; Returns: Json };
       web_pipeline_daftar: { Args: { p: Json }; Returns: Json };
+      web_pipeline_dasbor: { Args: { p: Json }; Returns: Json };
+      web_pipeline_dasbor_ids: { Args: { p: Json }; Returns: Json };
       web_pipeline_fu_catat: { Args: { p: Json }; Returns: Json };
       web_pipeline_ganti_sales: { Args: { p: Json }; Returns: Json };
       web_pipeline_kategori: { Args: Record<PropertyKey, never>; Returns: Json };

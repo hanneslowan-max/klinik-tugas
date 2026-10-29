@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { rpc } from "@/lib/api/rpc";
 import { kunci } from "@/lib/kunci-query";
 import { klienBrowser } from "@/lib/supabase/client";
-import type { PipelineSaya, SaringPelanggan, UrutPelanggan } from "@/types/domain";
+import type { MetrikDasbor, PipelineSaya, SaringPelanggan, UrutPelanggan } from "@/types/domain";
 
 /**
  * Akses modul untuk pengguna ini (gerbang menu & layar, §6). `awal` = hasil server dari layout (app) (KerangkaApp
@@ -62,6 +62,27 @@ export function usePipelineRingkas(arg: { bulan: string; dasar: "sp" | "lead" })
     queryFn: () =>
       rpc(klienBrowser(), "web_pipeline_ringkas", { p: { dasar: arg.dasar, bulan: arg.bulan || undefined } }),
     placeholderData: (lama) => lama,
+  });
+}
+
+/** Dasbor Tahap 1: bulan 'YYYY-MM' (kosong = bulan berjalan). Cakupan (penuh / milik saya) ditentukan server. */
+export function useDasborPipeline(bulan: string) {
+  return useQuery({
+    queryKey: kunci.pipelineDasbor(bulan),
+    queryFn: () => rpc(klienBrowser(), "web_pipeline_dasbor", { p: { bulan: bulan || undefined } }),
+    placeholderData: (lama) => lama,
+  });
+}
+
+/** Id lead di balik satu angka bagian 2 dasbor (klik angka → daftar lead). pemilik: id | 'tanpa' | '' (semua). */
+export function useDasborIds(arg: { metrik: MetrikDasbor | null; pemilik: string; bulan: string }) {
+  return useQuery({
+    queryKey: kunci.pipelineDasborIds(arg.metrik ?? "", arg.pemilik, arg.bulan),
+    queryFn: () =>
+      rpc(klienBrowser(), "web_pipeline_dasbor_ids", {
+        p: { metrik: arg.metrik, pemilik: arg.pemilik || undefined, bulan: arg.bulan || undefined },
+      }),
+    enabled: arg.metrik != null,
   });
 }
 

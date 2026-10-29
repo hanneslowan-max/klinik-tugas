@@ -33,6 +33,7 @@ function segarkanPipeline(qc: QueryClient, lead?: LeadDetail) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: kunci.semuaPipelineDaftar }),
     qc.invalidateQueries({ queryKey: kunci.semuaPipelineRingkas }),
+    qc.invalidateQueries({ queryKey: kunci.semuaPipelineDasbor }),
     // statistik & log pelanggan ikut berubah (lead baru, order, batal)
     qc.invalidateQueries({ queryKey: kunci.semuaPipelinePelanggan }),
   ]);
@@ -40,7 +41,7 @@ function segarkanPipeline(qc: QueryClient, lead?: LeadDetail) {
 
 /**
  * Sesudah pelanggan diubah/digabung/dibatalkan gabungnya: nama & pengelompokan pelanggan tampil di daftar lead,
- * detail lead, ringkasan (pelanggan baru), dan semua layar pelanggan.
+ * detail lead, ringkasan (pelanggan baru), dasbor (10 PM teratas), dan semua layar pelanggan.
  */
 function segarkanPelanggan(qc: QueryClient, detail?: PelangganDetail) {
   if (detail) qc.setQueryData(kunci.pipelinePelanggan(detail.pelanggan.id), detail);
@@ -49,6 +50,7 @@ function segarkanPelanggan(qc: QueryClient, detail?: PelangganDetail) {
     qc.invalidateQueries({ queryKey: kunci.semuaPipelineDaftar }),
     qc.invalidateQueries({ queryKey: kunci.semuaPipelineLead }),
     qc.invalidateQueries({ queryKey: kunci.semuaPipelineRingkas }),
+    qc.invalidateQueries({ queryKey: kunci.semuaPipelineDasbor }),
   ]);
 }
 
@@ -282,6 +284,7 @@ export function useGantiSales() {
         qc.invalidateQueries({ queryKey: kunci.semuaPipelineDaftar }),
         qc.invalidateQueries({ queryKey: kunci.semuaPipelineLead }),
         qc.invalidateQueries({ queryKey: kunci.semuaPipelineRingkas }),
+        qc.invalidateQueries({ queryKey: kunci.semuaPipelineDasbor }),
         qc.invalidateQueries({ queryKey: kunci.semuaPipelinePelanggan }),
       ]),
   });
