@@ -28,7 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AksiPipeline } from "@/features/pipeline/aksi-pipeline";
 import { DaftarOrder } from "@/features/pipeline/daftar-order";
-import { LABEL_METRIK, metrikSah, namaBulan } from "@/features/pipeline/dasbor";
+import { LABEL_METRIK, METRIK_BULANAN, metrikSah, namaBulan } from "@/features/pipeline/dasbor";
 import { DialogGantiSales } from "@/features/pipeline/dialog-ganti-sales";
 import { DialogLeadBaru } from "@/features/pipeline/dialog-lead-baru";
 import { GerbangPipeline, type AksesPipeline } from "@/features/pipeline/gerbang";
@@ -198,7 +198,7 @@ function SpandukDasbor({ metrik, bulan, pemilik, leads, total, hapus }: PropsSpa
     <div className="flex items-center gap-2 rounded-lg border bg-muted/50 py-1 pr-1 pl-3 text-sm" data-uji="saringan-dasbor">
       <p className="min-w-0 flex-1">
         <span className="text-muted-foreground">Dari dasbor:</span> <b>{LABEL_METRIK[metrik]}</b>
-        {(metrik === "sentuh_basis" || metrik === "sentuh_cepat") && bulan ? ` · ${namaBulan(bulan, true)}` : ""}
+        {METRIK_BULANAN.has(metrik) && bulan ? ` · ${namaBulan(bulan, true)}` : ""}
         {sales ? ` · ${sales}` : ""}
         {total != null ? ` · ${total} lead` : ""}
       </p>

@@ -24,6 +24,10 @@
 //   node tools/tugas.mjs pipeline bukti-set --file <items.json> [--dry-run]   bukti sumber lead dari chat WA (TIDAK mengubah
 //                                                                     `sumber` sales); scope tulis, token owner/bot. Berkas = {"items":[…]}
 //                                                                     atau array [{lead_id, bukti, kode?, chat_pada?}], maks 200 per panggilan
+//   node tools/tugas.mjs pipeline biaya-set --file <items.json> [--dry-run]   biaya iklan harian per campaign (dasbor bagian 5);
+//                                                                     scope tulis, token owner/bot. Berkas = {"items":[…]} atau array
+//                                                                     [{tanggal, platform google|meta, campaign, biaya, klik?, tayang?,
+//                                                                     konversi?}], maks 1000; per (tanggal, platform) = keadaan lengkap
 //   audit-free tidak berlaku di mode tugas.
 //   node tools/<tugas|clickup>.mjs backend                             (KEDUA mode) backend aktif + asal pilihan mode
 //
@@ -258,7 +262,22 @@ const EKSTRA = {
       if (opt["dry-run"]) return { dry_run: true, method: "POST", path: "/x/pipeline/sumber-bukti", url: `${BASE_X}/pipeline/sumber-bukti`, jumlah: items.length, body: { items } };
       return api("POST", `${BASE_X}/pipeline/sumber-bukti`, { items });
     }
-    throw new Error("pipeline: subperintah harus list | get <lead_id> | summary | fu-set | bukti-set");
+    if (sub === "biaya-set") {
+      // Biaya iklan harian per campaign (Agen Data Harian). Item = {tanggal YYYY-MM-DD, platform google|meta, campaign,
+      // biaya (rupiah), klik?, tayang?, konversi?}. Server memvalidasi semuanya (semua-atau-tidak); per (tanggal, platform)
+      // payload = keadaan lengkap hari itu → campaign yang tidak dikirim dihapus. Idempoten. --dry-run: tanpa request.
+      const berkas = wajibNilai("pipeline", "file");
+      if (!berkas) throw new Error("pipeline biaya-set: --file <items.json> wajib");
+      let isi;
+      try { isi = JSON.parse(fs.readFileSync(berkas, "utf8")); } catch (e) { throw new Error(`pipeline biaya-set: ${berkas} tidak terbaca sebagai JSON (${e.message})`); }
+      const items = Array.isArray(isi) ? isi : isi?.items;
+      if (!Array.isArray(items)) throw new Error('pipeline biaya-set: isi berkas harus {"items":[…]} atau array item');
+      if (!items.length) throw new Error("pipeline biaya-set: items kosong");
+      if (items.length > 1000) throw new Error(`pipeline biaya-set: maks 1000 item per panggilan (berkas berisi ${items.length}); pecah per rentang tanggal`);
+      if (opt["dry-run"]) return { dry_run: true, method: "POST", path: "/x/pipeline/biaya-iklan", url: `${BASE_X}/pipeline/biaya-iklan`, jumlah: items.length, body: { items } };
+      return api("POST", `${BASE_X}/pipeline/biaya-iklan`, { items });
+    }
+    throw new Error("pipeline: subperintah harus list | get <lead_id> | summary | fu-set | bukti-set | biaya-set");
   },
 };
 

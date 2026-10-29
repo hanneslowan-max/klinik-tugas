@@ -210,6 +210,7 @@ List sama → no-op. List tak ada → 404.
 | `x_lampiran_catat(p_aktor bigint, p_task text, p_comment text, p_path text, p_title text, p_mime text, p_size bigint)` | Untuk Edge `POST /v2/task/{id}/attachment` (scope `tulis`): catat baris lampiran setelah berkas ada di Storage. Logika bersama `inti_lampiran_catat` dengan `web_lampiran_catat` (§6); mode cermin & atribusi pengunggah via trigger; idempoten per `storage_path`. Hasil = lampiran web. |
 | `x_rawat_lampiran(p_aktor bigint, p_hari int default null, p_dry boolean default false)` | Untuk Edge `POST /x/rawat/lampiran` (scope `impor`, **owner/bot**). Soft-delete lampiran `sumber=app` pada kartu `sumber=app` yang `status_type in (done,closed)` dan `greatest(done_at,closed_at) < now() − N hari`. `N` = `p_hari`, atau `app_settings.rawat_lampiran.hari` (default 7); `aktif=false` → `{"dilewati":true,…}`. Kembalikan `{"hari","dihapus","dry","storage_paths":[…]}` (Edge yang menghapus berkas fisiknya). `p_dry` → hanya daftar. Trigger mencatat activity `lampiran_hapus`. Bukan owner/bot → `PT403 ACCESS_001`. Rincian di bawah tabel. |
 | `x_pipeline_sumber_bukti_set(p_aktor bigint, p jsonb)` | Untuk Edge `POST /x/pipeline/sumber-bukti` (scope `tulis`, aktor owner/bot/admin Pipeline): bukti sumber lead dari chat WA ke kolom `lead.sumber_bukti*`, tanpa menyentuh `sumber`. Maks 200 item, semua-atau-tidak, idempoten. Rincian §11. |
+| `x_pipeline_biaya_iklan_set(p_aktor bigint, p jsonb)` | Untuk Edge `POST /x/pipeline/biaya-iklan` (scope `tulis`, aktor owner/bot/admin Pipeline): biaya iklan harian per campaign ke tabel `iklan_biaya` (dasbor Pipeline bagian 5). Maks 1000 item; per (tanggal, platform) = keadaan lengkap hari itu; semua-atau-tidak, idempoten. Rincian §12. |
 
 **`x_search`: pencocokan dan urutan**
 - Cocok dengan ID atau `clickup_id`, URL (`app.clickup.com/t/<id>`, `/t/<team>/<id>`, `<app>/t/<id>`), kode di awal nama (`Y7`, `FX-PM`, `[Claude]`), `name ILIKE`, markdown/teks, atau full-text.
@@ -640,3 +641,32 @@ Tidak disamarkan untuk peran `baca`. Web: baris hanya-baca "Bukti sumber (agent)
 
 Hak: `x_pipeline_sumber_bukti_set` → service_role; `inti_pipeline_sumber_bukti_set`, `pipeline_sumber_bukti_kelas`,
 `pipeline_lead_sumber_bukti` internal. Fungsi `api_/x_/impor_` kini 36 (tes 09).
+
+## 12. Pipeline: dasbor Tahap 2 + biaya iklan (29 Okt 2026)
+Migrasi `20261029140000_pipeline_dasbor_lanjut.sql`, tes `uji/db/35_pipeline_dasbor_lanjut.sql`. Keputusan Hannes: biaya iklan
+disimpan di Anvil dan diisi agent (Agen Data Harian) lewat API; admin bisa menempel CSV sebagai cadangan.
+
+**Tabel `iklan_biaya`** (PK `tanggal, platform, campaign`): `biaya numeric(14,2)`, `klik int`, `tayang bigint`,
+`konversi numeric(12,2)` (Google Ads bisa pecahan), `diisi_pada`, `diisi_oleh`. RLS aktif; authenticated/anon tanpa akses
+langsung (biaya = angka tim, rep tidak boleh melihat); service_role SELECT saja. Tulis hanya lewat fungsi di bawah.
+
+**`x_pipeline_biaya_iklan_set(p_aktor, p)`** (Edge `POST /x/pipeline/biaya-iklan`, CLI `pipeline biaya-set --file`) dan
+**`web_pipeline_biaya_iklan_set(p)`** (tempel CSV di dasbor): aktor wajib peran Pipeline `admin` (owner/bot/admin; rep & baca →
+`PT403`). `p = {"items":[{"tanggal":"YYYY-MM-DD","platform":"google"|"meta","campaign":"…","biaya":123456.5,"klik":12,
+"tayang":3400,"konversi":2.5}]}`:
+- `tanggal` 2024-01-01 s/d hari ini WIB; `platform` dirapikan huruf kecil; `campaign` 1–120 karakter (spasi dirapikan);
+  `biaya` angka ≥ 0 maks 2 desimal; `klik`/`tayang` bulat ≥ 0; `konversi` ≥ 0 maks 2 desimal; kunci lain → `PT400`;
+  (tanggal, platform, campaign) ganda dalam satu payload (tanpa beda huruf) → `PT400`. Satu item tidak sah → tidak ada yang ditulis.
+- Per (tanggal, platform) yang ada di payload = keadaan LENGKAP hari itu: campaign lama yang tidak dikirim dihapus. Tanggal /
+  platform lain tidak disentuh. Kirim ulang payload sama → `sama` saja.
+- Hasil `{"diproses","baru","diubah","sama","dihapus","dari","sampai"}`.
+
+**`web_pipeline_dasbor_lanjut({bulan?})`** (authenticated): admin/baca → bagian 5–10 (`sumber`, `bukti`, `iklan`, `bayar`,
+`batal`, `kualitas`, `produk`, `pelanggan_lama`, `tidur`, `minggu`, `harian`); rep → HANYA `bayar_saya` & `rapikan` miliknya
+(tanpa biaya/angka sales lain); tanpa akses → `PT403`. Definisi di kepala migrasi. `web_pipeline_dasbor_ids` diganti: metrik Tahap 1
+sama persis + `bayar_belum_lunas`, `order_tanpa_bayar`, `nama_kosong`, `sumber_lainnya`, `batal_masuk`, `tanpa_bukti`,
+`dibatalkan`, `lead_dobel`, `pm_tanpa_nilai`.
+
+Hak: `x_pipeline_biaya_iklan_set` → service_role; `web_pipeline_dasbor_lanjut`, `web_pipeline_biaya_iklan_set` → authenticated;
+`inti_pipeline_dasbor_lanjut`, `inti_pipeline_biaya_iklan_set`, `pipeline_dasbor_batal` internal. Fungsi `web_*` kini 67,
+`api_/x_/impor_` 37 (tes 09).

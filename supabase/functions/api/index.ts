@@ -690,6 +690,13 @@ const RUTE: Rute[] = [
     m: "POST", p: /^\/x\/pipeline\/sumber-bukti$/, perlu: "tulis",
     h: async (c) => rpc("x_pipeline_sumber_bukti_set", { p_aktor: A(c), p: await c.body() }, T(c)),
   },
+  // Biaya iklan harian per campaign (Agen Data Harian menarik Google/Meta Ads) → tabel iklan_biaya untuk dasbor Pipeline
+  // bagian 5. Body {items:[{tanggal, platform, campaign, biaya, klik?, tayang?, konversi?}]} maks 1000; item per
+  // (tanggal, platform) = keadaan lengkap hari itu (campaign yang tidak dikirim dihapus). Aktor owner/bot/admin Pipeline.
+  {
+    m: "POST", p: /^\/x\/pipeline\/biaya-iklan$/, perlu: "tulis",
+    h: async (c) => rpc("x_pipeline_biaya_iklan_set", { p_aktor: A(c), p: await c.body() }, T(c)),
+  },
   {
     m: "GET", p: /^\/x\/pipeline\/leads$/, perlu: "baca",
     h: (c) => rpc("x_pipeline_daftar", { p_aktor: A(c), p: {
