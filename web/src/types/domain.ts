@@ -725,7 +725,10 @@ export type SkorDasbor = {
 /** Metrik bagian 2 yang bisa diklik → web_pipeline_dasbor_ids. */
 export type MetrikDasbor =
   | "terbuka90" | "lama" | "sentuh_basis" | "sentuh_cepat" | "fu_hari_ini" | "fu_telat" | "tanpa_jadwal"
-  | "baru_tanpa_catatan" | "diam_0_7" | "diam_8_14" | "diam_15_30" | "diam_31" | "pm_terbuka";
+  | "baru_tanpa_catatan" | "diam_0_7" | "diam_8_14" | "diam_15_30" | "diam_31" | "pm_terbuka"
+  // Tahap 2 (20261029140000)
+  | "bayar_belum_lunas" | "order_tanpa_bayar" | "nama_kosong" | "sumber_lainnya" | "batal_masuk" | "tanpa_bukti"
+  | "dibatalkan" | "lead_dobel" | "pm_tanpa_nilai";
 /** Satu baris kesehatan follow-up (basis lead terbuka ≤ 90 hari). pemilik null = tanpa pemilik. */
 export type KesehatanSales = {
   pemilik: IdAnggota | null;
@@ -782,6 +785,74 @@ export type DasborPipeline = {
   /** sales saja: FU hari ini (basis 90 hari), PM dulu lalu paling lama diam */
   fu_hari_ini?: LeadRingkas[];
 };
+// -------------------------------------------------------------------- dasbor pipeline Tahap 2 (20261029140000)
+export type PlatformIklan = "google" | "meta";
+/** Order belum LUNAS (tanggal SP 90 hari terakhir): kosong = status bayar belum dicatat, tua = umur SP > 30 hari. */
+export type BayarBelumLunas = { order: number; nilai: number; kosong: number; belum: number; dp: number; tua: number };
+/** Hasil web_pipeline_dasbor_lanjut untuk admin/baca: bagian 5–10. */
+export type DasborLanjutPenuh = {
+  peran: "penuh";
+  bulan: string;
+  hari_ini: string;
+  batas: string;
+  /** awal jendela pembayaran (order SP sejak tanggal ini) */
+  sejak_bayar: string;
+  sumber: { sumber: SumberLead; lead: number; order: number; omzet: number }[];
+  bukti: { kelas: KelasBuktiSumber | null; lead: number }[];
+  iklan: {
+    /** hari terakhir bulan itu yang punya data biaya Google (null = belum ada) */
+    sampai: string | null;
+    diisi_pada: string | null;
+    google: { biaya: number; klik: number; konversi: number };
+    lead_google: { lead: number; order: number; omzet: number };
+    kampanye: { platform: PlatformIklan; campaign: string; biaya: number; klik: number; konversi: number; sampai: string }[];
+  };
+  bayar: (BayarBelumLunas & { pemilik: IdAnggota | null; nama: string | null })[];
+  batal: {
+    lead: number;
+    fu_kurang2: number;
+    /** status BATAL hasil impor di bulan itu (tidak dihitung; tanggal batal asli tidak diketahui) */
+    impor: number;
+    alasan: { alasan: string; lead: number }[];
+    lonjakan: { tanggal: string; pemilik: IdAnggota | null; nama: string | null; lead: number }[];
+  };
+  kualitas: {
+    lead: number;
+    nama_kosong: number;
+    sumber_lainnya: number;
+    tanpa_bukti: number;
+    order: number;
+    order_tanpa_bayar: number;
+    dobel: { pelanggan: number; lead: number };
+  };
+  produk: { produk: ProdukLead; lead: number; order: number; omzet: number; gabungan: ProdukLead[] }[];
+  pelanggan_lama: { order: number; omzet: number };
+  tidur: { pernah: number; tidur: number; nilai: number };
+  minggu: { mulai: string; sampai: string; lead: number; order: number }[];
+  harian: { bulan: { tgl: number; omzet: number }[]; lalu: { tgl: number; omzet: number }[] };
+};
+/** Hasil web_pipeline_dasbor_lanjut untuk sales: hanya kartu miliknya. */
+export type DasborLanjutSales = {
+  peran: "sales";
+  bulan: string;
+  hari_ini: string;
+  sejak_bayar: string;
+  bayar_saya: BayarBelumLunas;
+  rapikan: { lead: number; nama_kosong: number; sumber_lainnya: number; batal: number };
+};
+export type DasborLanjut = DasborLanjutPenuh | DasborLanjutSales;
+/** Satu baris biaya iklan (web_pipeline_biaya_iklan_set / agent). */
+export type ItemBiayaIklan = {
+  tanggal: string;
+  platform: PlatformIklan;
+  campaign: string;
+  biaya: number;
+  klik?: number;
+  tayang?: number;
+  konversi?: number;
+};
+export type HasilBiayaIklan = { diproses: number; baru: number; diubah: number; sama: number; dihapus: number; dari: string; sampai: string };
+
 /** Hasil web_pipeline_dasbor_ids: id lead di balik satu angka bagian 2 (urut paling lama diam). */
 export type IdsDasbor = { metrik: MetrikDasbor; total: number; ids: string[] };
 
@@ -853,4 +924,6 @@ export type HasilRpc = {
   web_pipeline_ganti_sales: HasilGantiSales;
   web_pipeline_dasbor: DasborPipeline;
   web_pipeline_dasbor_ids: IdsDasbor;
+  web_pipeline_dasbor_lanjut: DasborLanjut;
+  web_pipeline_biaya_iklan_set: HasilBiayaIklan;
 };

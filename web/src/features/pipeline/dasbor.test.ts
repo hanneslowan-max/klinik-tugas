@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   AMBANG,
+  kumulatif,
+  labelTglBulan,
+  namaHari,
   hariKerjaAntara,
   hariKerjaBerikut,
   labelRentang,
@@ -10,6 +13,8 @@ import {
   perubahan,
   rentangBulan,
   rupiahJuta,
+  rupiahJuta2,
+  rupiahRingkas,
   siklusValid,
   skorTarget,
   splitQtyValid,
@@ -114,15 +119,37 @@ describe("format", () => {
   it("rupiah juta & rentang", () => {
     expect(rupiahJuta(596_759_433)).toBe("Rp596,8 jt");
     expect(rupiahJuta(850_000)).toBe("Rp850 rb");
+    expect(rupiahJuta(0)).toBe("Rp0");
     expect(rupiahJuta(300_000_000)).toBe("Rp300 jt");
     expect(rupiahJuta(147_999_694)).toBe("Rp148,0 jt");
     expect(labelRentang("2026-09-29")).toBe("1–29 Sep");
     expect(labelSisa("2026-10-29", "2026-10")).toBe("29–31 Okt");
     expect(labelSisa("2026-10-31", "2026-10")).toBe("31 Okt");
   });
+  it("rupiah ringkas biaya per hasil (mockup: Rp38,2 rb · Rp415 rb · Rp8,1 jt · Rp7,78 jt)", () => {
+    expect(rupiahRingkas(16_190_000 / 423.5)).toBe("Rp38,2 rb");
+    expect(rupiahRingkas(16_190_000 / 39)).toBe("Rp415 rb");
+    expect(rupiahRingkas(16_190_000 / 2)).toBe("Rp8,1 jt");
+    expect(rupiahRingkas(850)).toBe("Rp850");
+    expect(rupiahRingkas(Infinity)).toBe("—");
+    expect(rupiahJuta2(7_780_000)).toBe("Rp7,78 jt");
+  });
   it("perubahan relatif", () => {
     expect(perubahan(335, 385)).toBe("−13%");
     expect(perubahan(51, 50)).toBe("+2%");
     expect(perubahan(5, 0)).toBeNull();
+  });
+});
+
+describe("tren & kumulatif", () => {
+  it("omzet kumulatif per hari (hari tanpa order tetap)", () => {
+    expect(kumulatif([{ tgl: 1, omzet: 10 }, { tgl: 3, omzet: 5 }], 4)).toEqual([10, 10, 15, 15]);
+    expect(kumulatif([], 2)).toEqual([0, 0]);
+    expect(kumulatif([{ tgl: 30, omzet: 7 }], 29)).toEqual(Array(29).fill(0)); // di luar rentang tidak ikut
+  });
+  it("label minggu & nama hari", () => {
+    expect(labelTglBulan("2026-08-03")).toBe("3/8");
+    expect(namaHari("2026-10-29")).toBe("Kamis");
+    expect(namaHari("2026-10-26")).toBe("Senin");
   });
 });

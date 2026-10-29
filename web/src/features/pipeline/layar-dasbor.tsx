@@ -1,14 +1,14 @@
 "use client";
 
-// Dasbor Pipeline Tahap 1 (brief Hannes 29 Okt 2026; mockup "Dashboard Pipeline Anvil"), data web_pipeline_dasbor.
-// Admin/baca: 1 Skor bulan ini · 2 Kesehatan follow-up per sales · 3 Corong per bulan lead masuk · 4 Fokus Pallet Mesh.
+// Dasbor Pipeline (brief Hannes 29 Okt 2026; mockup "Dashboard Pipeline Anvil"). Tahap 1 = web_pipeline_dasbor:
+// admin/baca 1 Skor bulan ini · 2 Kesehatan follow-up per sales · 3 Corong per bulan lead masuk · 4 Fokus Pallet Mesh.
+// Tahap 2 = web_pipeline_dasbor_lanjut (dimuat terpisah, bagian-lanjut.tsx): bagian 5–10 + kartu sales bayar & rapikan.
 // Sales (rep): "milik saya" — server hanya mengirim angka miliknya + omzet tim (progres target tim); bagian penuh tidak
 // ada di data, bukan sekadar disembunyikan. Angka bergaris titik → daftar lead yang dihitung (/pipeline?kes=…).
 // Bulan dipilih di ?bulan=YYYY-MM (kosong = bulan berjalan). Target & ambang di dasbor.ts.
-import { Info } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 
 import { IsiHalaman } from "@/components/layout/isi-halaman";
 import { KepalaHalaman } from "@/components/layout/kepala-halaman";
@@ -16,6 +16,7 @@ import { GalatMuat, Kosong, MemuatDaftar } from "@/components/umum/keadaan";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AksiPipeline } from "@/features/pipeline/aksi-pipeline";
+import { BagianLanjutAdmin, KartuSalesLanjut } from "@/features/pipeline/bagian-lanjut";
 import {
   angka,
   awalBasis90,
@@ -37,99 +38,17 @@ import {
   targetSales,
   tglPendek,
 } from "@/features/pipeline/dasbor";
+import { Angka, Besar, Catatan, JudulBagian, Kartu, Label, Meter, namaSales, Sub } from "@/features/pipeline/dasbor-ui";
 import { DialogFu } from "@/features/pipeline/dialog-fu";
 import { GerbangPipeline, type AksesPipeline } from "@/features/pipeline/gerbang";
 import { ringkasProduk } from "@/features/pipeline/konstanta";
 import { PilTahap } from "@/features/pipeline/pil-tahap";
-import { useDasborPipeline } from "@/features/pipeline/queries";
+import { useDasborLanjut, useDasborPipeline } from "@/features/pipeline/queries";
 import { useProfil } from "@/features/profil/penyedia-profil";
 import { fmtTanggal, fmtTanggalPanjang } from "@/lib/tanggal";
 import { gantiUrl } from "@/lib/url-dangkal";
 import { cn } from "@/lib/utils";
 import type { BulanCorong, DasborPipeline, JumlahMenang, KesehatanSales, MetrikDasbor } from "@/types/domain";
-
-// ------------------------------------------------------------------ kepingan
-function Kartu({ children, className, uji }: { children: ReactNode; className?: string; uji?: string }) {
-  return (
-    <div className={cn("rounded-xl border bg-card p-4", className)} data-uji={uji}>
-      {children}
-    </div>
-  );
-}
-
-function JudulBagian({ no, children }: { no?: number; children: ReactNode }) {
-  return (
-    <h2 className="flex items-center gap-2 text-sm font-semibold">
-      {no ? (
-        <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs text-primary tabular-nums">
-          {no}
-        </span>
-      ) : null}
-      {children}
-    </h2>
-  );
-}
-
-function Label({ children }: { children: ReactNode }) {
-  return <div className="text-xs text-muted-foreground">{children}</div>;
-}
-
-function Besar({ children, uji }: { children: ReactNode; uji?: string }) {
-  return (
-    <div className="text-2xl font-semibold tabular-nums" data-uji={uji}>
-      {children}
-    </div>
-  );
-}
-
-function Sub({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("text-xs text-muted-foreground", className)}>{children}</div>;
-}
-
-/** Progres ke target (satu seri: tanpa legenda; angkanya tertulis di samping). */
-function Meter({ r, label, className }: { r: number; label: string; className?: string }) {
-  const p = Math.max(0, Math.min(1, r));
-  return (
-    <div
-      role="meter"
-      aria-label={label}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={Math.round(r * 100)}
-      className={cn("h-2 overflow-hidden rounded-full bg-muted", className)}
-    >
-      <div className="h-full rounded-r-[4px] bg-primary" style={{ width: `${p * 100}%` }} />
-    </div>
-  );
-}
-
-/** Angka yang membuka daftar lead di baliknya. */
-function Angka({ n, href, uji, className }: { n: number; href: string; uji?: string; className?: string }) {
-  return (
-    <Link
-      href={href}
-      data-uji={uji}
-      className={cn(
-        "tabular-nums underline decoration-muted-foreground/60 decoration-dotted underline-offset-4 hover:text-primary hover:decoration-primary",
-        className,
-      )}
-    >
-      {angka(n)}
-    </Link>
-  );
-}
-
-/** Catatan "kenapa angka ini kosong / belum valid" (oranye lembut, ikon + teks). */
-function Catatan({ children, uji }: { children: ReactNode; uji?: string }) {
-  return (
-    <p className="flex gap-2 rounded-lg bg-hari-ini-lembut px-3 py-2 text-xs text-foreground" data-uji={uji}>
-      <Info className="mt-px size-3.5 shrink-0 text-hari-ini" aria-hidden />
-      <span>{children}</span>
-    </p>
-  );
-}
-
-const namaSales = (nama: string | null, pemilik: number | null) => (pemilik == null ? "Tanpa pemilik" : (nama ?? `#${pemilik}`));
 
 // ------------------------------------------------------------------ 1 · skor bulan ini (admin)
 function BagianSkor({ d }: { d: DasborPipeline }) {
@@ -241,7 +160,8 @@ function BagianSkor({ d }: { d: DasborPipeline }) {
 }
 
 // ------------------------------------------------------------------ 2 · kesehatan follow-up (admin)
-const KOLOM_KESEHATAN: { k: Exclude<MetrikDasbor, "sentuh_basis" | "sentuh_cepat" | "lama" | "pm_terbuka" | "diam_0_7">; label: string }[] = [
+type KolomKesehatan = Extract<MetrikDasbor, "fu_hari_ini" | "fu_telat" | "tanpa_jadwal" | "baru_tanpa_catatan" | "diam_8_14" | "diam_15_30" | "diam_31">;
+const KOLOM_KESEHATAN: { k: KolomKesehatan; label: string }[] = [
   { k: "fu_hari_ini", label: "FU hari ini" },
   { k: "fu_telat", label: "FU telat" },
   { k: "tanpa_jadwal", label: "Tanpa jadwal FU" },
@@ -788,6 +708,7 @@ function IsiDasbor({ akses }: { akses: AksesPipeline }) {
   const bulanUrl = sp.get("bulan") ?? "";
   const bulan = pilihan.includes(bulanUrl) ? bulanUrl : "";
   const q = useDasborPipeline(bulan);
+  const lanjut = useDasborLanjut(bulan);
   const gantiBulan = (b: string) => gantiUrl(b === pilihan[0] ? "/pipeline/dasbor" : `/pipeline/dasbor?bulan=${b}`);
 
   return (
@@ -820,10 +741,18 @@ function IsiDasbor({ akses }: { akses: AksesPipeline }) {
           <BagianKesehatan d={q.data} />
           <BagianCorong d={q.data} />
           <BagianPm d={q.data} />
+          <BagianLanjutAdmin q={lanjut} d1={q.data} bolehTempel={akses.peran === "admin"} />
         </div>
       ) : (
-        <div className={cn("transition-opacity", q.isPlaceholderData && "opacity-60")}>
+        <div className={cn("space-y-4 transition-opacity", q.isPlaceholderData && "opacity-60")}>
           <TampilanSales d={q.data} akses={akses} />
+          {lanjut.isError ? (
+            <GalatMuat galat={lanjut.error} ulang={() => void lanjut.refetch()} />
+          ) : lanjut.data?.peran === "sales" ? (
+            <KartuSalesLanjut d={lanjut.data} saya={q.data.saya} />
+          ) : (
+            <MemuatDaftar baris={1} />
+          )}
         </div>
       )}
     </div>

@@ -596,7 +596,7 @@ Sebelumnya pemilik (sales) lead hanya terisi otomatis (pembuat, Klaim, klaim saa
 - Tes: `uji/db/33_pipeline_ganti_sales.sql` (38 cek), 09 (63 `web_*`) & 30 (kunci detail lead) disesuaikan;
   e2e `tests/e2e/pipeline-ganti-sales.spec.ts` (3 skenario × HP/desktop).
 
-## Dasbor Pipeline Tahap 1 (29 Okt 2026, brief ACC Hannes; PR terbuka, BELUM merge/deploy — deploy oleh Felix)
+## Dasbor Pipeline Tahap 1 (29 Okt 2026, brief ACC Hannes; live 29 Okt — migrasi & merge PR #31 atas permintaan Hannes)
 Bagian 1–4 mockup "Dashboard Pipeline Anvil" (admin) + tampilan sales "milik saya". Bagian 5–10 = Tahap 2.
 - DB `20261029130000_pipeline_dasbor.sql` (aditif, fungsi baru saja): `web_pipeline_dasbor({bulan?})` dan
   `web_pipeline_dasbor_ids({metrik, pemilik?, bulan?})` (id lead di balik angka bagian 2; predikat sama dengan angkanya,
@@ -619,6 +619,25 @@ Bagian 1–4 mockup "Dashboard Pipeline Anvil" (admin) + tampilan sales "milik s
   diam tersingkat); urutan tumpukan corong ORDER·BARU·PENAWARAN·DIALIHKAN·BATAL (lolos uji buta warna).
 - Tes: `uji/db/34_pipeline_dasbor.sql` (54 cek, termasuk akses rep), 09 (65 `web_*`); vitest
   `features/pipeline/dasbor.test.ts`; e2e `tests/e2e/pipeline-dasbor.spec.ts` (3 skenario × HP/desktop).
+
+## Dasbor Pipeline Tahap 2 (29 Okt 2026, bagian 5–10 + kartu sales; Hannes: biaya iklan diisi agent, langsung migrasi + merge)
+- DB `20261029140000_pipeline_dasbor_lanjut.sql` (aditif): tabel `iklan_biaya` (harian per campaign; tanpa akses langsung
+  web — biaya = angka tim), tulis `x_pipeline_biaya_iklan_set` (Edge `POST /x/pipeline/biaya-iklan`, CLI `pipeline biaya-set`)
+  & `web_pipeline_biaya_iklan_set` (tempel CSV admin) — peran Pipeline admin saja; per (tanggal, platform) = keadaan lengkap
+  hari itu. `web_pipeline_dasbor_lanjut`: admin/baca bagian 5–10, rep hanya kartu bayar & rapikan miliknya.
+  `web_pipeline_dasbor_ids` diganti (metrik Tahap 1 sama + 9 metrik baru).
+- Definisi (dicek ke data produksi 29 Okt, baca saja): sumber = isian sales, bukti = kelas agent; biaya Google per hasil
+  = tgl 1 s/d hari terakhir data biaya; bayar = order SP 90 hari terakhir bukan LUNAS (Michael 64 / Rp454,2 jt = mockup);
+  batal = perubahan tahap ke BATAL yang dicatat di Anvil bulan itu — 51 status BATAL hasil impor 12 Okt tidak dihitung
+  (mockup memasukkan 20 di antaranya, tanggal batal aslinya tidak diketahui); kualitas (nama "-" 69/Riksa 37, Lainnya 175,
+  dobel 63 pelanggan/140 lead = mockup); produk = item pertama (kecil digabung Lainnya); pelanggan lama = order_sebelumnya;
+  tidur = pernah order, tanpa lead masuk 90 hari & tanpa lead terbuka (72/193, Rp705,1 jt ≈ mockup 74/191 Rp707,1 jt);
+  tren 13 minggu (Senin) dua grafik terpisah (bukan sumbu ganda) + omzet kumulatif vs bulan lalu & target.
+- Web: `bagian-lanjut.tsx` (bagian 5–10, kartu sales, dialog "Tempel biaya iklan" — parser `biaya-csv.ts`: tab/koma,
+  angka Indonesia/Inggris, baris total dilewati, kiriman dipecah tanpa memisah satu hari), `dasbor-ui.tsx` (kepingan
+  bersama). Agent: Agen Data Harian perlu memanggil `pipeline biaya-set` (belum dipasang di routine-nya).
+- Tes: `uji/db/35_pipeline_dasbor_lanjut.sql` (51 cek), 09 (67 `web_*`, 37 `api_/x_/impor_`); vitest `biaya-csv.test.ts`,
+  `dasbor.test.ts`; e2e `pipeline-dasbor-lanjut.spec.ts` (3 skenario × HP/desktop, termasuk halaman tidak melebar di HP).
 
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)
 Prasyarat dari Hannes: project Supabase baru `rhj-tugas` (akun/org baru, Sydney `ap-southeast-2` per keputusan 30/9, Free); env cloud `SUPABASE_ACCESS_TOKEN` (PAT akun baru) + `SUPABASE_PROJECT_REF`; `CLICKUP_API_TOKEN` (sudah ada); sesi baru supaya env terbaca. Semua langkah ke ClickUp **GET saja**. Tidak memakai MCP Supabase (itu ERP).

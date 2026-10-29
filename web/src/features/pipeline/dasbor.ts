@@ -139,10 +139,25 @@ export const namaBulan = (bulan: string, panjang = false) =>
 /** 'Rp243,3 jt' (juta, satu desimal; juta bulat 'Rp300 jt'); di bawah 1 jt: 'Rp850 rb'. */
 export function rupiahJuta(n: number | null | undefined): string {
   if (n == null) return "—";
+  if (n === 0) return "Rp0";
   if (Math.abs(n) < 1_000_000) return `Rp${Math.round(n / 1000).toLocaleString("id-ID")} rb`;
   // juta bulat (target) tanpa desimal: 'Rp300 jt'
   return `Rp${n % 1_000_000 === 0 ? n / 1_000_000 : SATU_DESIMAL.format(n / 1_000_000)} jt`;
 }
+
+const DUA_DESIMAL = new Intl.NumberFormat("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** Biaya per hasil: 'Rp8,1 jt' · 'Rp415 rb' · 'Rp38,2 rb' · 'Rp850'. */
+export function rupiahRingkas(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return "—";
+  if (Math.abs(n) >= 1_000_000) return rupiahJuta(n);
+  if (Math.abs(n) >= 100_000) return `Rp${Math.round(n / 1000)} rb`;
+  if (Math.abs(n) >= 1000) return `Rp${SATU_DESIMAL.format(n / 1000)} rb`;
+  return `Rp${Math.round(n)}`;
+}
+
+/** Biaya campaign: 'Rp7,78 jt' (dua desimal). */
+export const rupiahJuta2 = (n: number) => `Rp${DUA_DESIMAL.format(n / 1_000_000)} jt`;
 
 /** '37,9%' */
 export const persen = (r: number) => PERSEN.format(r);
@@ -202,7 +217,21 @@ export const LABEL_METRIK: Record<MetrikDasbor, string> = {
   diam_15_30: "Diam 15–30 hari",
   diam_31: "Diam >30 hari",
   pm_terbuka: "Lead Pallet Mesh terbuka",
+  bayar_belum_lunas: "Order belum lunas (SP 90 hari terakhir)",
+  order_tanpa_bayar: "Order tanpa status bayar",
+  nama_kosong: 'Nama pelanggan "-"',
+  sumber_lainnya: 'Sumber "Lainnya"',
+  batal_masuk: "Lead masuk yang BATAL",
+  tanpa_bukti: "Tanpa bukti sumber",
+  dibatalkan: "Lead dibatalkan",
+  lead_dobel: "Pelanggan dengan >1 lead terbuka",
+  pm_tanpa_nilai: "Lead PM terbuka tanpa nilai penawaran",
 };
+
+/** Metrik yang dihitung per bulan dipilih (spanduk daftar menyebut bulannya). */
+export const METRIK_BULANAN: ReadonlySet<MetrikDasbor> = new Set<MetrikDasbor>([
+  "sentuh_basis", "sentuh_cepat", "nama_kosong", "sumber_lainnya", "batal_masuk", "tanpa_bukti", "dibatalkan", "order_tanpa_bayar",
+]);
 
 export const metrikSah = (s: string | null): s is MetrikDasbor => s != null && Object.hasOwn(LABEL_METRIK, s);
 
@@ -217,3 +246,22 @@ export function tautanDaftar(metrik: MetrikDasbor, pemilik: number | null | "sem
   p.set("kb", bulan);
   return `/pipeline?${p.toString()}`;
 }
+
+/** Omzet harian [{tgl, omzet}] → kumulatif hari 1…hariAkhir (hari tanpa order = sama dengan hari sebelumnya). */
+export function kumulatif(harian: { tgl: number; omzet: number }[], hariAkhir: number): number[] {
+  const per = new Map(harian.map((x) => [x.tgl, x.omzet]));
+  const hasil: number[] = [];
+  let jalan = 0;
+  for (let h = 1; h <= hariAkhir; h++) {
+    jalan += per.get(h) ?? 0;
+    hasil.push(jalan);
+  }
+  return hasil;
+}
+
+/** '3/8' (tanggal/bulan) untuk label minggu. */
+export const labelTglBulan = (iso: string) => `${Number(iso.slice(8, 10))}/${Number(iso.slice(5, 7))}`;
+
+const HARI_PENDEK = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+/** Nama hari ('Kamis') dari tanggal ISO. */
+export const namaHari = (iso: string) => HARI_PENDEK[new Date(`${iso}T00:00:00Z`).getUTCDay()];

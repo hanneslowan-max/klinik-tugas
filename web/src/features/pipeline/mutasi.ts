@@ -12,6 +12,8 @@ import type { Json } from "@/types/database";
 import type {
   AlasanDobel,
   CekDuplikatTelepon,
+  HasilBiayaIklan,
+  ItemBiayaIklan,
   JenisPelanggan,
   LeadDetail,
   PapanKategori,
@@ -52,6 +54,21 @@ function segarkanPelanggan(qc: QueryClient, detail?: PelangganDetail) {
     qc.invalidateQueries({ queryKey: kunci.semuaPipelineRingkas }),
     qc.invalidateQueries({ queryKey: kunci.semuaPipelineDasbor }),
   ]);
+}
+
+/** Tempel biaya iklan (admin Pipeline) per kiriman; dasbor dimuat ulang sesudah semua kiriman. */
+export function useBiayaIklanSet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (kiriman: ItemBiayaIklan[][]) => {
+      const hasil: HasilBiayaIklan[] = [];
+      for (const items of kiriman) {
+        hasil.push(await rpc(klienBrowser(), "web_pipeline_biaya_iklan_set", { p: { items } as unknown as Json }));
+      }
+      return hasil;
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: kunci.semuaPipelineDasbor }),
+  });
 }
 
 export type ItemMasuk = { produk: ProdukLead; qty: number; satuan?: SatuanItem; spesifikasi?: string | null };

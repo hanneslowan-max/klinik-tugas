@@ -47,6 +47,7 @@ export const kunci = {
   semuaPipelineRingkas: ["pipeline", "ringkas"] as const,
   pipelineDasbor: (bulan: string) => ["pipeline", "dasbor", bulan] as const,
   pipelineDasborIds: (metrik: string, pemilik: string, bulan: string) => ["pipeline", "dasbor", "ids", metrik, pemilik, bulan] as const,
+  pipelineDasborLanjut: (bulan: string) => ["pipeline", "dasbor", "lanjut", bulan] as const,
   /** akar dasbor (angka & id di baliknya) */
   semuaPipelineDasbor: ["pipeline", "dasbor"] as const,
   /** daftar akses modul Pipeline (layar admin owner) */

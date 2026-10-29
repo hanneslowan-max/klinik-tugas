@@ -74,6 +74,15 @@ export function useDasborPipeline(bulan: string) {
   });
 }
 
+/** Dasbor Tahap 2 (bagian 5–10 untuk admin/baca; kartu bayar & rapikan untuk sales). Dimuat terpisah dari bagian 1–4. */
+export function useDasborLanjut(bulan: string) {
+  return useQuery({
+    queryKey: kunci.pipelineDasborLanjut(bulan),
+    queryFn: () => rpc(klienBrowser(), "web_pipeline_dasbor_lanjut", { p: { bulan: bulan || undefined } }),
+    placeholderData: (lama) => lama,
+  });
+}
+
 /** Id lead di balik satu angka bagian 2 dasbor (klik angka → daftar lead). pemilik: id | 'tanpa' | '' (semua). */
 export function useDasborIds(arg: { metrik: MetrikDasbor | null; pemilik: string; bulan: string }) {
   return useQuery({
