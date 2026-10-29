@@ -42,6 +42,11 @@ export function usePipelineDaftar(arg: { tab: string; pemilik: number | null; q:
   });
 }
 
+/** Sales yang sah sebagai tujuan Ganti sales (owner + akses admin/rep, aktif). */
+export function useSalesPipeline(aktif = true) {
+  return useQuery({ queryKey: kunci.pipelineSales, queryFn: () => rpc(klienBrowser(), "web_pipeline_sales"), staleTime: 5 * 60_000, enabled: aktif });
+}
+
 /** Detail satu lead. */
 export function usePipelineLead(id: string) {
   return useQuery({

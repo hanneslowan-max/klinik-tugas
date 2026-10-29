@@ -11,11 +11,11 @@
 // yang bertahan saat Kembali dari detail; kotak cari terpisah (ketikan tidak merender ulang daftar); baris di-memo.
 // Papan (dnd-kit) dimuat malas: dipramuat saat ?v=papan aktif, saat senggang sesudah daftar tiba, atau tombol Papan
 // disentuh/difokus; gagal memuat → pesan + Coba lagi di tempat papan (muatKomponen).
-import { List, Plus, SquareKanban } from "lucide-react";
+import { CheckSquare, List, Plus, SquareKanban, UserPen, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 
 import { IsiHalaman } from "@/components/layout/isi-halaman";
 import { IsiTautan } from "@/components/layout/petunjuk-tautan";
@@ -23,8 +23,10 @@ import { KepalaHalaman } from "@/components/layout/kepala-halaman";
 import { GalatMuat, Kosong, MemuatDaftar } from "@/components/umum/keadaan";
 import { Chip } from "@/components/umum/chip";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { AksiPipeline } from "@/features/pipeline/aksi-pipeline";
 import { DaftarOrder } from "@/features/pipeline/daftar-order";
+import { DialogGantiSales } from "@/features/pipeline/dialog-ganti-sales";
 import { DialogLeadBaru } from "@/features/pipeline/dialog-lead-baru";
 import { GerbangPipeline, type AksesPipeline } from "@/features/pipeline/gerbang";
 import { infoFu, PRODUK, ringkasProduk, rupiah, TAB_DAFTAR } from "@/features/pipeline/konstanta";
@@ -72,57 +74,101 @@ function urlPipeline(dasar: string, ubah: Record<string, string | null>) {
   return s ? `/pipeline?${s}` : "/pipeline";
 }
 
-// memo: daftar besar tidak dirender ulang per baris saat induk berubah (data lead = objek cache yang sama)
-const BarisLead = memo(function BarisLead({ lead, hariIni, kategori }: { lead: LeadRingkas; hariIni: string; kategori?: string }) {
+type PropsBaris = { lead: LeadRingkas; hariIni: string; kategori?: string };
+
+/** Isi baris lead (dipakai baris tautan & baris mode Pilih). */
+function IsiBarisLead({ lead, hariIni, kategori }: PropsBaris) {
   const buka = lead.tahap === "BARU" || lead.tahap === "PENAWARAN";
   const panas = buka && lead.diam_hari > 7;
   const fu = buka && lead.fu_berikutnya ? infoFu(lead.fu_berikutnya, hariIni) : null;
   return (
+    <>
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate font-semibold">{lead.pelanggan}</span>
+          {lead.periksa ? <Chip nada="hari-ini">periksa</Chip> : null}
+          {kategori ? (
+            <Chip nada="garis" className="min-w-0 shrink truncate" data-uji="chip-kategori">
+              {kategori}
+            </Chip>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="min-w-0 truncate text-sm text-muted-foreground">{ringkasProduk(lead.produk)}</span>
+          <ChipRepeat n={lead.order_sebelumnya} />
+        </div>
+        <div className="truncate text-xs text-muted-foreground">
+          {lead.kode}
+          {lead.kota ? ` · ${lead.kota}` : ""}
+          {lead.pemilik_nama ? ` · ${lead.pemilik_nama}` : " · tanpa pemilik"}
+        </div>
+      </div>
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <PilTahap tahap={lead.tahap} />
+        {lead.tahap === "ORDER" ? (
+          <span className="text-xs font-medium tabular-nums">{rupiah(lead.nilai_transaksi)}</span>
+        ) : buka ? (
+          <>
+            {fu ? (
+              <span className={cn("text-xs whitespace-nowrap", fu.mendesak ? "font-semibold text-telat" : "text-muted-foreground")}>
+                {fu.teks}
+              </span>
+            ) : null}
+            <span className={cn("text-xs tabular-nums", panas ? "font-semibold text-telat" : "text-muted-foreground")}>
+              diam {lead.diam_hari} hr
+            </span>
+          </>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
+// memo: daftar besar tidak dirender ulang per baris saat induk berubah (data lead = objek cache yang sama)
+const BarisLead = memo(function BarisLead(props: PropsBaris) {
+  return (
     <Link
-      href={`/pipeline/${encodeURIComponent(lead.id)}`}
+      href={`/pipeline/${encodeURIComponent(props.lead.id)}`}
       className="block rounded-xl border bg-card transition-colors hover:bg-muted"
       data-uji="baris-lead"
     >
       <IsiTautan className="flex items-start gap-2 px-3 py-2.5" kelasPetunjuk="inset-x-3 bottom-0.5 h-0.5">
-        <div className="min-w-0 flex-1 space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="truncate font-semibold">{lead.pelanggan}</span>
-            {lead.periksa ? <Chip nada="hari-ini">periksa</Chip> : null}
-            {kategori ? (
-              <Chip nada="garis" className="min-w-0 shrink truncate" data-uji="chip-kategori">
-                {kategori}
-              </Chip>
-            ) : null}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="min-w-0 truncate text-sm text-muted-foreground">{ringkasProduk(lead.produk)}</span>
-            <ChipRepeat n={lead.order_sebelumnya} />
-          </div>
-          <div className="truncate text-xs text-muted-foreground">
-            {lead.kode}
-            {lead.kota ? ` · ${lead.kota}` : ""}
-            {lead.pemilik_nama ? ` · ${lead.pemilik_nama}` : " · tanpa pemilik"}
-          </div>
-        </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <PilTahap tahap={lead.tahap} />
-          {lead.tahap === "ORDER" ? (
-            <span className="text-xs font-medium tabular-nums">{rupiah(lead.nilai_transaksi)}</span>
-          ) : buka ? (
-            <>
-              {fu ? (
-                <span className={cn("text-xs whitespace-nowrap", fu.mendesak ? "font-semibold text-telat" : "text-muted-foreground")}>
-                  {fu.teks}
-                </span>
-              ) : null}
-              <span className={cn("text-xs tabular-nums", panas ? "font-semibold text-telat" : "text-muted-foreground")}>
-                diam {lead.diam_hari} hr
-              </span>
-            </>
-          ) : null}
-        </div>
+        <IsiBarisLead {...props} />
       </IsiTautan>
     </Link>
+  );
+});
+
+/** Baris mode Pilih (pindah massal): ketuk = pilih/lepas; lead yang tidak boleh dipindah pengguna ini redup. */
+const BarisPilih = memo(function BarisPilih({
+  dipilih,
+  boleh,
+  alih,
+  ...props
+}: PropsBaris & { dipilih: boolean; boleh: boolean; alih: (id: string) => void }) {
+  const id = `pilih-${props.lead.id}`;
+  return (
+    <label
+      htmlFor={id}
+      className={cn(
+        "flex items-start gap-2 rounded-xl border bg-card px-3 py-2.5 transition-colors",
+        boleh ? "cursor-pointer hover:bg-muted" : "cursor-not-allowed opacity-55",
+        dipilih && "border-primary bg-primary/5",
+      )}
+      data-uji="baris-lead"
+      data-dipilih={dipilih ? "" : undefined}
+      title={boleh ? undefined : "Lead milik sales lain: hanya admin yang bisa memindahkannya"}
+    >
+      <Checkbox
+        id={id}
+        checked={dipilih}
+        disabled={!boleh}
+        onCheckedChange={() => alih(props.lead.id)}
+        aria-label={`Pilih ${props.lead.kode} ${props.lead.pelanggan}`}
+        className="mt-1 pointer-coarse:size-5"
+      />
+      <IsiBarisLead {...props} />
+    </label>
   );
 });
 
@@ -157,6 +203,25 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
   const q = qUrl.trim();
 
   const [bukaBaru, setBukaBaru] = useState(false);
+  // mode Pilih (pindah massal ke sales lain): hanya tampilan daftar (bukan papan / tab Order)
+  const [pilih, setPilih] = useState(false);
+  const [dipilih, setDipilih] = useState<ReadonlySet<string>>(new Set());
+  const [bukaPindah, setBukaPindah] = useState(false);
+  // salinan lead yang dipindah saat dialog dibuka: dialog tetap utuh selama animasi tutup sesudah mode Pilih selesai
+  const [leadPindah, setLeadPindah] = useState<LeadRingkas[]>([]);
+  const alihPilih = useCallback(
+    (id: string) =>
+      setDipilih((lama) => {
+        const baru = new Set(lama);
+        if (!baru.delete(id)) baru.add(id);
+        return baru;
+      }),
+    [],
+  );
+  const keluarPilih = () => {
+    setPilih(false);
+    setDipilih(new Set());
+  };
 
   const hrefParam = (kunci: string, nilai: string | null) => urlPipeline(sp.toString(), { [kunci]: nilai }); // href <Link>
   // handler: dasarnya URL SAAT INI, bukan sp render terakhir (kotak cari bisa baru saja menulis ?q di klik yang sama)
@@ -213,6 +278,13 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
   const { batas, tambah } = useBatasTampil(
     [tab, pemilik ?? "semua", q, stSaring, dariSaring, sampaiSaring, produkSaring, salesSaring, urut].join("|"),
   );
+  // sama dengan server (web_pipeline_ganti_sales): admin semua lead; rep lead miliknya / tanpa pemilik
+  const bisaPindah = (l: LeadRingkas) => akses.peran === "admin" || (akses.peran === "rep" && (l.pemilik == null || Number(l.pemilik) === idSaya));
+  const modePilih = pilih && akses.bolehTulis && !papan && !modeOrder;
+  const bolehDipilih = modePilih ? terurut.filter(bisaPindah) : [];
+  // pilihan yang masih tampil di saringan sekarang (saringan berubah → lead yang tersembunyi tidak ikut dipindah)
+  const terpilih = modePilih ? terurut.filter((l) => dipilih.has(l.id)) : [];
+  const semuaTerpilih = bolehDipilih.length > 0 && terpilih.length === bolehDipilih.length;
   const bisaUbahOrder = (l: LeadRingkas) =>
     akses.bolehTulis && (akses.peran === "admin" || l.pemilik == null || Number(l.pemilik) === idSaya);
   const hitungan = daftar.data
@@ -365,17 +437,80 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
         </>
       ) : (
         <>
-          <p className="text-xs text-muted-foreground">{hitungan}</p>
+          <div className="flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1">
+            <p className="text-xs text-muted-foreground">{hitungan}</p>
+            {modePilih ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="ml-auto"
+                onClick={() => setDipilih(semuaTerpilih ? new Set() : new Set(bolehDipilih.map((l) => l.id)))}
+                data-uji="pilih-semua"
+              >
+                {semuaTerpilih ? "Batalkan pilihan" : `Pilih semua (${bolehDipilih.length})`}
+              </Button>
+            ) : akses.bolehTulis ? (
+              <Button type="button" variant="outline" size="sm" className="ml-auto" onClick={() => setPilih(true)} data-uji="mode-pilih">
+                <CheckSquare aria-hidden />
+                Pilih
+              </Button>
+            ) : null}
+          </div>
           <div className="space-y-2">
-            {terurut.slice(0, batas).map((l) => (
-              <BarisLead key={l.id} lead={l} hariIni={hariIni} kategori={kategoriLead(l.id)} />
-            ))}
+            {terurut.slice(0, batas).map((l) =>
+              modePilih ? (
+                <BarisPilih
+                  key={l.id}
+                  lead={l}
+                  hariIni={hariIni}
+                  kategori={kategoriLead(l.id)}
+                  dipilih={dipilih.has(l.id)}
+                  boleh={bisaPindah(l)}
+                  alih={alihPilih}
+                />
+              ) : (
+                <BarisLead key={l.id} lead={l} hariIni={hariIni} kategori={kategoriLead(l.id)} />
+              ),
+            )}
           </div>
           {terurut.length > batas ? <TampilLagi sisa={terurut.length - batas} tambah={tambah} /> : null}
         </>
       )}
 
+      {modePilih ? (
+        // bar aksi mode Pilih: menempel di bawah layar (di atas navigasi bawah HP) selama daftar digulir
+        <div
+          className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 flex items-center gap-2 rounded-xl border bg-background/95 p-2 shadow-lg backdrop-blur lg:bottom-4"
+          role="region"
+          aria-label="Lead dipilih"
+          data-uji="bar-pilih"
+        >
+          <Button type="button" variant="ghost" size="icon" aria-label="Keluar dari mode pilih" onClick={keluarPilih}>
+            <X aria-hidden />
+          </Button>
+          <span className="min-w-0 flex-1 truncate text-sm font-medium" role="status">
+            {terpilih.length} lead dipilih
+          </span>
+          <Button
+            type="button"
+            disabled={!terpilih.length}
+            onClick={() => {
+              setLeadPindah(terpilih);
+              setBukaPindah(true);
+            }}
+            data-uji="pindahkan-sales"
+          >
+            <UserPen aria-hidden />
+            Pindahkan ke sales
+          </Button>
+        </div>
+      ) : null}
       {akses.bolehTulis ? (
+        <DialogGantiSales buka={bukaPindah} ubahBuka={setBukaPindah} leads={leadPindah} onSelesai={keluarPilih} />
+      ) : null}
+
+      {akses.bolehTulis && !modePilih ? (
         <>
           {/* ruang supaya baris terakhir tidak tertutup tombol melayang */}
           <div className="h-16 lg:hidden" aria-hidden />

@@ -267,3 +267,22 @@ export function useKategoriPindah() {
         : undefined,
   });
 }
+
+/**
+ * Ganti sales (pemilik) satu atau banyak lead sekaligus; pemilik null = tanpa pemilik. Semua-atau-tidak di server.
+ * Pemilik tampil di daftar, detail, ringkasan per sales, dan log pelanggan → semua dimuat ulang.
+ */
+export function useGantiSales() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { lead_ids: string[]; pemilik: number | null }) =>
+      rpc(klienBrowser(), "web_pipeline_ganti_sales", { p: body as unknown as Json }),
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: kunci.semuaPipelineDaftar }),
+        qc.invalidateQueries({ queryKey: kunci.semuaPipelineLead }),
+        qc.invalidateQueries({ queryKey: kunci.semuaPipelineRingkas }),
+        qc.invalidateQueries({ queryKey: kunci.semuaPipelinePelanggan }),
+      ]),
+  });
+}

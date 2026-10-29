@@ -310,7 +310,7 @@ select uji.sama(uji.ambil('xl') - array['id', 'kode', 'tanggal_masuk', 'tahap', 
     'dialihkan_ke', 'kebutuhan', 'catatan', 'catatan_impor', 'nilai_penawaran', 'tanggal_penawaran', 'no_sp', 'tanggal_sp',
     'nilai_transaksi', 'no_po', 'bayar_status', 'bayar_dp', 'tanggal_dp', 'tanggal_lunas', 'bayar_diubah_oleh_nama',
     'bayar_diubah_pada', 'alasan_batal', 'alasan_batal_lain', 'periksa', 'periksa_sebab', 'ref_sheet', 'diam_sejak', 'diam_hari',
-    'fu_berikutnya', 'dibuat_pada', 'pelanggan', 'kontak', 'items', 'aktivitas', 'riwayat_tahap'],
+    'fu_berikutnya', 'dibuat_pada', 'pelanggan', 'kontak', 'items', 'aktivitas', 'riwayat_tahap', 'riwayat_pemilik'],
   jsonb_build_object('sumber_bukti', 'ga-oy', 'sumber_bukti_kode', 'GA-OY-9Z9Z', 'sumber_bukti_chat_pada', '2026-10-15T01:05:00.000Z',
     'sumber_bukti_diisi_pada', public.iso_utc(now())),
   'x_pipeline_lead: kunci lama tetap + tepat 4 field bukti (waktu ISO UTC)');
