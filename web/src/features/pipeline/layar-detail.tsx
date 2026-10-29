@@ -1,11 +1,11 @@
 "use client";
 
-// Detail lead (§5): info kv, tombol aksi (Catat FU / Penawaran / Order / Batal / Alihkan / Klaim / Data order /
-// Batalkan order / Ubah), riwayat pelanggan (order & lead lain pelanggan yang sama → repeat order, tautan ke log
-// lengkap di /pipeline/pelanggan/[id]), dan log gabungan aktivitas + riwayat tahap. 'baca' (Yosie) melihat tanpa
+// Detail lead (§5): info kv, tombol aksi (Catat FU / Penawaran / Order / Batal / Alihkan / Klaim / Ganti sales /
+// Data order / Batalkan order / Ubah), riwayat pelanggan (order & lead lain pelanggan yang sama → repeat order, tautan ke log
+// lengkap di /pipeline/pelanggan/[id]), dan log gabungan aktivitas + riwayat tahap + pergantian sales. 'baca' (Yosie) melihat tanpa
 // telepon/PIC & tanpa tombol tulis (§6). Order yang dibatalkan (BATAL, alasan "Order dibatalkan") tetap menampilkan data
 // ordernya (riwayat). Di bawah Sumber: bukti sumber dari chat WA (diisi agent, hanya-baca; semua peran melihatnya).
-import { ArrowRightLeft, FileText, Hand, Pencil, PhoneCall, ReceiptText, ShoppingCart, XCircle } from "lucide-react";
+import { ArrowRightLeft, FileText, Hand, Pencil, PhoneCall, ReceiptText, ShoppingCart, UserPen, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { useAnggota } from "@/features/anggota/queries";
 import { DialogBatalOrder } from "@/features/pipeline/dialog-batal-order";
 import { DialogFu } from "@/features/pipeline/dialog-fu";
+import { DialogGantiSales } from "@/features/pipeline/dialog-ganti-sales";
 import { DialogOrder } from "@/features/pipeline/dialog-order";
 import { DialogTahap, type AksiTahap } from "@/features/pipeline/dialog-tahap";
 import { DialogUbah } from "@/features/pipeline/dialog-ubah";
@@ -31,11 +32,12 @@ import { usePipelineLead } from "@/features/pipeline/queries";
 import { useProfil } from "@/features/profil/penyedia-profil";
 import { pesanGalat } from "@/lib/api/galat";
 import { fmtTanggal, fmtWaktu } from "@/lib/tanggal";
-import type { AktivitasLead, IdAnggota, LeadDetail, RiwayatTahapLead } from "@/types/domain";
+import type { AktivitasLead, IdAnggota, LeadDetail, RiwayatPemilikLead, RiwayatTahapLead } from "@/types/domain";
 
 type ItemLog =
   | { kind: "fu"; waktu: string; a: AktivitasLead }
-  | { kind: "tahap"; waktu: string; r: RiwayatTahapLead };
+  | { kind: "tahap"; waktu: string; r: RiwayatTahapLead }
+  | { kind: "sales"; waktu: string; s: RiwayatPemilikLead };
 
 function Baris({ dt, children }: { dt: string; children: ReactNode }) {
   return (
@@ -54,6 +56,7 @@ function IsiDetail({ lead, akses }: { lead: LeadDetail; akses: AksesPipeline }) 
   const [aksi, setAksi] = useState<AksiTahap | null>(null);
   const [dataOrder, setDataOrder] = useState(false);
   const [batalOrder, setBatalOrder] = useState(false);
+  const [gantiSales, setGantiSales] = useState(false);
 
   const namaAnggota = (id: IdAnggota | null | undefined) =>
     id == null ? "sistem" : (anggota.data?.find((m) => Number(m.id) === Number(id))?.username ?? `#${id}`);
@@ -61,6 +64,9 @@ function IsiDetail({ lead, akses }: { lead: LeadDetail; akses: AksesPipeline }) 
   const { member } = useProfil();
   const buka = lead.tahap === "BARU" || lead.tahap === "PENAWARAN";
   const bisaKlaim = akses.bolehTulis && lead.pemilik == null;
+  // sama dengan server (web_pipeline_ganti_sales): admin semua lead; rep lead miliknya / tanpa pemilik
+  const bisaGantiSales =
+    akses.peran === "admin" || (akses.peran === "rep" && (lead.pemilik == null || Number(lead.pemilik) === Number(member.id)));
   // sama dengan pipeline_boleh_ubah & tab Order: admin, pemilik, atau lead tanpa pemilik
   const bisaUbahOrder = lead.tahap === "ORDER" && (akses.peran === "admin" || lead.pemilik == null || Number(lead.pemilik) === Number(member.id));
   // lebih ketat (sama dengan server, aksi batal_order): admin, atau rep PEMILIK — order tanpa pemilik: admin (rep Klaim dulu)
@@ -72,6 +78,7 @@ function IsiDetail({ lead, akses }: { lead: LeadDetail; akses: AksesPipeline }) 
   const log: ItemLog[] = [
     ...lead.aktivitas.map((a) => ({ kind: "fu" as const, waktu: a.waktu, a })),
     ...lead.riwayat_tahap.map((r) => ({ kind: "tahap" as const, waktu: r.waktu, r })),
+    ...(lead.riwayat_pemilik ?? []).map((s) => ({ kind: "sales" as const, waktu: s.waktu, s })),
   ].sort((x, y) => (x.waktu < y.waktu ? 1 : -1));
 
   const lakukanKlaim = async () => {
@@ -135,7 +142,9 @@ function IsiDetail({ lead, akses }: { lead: LeadDetail; akses: AksesPipeline }) 
           <BuktiSumber lead={lead} />
         </Baris>
         <Baris dt="Masuk">{fmtTanggal(lead.tanggal_masuk)}</Baris>
-        <Baris dt="Pemilik">{lead.pemilik_nama || <span className="text-muted-foreground">tanpa pemilik</span>}</Baris>
+        <Baris dt="Sales">
+          <span data-uji="detail-sales">{lead.pemilik_nama || <span className="text-muted-foreground">tanpa pemilik</span>}</span>
+        </Baris>
         {lead.nilai_penawaran != null ? <Baris dt="Penawaran">{rupiah(lead.nilai_penawaran)}</Baris> : null}
         {lead.tahap === "ORDER" || orderBatal ? (
           <>
@@ -204,6 +213,12 @@ function IsiDetail({ lead, akses }: { lead: LeadDetail; akses: AksesPipeline }) 
               Klaim
             </Button>
           ) : null}
+          {bisaGantiSales ? (
+            <Button type="button" variant="outline" size="sm" onClick={() => setGantiSales(true)} data-uji="aksi-ganti-sales">
+              <UserPen aria-hidden />
+              Ganti sales
+            </Button>
+          ) : null}
           {bisaUbahOrder ? (
             <Button type="button" variant="outline" size="sm" onClick={() => setDataOrder(true)} data-uji="aksi-data-order">
               <ReceiptText aria-hidden />
@@ -242,6 +257,15 @@ function IsiDetail({ lead, akses }: { lead: LeadDetail; akses: AksesPipeline }) 
                     <p className="text-xs text-muted-foreground">Rencana berikutnya: {fmtTanggal(it.a.rencana_berikutnya)}</p>
                   ) : null}
                 </li>
+              ) : it.kind === "sales" ? (
+                <li key={`s${i}`} className="border-l-2 border-primary/40 pl-3" data-uji="log-sales">
+                  <div className="text-xs text-muted-foreground tabular-nums">
+                    {fmtWaktu(it.s.waktu)} · {it.s.oleh_nama ?? "sistem"}
+                  </div>
+                  <p className="text-sm">
+                    Sales {it.s.dari_nama ?? "tanpa pemilik"} → <span className="font-medium">{it.s.ke_nama ?? "tanpa pemilik"}</span>
+                  </p>
+                </li>
               ) : (
                 <li key={`r${i}`} className="border-l-2 border-primary/40 pl-3">
                   <div className="text-xs text-muted-foreground tabular-nums">{fmtWaktu(it.r.waktu)}</div>
@@ -264,6 +288,7 @@ function IsiDetail({ lead, akses }: { lead: LeadDetail; akses: AksesPipeline }) 
           {bisaUbahOrder ? <DialogOrder buka={dataOrder} ubahBuka={setDataOrder} lead={lead} /> : null}
           {/* tidak digerbang bisaBatalOrder: sesudah berhasil lead jadi BATAL, dialog harus tetap ada sampai animasi tutup */}
           <DialogBatalOrder buka={batalOrder} ubahBuka={setBatalOrder} lead={lead} />
+          <DialogGantiSales buka={gantiSales} ubahBuka={setGantiSales} leads={[lead]} />
         </>
       ) : null}
     </div>

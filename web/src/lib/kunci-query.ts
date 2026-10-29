@@ -47,6 +47,8 @@ export const kunci = {
   semuaPipelineRingkas: ["pipeline", "ringkas"] as const,
   /** daftar akses modul Pipeline (layar admin owner) */
   pipelineAkses: ["pipeline", "akses"] as const,
+  /** sales yang sah sebagai pemilik lead (pilihan Ganti sales) */
+  pipelineSales: ["pipeline", "sales"] as const,
   /** kategori papan pribadi + penempatan lead milik pengguna ini */
   pipelineKategori: ["pipeline", "kategori"] as const,
   /** akar semua data Pipeline (dipakai bila hak akses berubah; mutasi lead cukup daftar + ringkasan) */

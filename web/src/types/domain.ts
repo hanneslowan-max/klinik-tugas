@@ -411,6 +411,20 @@ export type AktivitasLead = {
 };
 
 export type RiwayatTahapLead = { dari: TahapLead | null; ke: TahapLead; waktu: string };
+/** Pergantian pemilik (sales) lead: Ganti sales, Klaim, klaim otomatis saat ORDER (29 Okt 2026). */
+export type RiwayatPemilikLead = {
+  dari: IdAnggota | null;
+  dari_nama: string | null;
+  ke: IdAnggota | null;
+  ke_nama: string | null;
+  oleh: IdAnggota | null;
+  oleh_nama: string | null;
+  waktu: string;
+};
+/** Sales yang sah sebagai pemilik lead (web_pipeline_sales): owner, atau akses Pipeline admin/rep. */
+export type SalesPipeline = { id: IdAnggota; username: string; nama: string | null; peran: PeranPipeline; kode_sp: string | null };
+/** Hasil web_pipeline_ganti_sales. */
+export type HasilGantiSales = { diubah: number; sama: number; pemilik: IdAnggota | null; pemilik_nama: string | null };
 
 /** Nama & telepon null bila disamarkan (peran 'baca' / Yosie, §6). */
 export type KontakLead = { id: string; nama: string | null; telepon: string | null; jabatan: string | null };
@@ -496,6 +510,7 @@ export type LeadDetail = {
   items: ItemLead[];
   aktivitas: AktivitasLead[];
   riwayat_tahap: RiwayatTahapLead[];
+  riwayat_pemilik: RiwayatPemilikLead[];
   /**
    * Bukti sumber dari chat WA 0878, diisi agent lewat x_pipeline_sumber_bukti_set (20261021120000). Terpisah dari
    * `sumber` isian sales; hanya-baca di web. Semua null = belum ada bukti. kode mis. "GA-OY-7K3F" / "PM-06";
@@ -756,4 +771,6 @@ export type HasilRpc = {
   web_pipeline_kategori: PapanKategori;
   web_pipeline_kategori_simpan: PapanKategori;
   web_pipeline_kategori_pindah: { lead_id: string; kategori_id: string | null };
+  web_pipeline_sales: SalesPipeline[];
+  web_pipeline_ganti_sales: HasilGantiSales;
 };

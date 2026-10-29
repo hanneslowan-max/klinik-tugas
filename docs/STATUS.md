@@ -584,6 +584,18 @@ list tetap bisa dibuka dari detail tugas / Cari).
 - Isi awal produksi: usulan otomatis 369 tugas (dari kode/nama/list/assignee) dikirim ke Hannes untuk dicek; diterapkan
   ke produksi hanya sesudah disetujui.
 
+## Pipeline: Ganti sales + pindah massal (29 Okt 2026, permintaan Hannes "fitur edit untuk ubah pic sales … sekalian pindah massal")
+Sebelumnya pemilik (sales) lead hanya terisi otomatis (pembuat, Klaim, klaim saat ORDER) dan tidak bisa dipindah.
+- DB `20261029120000_pipeline_ganti_sales.sql`: `web_pipeline_ganti_sales({lead_ids, pemilik|null})` (1–500 lead,
+  semua-atau-tidak; admin semua lead, rep hanya lead miliknya/tanpa pemilik; tujuan harus owner atau akses admin/rep
+  aktif; tahap apa pun, No SP lama tetap), `web_pipeline_sales()` (pilihan tujuan). Tabel `lead_riwayat_pemilik`
+  diisi trigger untuk SETIAP pergantian pemilik (juga Klaim & klaim otomatis ORDER); `j_pipeline_lead.riwayat_pemilik`.
+- Web: detail lead → baris **Sales** + tombol **Ganti sales**; Riwayat memuat "Sales A → B". Daftar lead (tampilan
+  Daftar, tab selain Order) → **Pilih** → centang lead / Pilih semua (sesuai saringan) → bar bawah **Pindahkan ke sales**.
+  Rep: lead milik sales lain redup & tak bisa dicentang; peran baca tanpa tombol.
+- Tes: `uji/db/33_pipeline_ganti_sales.sql` (38 cek), 09 (63 `web_*`) & 30 (kunci detail lead) disesuaikan;
+  e2e `tests/e2e/pipeline-ganti-sales.spec.ts` (3 skenario × HP/desktop).
+
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)
 Prasyarat dari Hannes: project Supabase baru `rhj-tugas` (akun/org baru, Sydney `ap-southeast-2` per keputusan 30/9, Free); env cloud `SUPABASE_ACCESS_TOKEN` (PAT akun baru) + `SUPABASE_PROJECT_REF`; `CLICKUP_API_TOKEN` (sudah ada); sesi baru supaya env terbaca. Semua langkah ke ClickUp **GET saja**. Tidak memakai MCP Supabase (itu ERP).
 

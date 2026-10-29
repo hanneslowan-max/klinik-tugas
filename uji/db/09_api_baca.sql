@@ -19,8 +19,8 @@ select uji.cek(not exists (
           or has_function_privilege('anon', p.oid, 'EXECUTE')
           or has_function_privilege('service_role', p.oid, 'EXECUTE'))),
   'web_* hanya authenticated');
-select uji.sama((select count(*)::int from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname ~ '^web_'), 61,
-  '61 fungsi web_* (kontrak §7: 33 + 11 web_pipeline_* + 3 web_pipeline_kategori* + web_pipeline_order_ubah + web_pipeline_cek_duplikat + 7 web_pipeline_pelanggan* + 5 kategori kerja)');
+select uji.sama((select count(*)::int from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname ~ '^web_'), 63,
+  '63 fungsi web_* (kontrak §7: 33 + 11 web_pipeline_* + 3 web_pipeline_kategori* + web_pipeline_order_ubah + web_pipeline_cek_duplikat + 7 web_pipeline_pelanggan* + 5 kategori kerja + web_pipeline_sales/_ganti_sales)');
 select uji.sama((select count(*)::int from pg_proc p where p.pronamespace = 'public'::regnamespace
                   and p.proname ~ '^(api|x|impor)_'), 36,
   '36 fungsi api_/x_/impor_ (kontrak §6 + x_admin_akun + x_lampiran_catat + x_rawat_lampiran + 5 x_pipeline_*)');

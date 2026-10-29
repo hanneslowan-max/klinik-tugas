@@ -1377,6 +1377,7 @@ export type Database = {
       web_pipeline_cek_duplikat: { Args: { p_telepon: string }; Returns: Json };
       web_pipeline_daftar: { Args: { p: Json }; Returns: Json };
       web_pipeline_fu_catat: { Args: { p: Json }; Returns: Json };
+      web_pipeline_ganti_sales: { Args: { p: Json }; Returns: Json };
       web_pipeline_kategori: { Args: Record<PropertyKey, never>; Returns: Json };
       web_pipeline_kategori_pindah: { Args: { p: Json }; Returns: Json };
       web_pipeline_kategori_simpan: { Args: { p: Json }; Returns: Json };
@@ -1394,6 +1395,7 @@ export type Database = {
       web_pipeline_pelanggan_ubah: { Args: { p: Json }; Returns: Json };
       web_pipeline_ringkas: { Args: { p: Json }; Returns: Json };
       web_pipeline_saya: { Args: Record<PropertyKey, never>; Returns: Json };
+      web_pipeline_sales: { Args: Record<PropertyKey, never>; Returns: Json };
       web_pipeline_tahap: { Args: { p: Json }; Returns: Json };
       web_pulihkan: { Args: { p_task: string }; Returns: Json };
       web_purge: { Args: { p_task: string }; Returns: Json };
