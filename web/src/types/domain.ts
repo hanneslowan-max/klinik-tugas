@@ -856,6 +856,96 @@ export type HasilBiayaIklan = { diproses: number; baru: number; diubah: number; 
 /** Hasil web_pipeline_dasbor_ids: id lead di balik satu angka bagian 2 (urut paling lama diam). */
 export type IdsDasbor = { metrik: MetrikDasbor; total: number; ids: string[] };
 
+// ---------------------------------------------------------------- Berita (owner; 20261107120000_berita.sql)
+export type KategoriBerita =
+  | "ekonomi" | "kebijakan" | "industri" | "logistik" | "komoditas" | "bisnis" | "geopolitik" | "nasional" | "teknologi"
+  | "lainnya";
+export type WilayahBerita = "dalam" | "luar";
+/** Satu berita pilihan kurator (routine Claude) + tanda milik owner. */
+export type PilihanBerita = {
+  id: number;
+  edisi_id: number;
+  urutan: number;
+  url: string;
+  judul: string;
+  sumber: string;
+  terbit_at: string | null;
+  wilayah: WilayahBerita;
+  kategori: KategoriBerita;
+  /** 5 wajib baca · 4 penting · 1–3 perlu tahu */
+  skor: number;
+  ringkasan: string;
+  /** kenapa penting untuk bisnis RHJ */
+  dampak: string;
+  /** bahan obrolan dengan relasi (opsional) */
+  bahan_relasi: string | null;
+  dibaca: boolean;
+  disimpan: boolean;
+  kurang: boolean;
+  disimpan_at: string | null;
+};
+export type EdisiBerita = {
+  id: number;
+  dibuat_at: string;
+  garis_besar: string;
+  pantau: string | null;
+  kandidat: number | null;
+  catatan: string | null;
+  pilihan: PilihanBerita[];
+};
+export type RingkasEdisiBerita = { id: number; dibuat_at: string; jumlah: number; wajib: number };
+/** Hasil web_berita. */
+export type DataBerita = {
+  edisi: EdisiBerita | null;
+  daftar_edisi: RingkasEdisiBerita[];
+  tersimpan: number;
+  sumber: { aktif: number; galat: number; terakhir_tarik: string | null };
+};
+/** Item mentah hasil tarik feed (tab Semua). */
+export type ItemBerita = {
+  id: number;
+  sumber_id: string;
+  sumber: string;
+  wilayah: WilayahBerita;
+  topik: string;
+  penerbit: string | null;
+  judul: string;
+  cuplikan: string | null;
+  url: string;
+  terbit_at: string | null;
+  ditarik_at: string;
+};
+export type SumberBerita = {
+  id: string;
+  nama: string;
+  wilayah: WilayahBerita;
+  topik: string;
+  aktif: boolean;
+  terakhir_tarik: string | null;
+  terakhir_ok: string | null;
+  terakhir_galat: string | null;
+  terakhir_item: number | null;
+  item_24j: number;
+};
+/** Hasil web_berita_semua. `berikut` = id penanda halaman berikut (null = habis). */
+export type SemuaBerita = { items: ItemBerita[]; berikut: number | null; sumber: SumberBerita[] };
+/** Hasil Edge POST /x/admin/berita-tarik. */
+export type HasilTarikBerita =
+  | { ditunda: true; terakhir_tarik: string }
+  | {
+      ditunda?: undefined;
+      sumber: number;
+      sumber_ok: number;
+      sumber_galat: number;
+      item: number;
+      baru: number;
+      dobel: number;
+      /** item kotor (URL/judul tidak sah) yang dilewati */
+      dilewati: number;
+      dihapus: number;
+      per_sumber: { sumber_id: string; ok: boolean; item: number; galat?: string }[];
+    };
+
 /** Peta nama fungsi web_* → bentuk hasilnya. */
 export type HasilRpc = {
   web_saya: Profil;
@@ -926,4 +1016,8 @@ export type HasilRpc = {
   web_pipeline_dasbor_ids: IdsDasbor;
   web_pipeline_dasbor_lanjut: DasborLanjut;
   web_pipeline_biaya_iklan_set: HasilBiayaIklan;
+  web_berita: DataBerita;
+  web_berita_semua: SemuaBerita;
+  web_berita_tersimpan: { items: PilihanBerita[] };
+  web_berita_tanda: PilihanBerita;
 };
