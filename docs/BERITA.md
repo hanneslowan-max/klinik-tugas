@@ -80,7 +80,7 @@ Tambah/matikan sumber (SQL lewat `alat/sql-proyek.sh`, belum ada layar admin):
 
 ## Routine kurasi
 
-Scheduled task Claude (sesi baru tiap jalan) di environment **Marketing** (punya `TUGAS_API_URL` + `TUGAS_API_TOKEN`
+Scheduled task Claude "Kurasi Berita Anvil" (`trig_018JcW4KxRHo2UXtMx9ihUip`, sesi baru tiap jalan) di environment **Marketing** (punya `TUGAS_API_URL` + `TUGAS_API_TOKEN`
 bot scope tulis). Jadwal: Senin–Sabtu 05.42, 07.42, 09.42, 11.42, 13.42, 15.42, 17.42 WIB
 (`CRON_TZ=Asia/Jakarta 42 5,7,9,11,13,15,17 * * 1-6`). Senin pagi mencakup sejak Sabtu sore (jendela kandidat ≤48 jam).
 Prompt lengkap = bagian di bawah (salinan yang dipasang di scheduled task; ubah keduanya bersamaan).

@@ -650,7 +650,15 @@ Rincian lengkap (alur, kontrak edisi, sumber, prompt routine, deploy): `docs/BER
   `<source>`); tarikan < 90 dtk → `ditunda`.
 - Web: `/berita` (menu utama, `ownerSaja`; HP nav bawah owner jadi 5 item + Menu), tab Pilihan / Semua / Tersimpan,
   tombol Tarik terbaru, simpan / kurang relevan (umpan balik ke kurator).
-- Kurasi: scheduled task Claude di environment Marketing (token bot tulis), Senin–Sabtu 05.42–17.42 WIB tiap 2 jam.
+- Kurasi: scheduled task Claude "Kurasi Berita Anvil" (`trig_018JcW4KxRHo2UXtMx9ihUip`, sesi baru tiap jalan) di
+  environment Marketing (token `TUGAS_API_TOKEN` yang sudah ada), Senin–Sabtu 05.42–17.42 WIB tiap 2 jam.
+- **Deploy 8 Nov 2026 ±06.50 WIB (atas persetujuan Hannes di sesi ini):** migrasi `20261107120000_berita` diterapkan ke
+  `admhlyurfvodfyedgaio` lewat `alat/sql-proyek.sh --migrasi` (sebelumnya 41 migrasi, terakhir 20261029140000; DB 38,6 MB);
+  cek: 36 sumber, RLS ON, 4 `web_berita*` + 4 `x_berita*`, authenticated tanpa SELECT, sequence tertutup. Edge `api`
+  di-deploy dari cabang `ccr-d666c6e5-t1ygno` (commit c595873, `--use-api --no-verify-jwt`); rute lama tetap
+  (`/v2/user` 401 tanpa token), rute baru aktif (`/x/berita/kandidat` 401, GET `/x/berita/tarik` 405). Web `/berita` tayang
+  sesudah PR #34 di-merge. Token baru TIDAK dibuat (ditolak sistem izin; routine memakai token Marketing).
+  Run pertama routine (dipicu manual 06.53 WIB): tarik produksi 36/36 sumber ok, 1.209 item.
 - Tes (lokal, dari `supabase db reset`): `uji/db` 36 berkas 1939 cek 0 gagal (36_berita 74); `uji/berita/jalankan.mjs`
   34; `uji/berita/kontrak.mjs` 21 (Edge lokal); `uji/kontrak` 492 lulus, 1 gagal = snapshot `clickup.mjs` vs
   rhj-brain/tools/clickup.mjs yang sudah berubah di rhj-brain (tidak terkait modul ini); web `npm run cek` (vitest 170);
