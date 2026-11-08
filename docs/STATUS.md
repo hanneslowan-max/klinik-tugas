@@ -639,6 +639,36 @@ Bagian 1–4 mockup "Dashboard Pipeline Anvil" (admin) + tampilan sales "milik s
 - Tes: `uji/db/35_pipeline_dasbor_lanjut.sql` (51 cek), 09 (67 `web_*`, 37 `api_/x_/impor_`); vitest `biaya-csv.test.ts`,
   `dasbor.test.ts`; e2e `pipeline-dasbor-lanjut.spec.ts` (3 skenario × HP/desktop, termasuk halaman tidak melebar di HP).
 
+## Modul Berita (7 Nov 2026, permintaan Hannes "memantau news terpenting, terhangat, terupdate dari dalam dan luar negeri ... kamu yang memilah"; Hannes memilih modul baru di Anvil, pembaruan tiap 2–3 jam jam kerja)
+Rincian lengkap (alur, kontrak edisi, sumber, prompt routine, deploy): `docs/BERITA.md`.
+- DB `20261107120000_berita.sql` (aditif): tabel `berita_sumber` (36 feed awal), `berita` (mentah, 14 hari), `berita_edisi`,
+  `berita_pilihan`, `berita_tanda`; fungsi `x_berita_sumber/_simpan/_kandidat/_edisi_simpan` (aktor owner/bot) dan
+  `web_berita/_semua/_tersimpan/_tanda` (owner saja). Tanpa grant tabel untuk authenticated/anon; sequence dicabut dari
+  service_role (dicek `01`). Tidak ikut `x_export`.
+- Edge `api`: `POST /x/berita/tarik`, `GET /x/berita/kandidat`, `POST /x/berita/edisi`, `POST /x/admin/berita-tarik` (sesi
+  owner). Parser feed tanpa dependensi `supabase/functions/api/berita.ts` (RSS 2.0, RSS 1.0/RDF, Atom, Google News
+  `<source>`); tarikan < 90 dtk → `ditunda`.
+- Web: `/berita` (menu utama, `ownerSaja`; HP nav bawah owner jadi 5 item + Menu), tab Pilihan / Semua / Tersimpan,
+  tombol Tarik terbaru, simpan / kurang relevan (umpan balik ke kurator).
+- Kurasi: scheduled task Claude "Kurasi Berita Anvil" (`trig_018JcW4KxRHo2UXtMx9ihUip`, sesi baru tiap jalan) di
+  environment Marketing (token `TUGAS_API_TOKEN` yang sudah ada), Senin–Sabtu 05.42–17.42 WIB tiap 2 jam.
+- **Deploy 8 Nov 2026 ±06.50 WIB (atas persetujuan Hannes di sesi ini):** migrasi `20261107120000_berita` diterapkan ke
+  `admhlyurfvodfyedgaio` lewat `alat/sql-proyek.sh --migrasi` (sebelumnya 41 migrasi, terakhir 20261029140000; DB 38,6 MB);
+  cek: 36 sumber, RLS ON, 4 `web_berita*` + 4 `x_berita*`, authenticated tanpa SELECT, sequence tertutup. Edge `api`
+  di-deploy dari cabang `ccr-d666c6e5-t1ygno` (commit c595873, `--use-api --no-verify-jwt`); rute lama tetap
+  (`/v2/user` 401 tanpa token), rute baru aktif (`/x/berita/kandidat` 401, GET `/x/berita/tarik` 405). Web `/berita` tayang
+  sesudah PR #34 di-merge. Token baru TIDAK dibuat (ditolak sistem izin; routine memakai token Marketing).
+  Run pertama routine (dipicu manual 06.53 WIB): tarik produksi 36/36 sumber ok, 1.209 item.
+- Tes (lokal, dari `supabase db reset`): `uji/db` 36 berkas 1939 cek 0 gagal (36_berita 74); `uji/berita/jalankan.mjs`
+  34; `uji/berita/kontrak.mjs` 21 (Edge lokal); `uji/kontrak` 492 lulus, 1 gagal = snapshot `clickup.mjs` vs
+  rhj-brain/tools/clickup.mjs yang sudah berubah di rhj-brain (tidak terkait modul ini); web `npm run cek` (vitest 170);
+  e2e penuh terhadap build produksi (`next build --webpack` + `next start`, seperti CI) 188 lulus, 14 dilewati (khusus
+  HP/desktop), 0 gagal; `berita.spec.ts` 6/6. Catatan lokal: di `next dev`, tombol Next.js dev (kiri bawah) menutupi
+  tautan "Saya" di nav bawah HP owner yang kini 6 item → `performa.spec.ts` (keluar lalu masuk akun lain) gagal di mode
+  dev saja; jalankan e2e terhadap build produksi. Catatan sandbox: Edge lokal di container cloud tidak bisa HTTPS ke luar (CA proxy),
+  jadi tarik feed sungguhan diuji dengan parser + `x_berita_simpan` langsung: 36 feed asli → 1.254 item, 1.201 baru,
+  53 dobel lintas sumber, 260 ms; ulang → 0 baru.
+
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)
 Prasyarat dari Hannes: project Supabase baru `rhj-tugas` (akun/org baru, Sydney `ap-southeast-2` per keputusan 30/9, Free); env cloud `SUPABASE_ACCESS_TOKEN` (PAT akun baru) + `SUPABASE_PROJECT_REF`; `CLICKUP_API_TOKEN` (sudah ada); sesi baru supaya env terbaca. Semua langkah ke ClickUp **GET saja**. Tidak memakai MCP Supabase (itu ERP).
 

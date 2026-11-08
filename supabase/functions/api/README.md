@@ -17,7 +17,7 @@ REST untuk agent, CLI, dan importer. Meniru ClickUp v2 dan menambah endpoint `/x
   - `tulis`: ditambah POST/PUT.
   - `impor`: ditambah `/x/impor/*` dan `/x/export`.
   - DELETE hanya untuk token dengan role owner.
-- **Admin:** hanya `/x/admin/*`, memakai header `x-sesi: <access_token user>`. JWT dicek lewat GoTrue, dan pemiliknya wajib owner aktif.
+- **Admin:** hanya `/x/admin/*` (akun, reset, purge, berita-tarik), memakai header `x-sesi: <access_token user>`. JWT dicek lewat GoTrue, dan pemiliknya wajib owner aktif.
 - **Burst:** ember per token (hash) per isolate, kapasitas `TUGAS_API_BURST` (40), isi ulang `TUGAS_API_LAJU` (20/detik). Bila habis: `429 {err:"Rate limit", ECODE:"APP_002"}` dengan header `Retry-After` dan `x-ratelimit-reset`. Batas ini tidak global lintas instance.
 
 ## Galat
@@ -57,6 +57,10 @@ Jelajah web; daftar kategori diatur owner di Admin → Kategori.
 | POST | `/x/pipeline/fu` (scope tulis) `{items:[{lead_id, tanggal?}]}` | `x_pipeline_fu_set`: rencana FU lead (tab "Follow up hari ini") |
 | POST | `/x/pipeline/sumber-bukti` (scope tulis; aktor owner/bot/admin Pipeline) `{items:[{lead_id, bukti, kode?, chat_pada?}]}` maks 200 | `x_pipeline_sumber_bukti_set`: bukti asal lead dari chat WA (kelas pola tetap, mis. `situs-rh`, `ga-oy` + kode `GA-OY-7K3F`). Tidak menyentuh `sumber` isian sales. Semua-atau-tidak, idempoten; balas `{diproses, diubah, sama, items:[{lead_id, ok, diubah}]}`. Rincian `docs/KONTRAK-DB.md` §11 |
 | POST | `/x/pipeline/biaya-iklan` (scope tulis; aktor owner/bot/admin Pipeline) `{items:[{tanggal, platform google\|meta, campaign, biaya, klik?, tayang?, konversi?}]}` maks 1000 | `x_pipeline_biaya_iklan_set`: biaya iklan harian per campaign untuk dasbor Pipeline bagian 5. Per (tanggal, platform) = keadaan lengkap hari itu (campaign yang tidak dikirim dihapus); semua-atau-tidak, idempoten; balas `{diproses, baru, diubah, sama, dihapus, dari, sampai}`. Rincian `docs/KONTRAK-DB.md` §12 |
+| POST | `/x/berita/tarik` (scope tulis; aktor owner/bot) | Modul Berita: Edge mengunduh semua feed aktif `berita_sumber` (RSS 2.0/1.0/Atom, paralel, 12 dtk/feed, ≤50 item & ≤4 hari per feed; parser `berita.ts`), lalu `x_berita_simpan` menyimpan item baru (dobel URL / judul sama 3 hari dilewati; item > 14 hari dihapus). Balas `{sumber, sumber_ok, sumber_galat, item, baru, dobel, dilewati, dihapus, per_sumber:[{sumber_id, ok, item, galat?}]}`; tarikan < 90 dtk sejak yang terakhir → `{ditunda:true, terakhir_tarik}` |
+| GET | `/x/berita/kandidat?jam=&batas=` (aktor owner/bot) | `x_berita_kandidat`: item sejak edisi terakhir (− 30 mnt, maks 48 jam; `jam` 1–48 menimpa), tanpa yang sudah dipilih 48 jam, maks `batas` (400) + `edisi_terakhir`, `umpan_balik` owner (disimpan/kurang relevan), `sumber_galat` |
+| POST | `/x/berita/edisi` (scope tulis; aktor owner/bot) `{garis_besar, pantau?, kandidat?, catatan?, pilihan:[1–30]}` | `x_berita_edisi_simpan`: satu edisi kurasi (semua-atau-tidak; galat menyebut `pilihan[i]`). Kontrak item di komentar fungsi & `docs/BERITA.md`. Balas `{id, dibuat_at, pilihan}` |
+| POST | `/x/admin/berita-tarik` (sesi owner, `x-sesi`) | Tombol "Tarik terbaru" di /berita: sama dengan `/x/berita/tarik` dengan aktor = owner |
 | POST | `/x/rawat/lampiran` (scope impor, owner/bot; body opsional `{hari?:int, dry?:bool}`) | Perawatan: `x_rawat_lampiran` men-soft-delete lampiran app pada kartu selesai > N hari (setelan `app_settings.rawat_lampiran` `{aktif,hari}`, default 7; hanya `sumber=app`, salinan ClickUp dibiarkan), lalu service role menghapus BERKAS-nya. `dry` → hanya hitung. Balas `{hari, dihapus, berkas_dihapus, berkas_sisa, berkas_gagal}` (atau `{dilewati:true}` bila setelan `aktif=false`). Dipanggil job terjadwal `rawat.yml` |
 | GET | `/x/file/{attachment_id}` | 302 ke signed URL (atau `clickup_url`) |
 | POST | `/x/impor/batch` `{jenis, rows, mode?, at_awal?}` | `impor_batch` |

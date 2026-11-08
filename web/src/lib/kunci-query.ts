@@ -23,6 +23,11 @@ export const kunci = {
   /** satu tab notifikasi "Dari tim" / "Dari agent" (datanya sendiri, limit sendiri) */
   notifDari: (dari: DariNotif) => ["notif", dari] as const,
   sampah: ["sampah"] as const,
+  // Berita (owner): akar invalidasi sesudah tarik/tanda; edisi (null = terbaru), semua item per saringan, tersimpan
+  berita: ["berita"] as const,
+  beritaEdisi: (edisi: number | null) => ["berita", "edisi", edisi ?? "terbaru"] as const,
+  beritaSemua: (wilayah: string, sumber: string, q: string) => ["berita", "semua", wilayah, sumber, q] as const,
+  beritaTersimpan: ["berita", "tersimpan"] as const,
   adminTokens: ["admin", "tokens"] as const,
   adminSinkron: ["admin", "sinkron"] as const,
   adminLibur: ["admin", "libur"] as const,

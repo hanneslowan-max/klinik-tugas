@@ -1,13 +1,13 @@
 "use client";
 
-// Edge admin (ARSITEKTUR §8): POST {apiUrl}/x/admin/<akun|reset|purge>, header x-sesi = JWT owner.
+// Edge admin (ARSITEKTUR §8): POST {apiUrl}/x/admin/<akun|reset|purge|berita-tarik>, header x-sesi = JWT owner.
 // Galat Edge berbentuk {err, ECODE}. Edge belum terpasang / tidak jalan (jaringan, 404 atau 502–504 tanpa ECODE)
 // → GalatApi dengan hint EDGE_TIDAK_ADA.
 import { GalatApi } from "@/lib/api/galat";
 import { env } from "@/lib/env";
 import { klienBrowser } from "@/lib/supabase/client";
 
-export async function edgeAdmin<T = unknown>(jalur: "akun" | "reset" | "purge", body: unknown): Promise<T> {
+export async function edgeAdmin<T = unknown>(jalur: "akun" | "reset" | "purge" | "berita-tarik", body: unknown): Promise<T> {
   const { data } = await klienBrowser().auth.getSession();
   const token = data.session?.access_token;
   if (!token) throw new GalatApi({ message: "Sesi habis. Silakan masuk lagi.", code: "PT401", status: 401 });

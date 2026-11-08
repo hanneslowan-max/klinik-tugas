@@ -269,7 +269,8 @@ export function KerangkaApp({
   // pipelineAwal (dari layout server) mengisi cache sebelum render pertama: menu tidak bergeser dan GerbangPipeline
   // (turunan KerangkaApp) langsung lolos tanpa menunggu web_pipeline_saya dari browser.
   const aksesPipeline = usePipelineSaya(pipelineAwal);
-  const navUtama = NAV_UTAMA.filter((i) => !i.pipelineSaja || !!aksesPipeline.data?.peran);
+  const { owner } = useProfil();
+  const navUtama = NAV_UTAMA.filter((i) => (!i.pipelineSaja || !!aksesPipeline.data?.peran) && (!i.ownerSaja || owner));
   return (
     <PenyediaSidebar awal={sidebarAwal}>
       <div className="flex min-h-dvh">

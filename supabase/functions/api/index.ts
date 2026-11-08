@@ -10,8 +10,10 @@
 //   rpc api_token_cek → {member_id, scope, token_id, role}. Scope: baca = GET; tulis = + POST/PUT;
 //   impor = + /x/impor/* dan /x/export. DELETE hanya role owner. token_id diteruskan ke DB lewat header
 //   x-token-id (activity.token_id + cek scope lapis kedua).
-// Auth sesi (UI owner, hanya /x/admin/*): header `x-sesi: <access_token>` → GoTrue /auth/v1/user.
+// Auth sesi (UI owner, hanya /x/admin/*, termasuk /x/admin/berita-tarik): header `x-sesi: <access_token>` → GoTrue /auth/v1/user.
 // Galat: {err, ECODE} + status HTTP (PT4xx dari DB dipetakan apa adanya).
+
+import { ringkasTarik, tarikSemua, type SumberFeed } from "./berita.ts";
 
 type Obj = Record<string, unknown>;
 type Scope = "baca" | "tulis" | "impor";
@@ -467,6 +469,25 @@ async function adminPurge(req: Request): Promise<unknown> {
   return { ...hasil, storage_dihapus: dihapus, storage_sisa: paths.filter((p) => !dihapus.includes(p)), storage_gagal: storageGagal };
 }
 
+// ---------------------------------------------------------------- Berita (20261107120000_berita.sql)
+// Tarik semua feed aktif (Edge mengunduh & mengurai, DB menyimpan + menyaring dobel). Dipanggil routine kurasi (token
+// owner/bot) dan tombol "Tarik terbaru" owner. Tarikan < 90 detik sejak yang terakhir dilewati (tombol ditekan berulang /
+// routine & owner bersamaan) — hasilnya {ditunda:true, terakhir_tarik}. (`dilewati` di hasil biasa = jumlah item kotor.)
+async function beritaTarik(aktor: number, tokenId?: string): Promise<Obj> {
+  const sumber = (await rpc("x_berita_sumber", { p_aktor: aktor }, tokenId)) as SumberFeed[];
+  const [akhir] = await pilih("berita_sumber", "select=terakhir_tarik&terakhir_tarik=not.is.null&order=terakhir_tarik.desc&limit=1");
+  const t = akhir?.terakhir_tarik ? Date.parse(String(akhir.terakhir_tarik)) : NaN;
+  if (Number.isFinite(t) && Date.now() - t < 90_000) return { ditunda: true, terakhir_tarik: akhir.terakhir_tarik };
+  const hasil = await tarikSemua(sumber ?? []);
+  const simpan = (await rpc("x_berita_simpan", { p_aktor: aktor, p: { hasil } }, tokenId)) as Obj;
+  return { ...simpan, per_sumber: ringkasTarik(hasil) };
+}
+
+async function adminBeritaTarik(req: Request): Promise<unknown> {
+  const { member } = await ownerDariSesi(req);
+  return await beritaTarik(Number(member.id));
+}
+
 // ---------------------------------------------------------------- rute token
 type Handler = (c: Ctx, g: string[]) => Promise<unknown>;
 interface Rute { m: string; p: RegExp; perlu: Scope; owner?: boolean; h: Handler }
@@ -744,6 +765,18 @@ const RUTE: Rute[] = [
       return new Response(null, { status: 302, headers: { location: String(a.url), "cache-control": "no-store" } });
     },
   },
+  // ---- Berita (owner/bot saja, ditegakkan DB). tarik = unduh semua feed + simpan item baru; kandidat = item sejak edisi
+  // terakhir + umpan balik owner (routine kurasi); edisi = simpan hasil kurasi {garis_besar, pantau?, kandidat?,
+  // catatan?, pilihan:[…]} (kontrak lengkap di komentar x_berita_edisi_simpan).
+  { m: "POST", p: /^\/x\/berita\/tarik$/, perlu: "tulis", h: (c) => beritaTarik(A(c), T(c)) },
+  {
+    m: "GET", p: /^\/x\/berita\/kandidat$/, perlu: "baca",
+    h: (c) => rpc("x_berita_kandidat", { p_aktor: A(c), p: { jam: intQ(c.q, "jam"), batas: intQ(c.q, "batas") } }, T(c)),
+  },
+  {
+    m: "POST", p: /^\/x\/berita\/edisi$/, perlu: "tulis",
+    h: async (c) => rpc("x_berita_edisi_simpan", { p_aktor: A(c), p: await c.body() }, T(c)),
+  },
   // ---- x/impor (scope impor)
   {
     m: "POST", p: /^\/x\/impor\/batch$/, perlu: "impor",
@@ -864,6 +897,7 @@ async function tangani(req: Request): Promise<Response> {
     });
   }
 
+  if (method === "POST" && path === "/x/admin/berita-tarik") return json(200, await adminBeritaTarik(req));
   if (method === "POST" && /^\/x\/admin\/(akun|reset|purge)$/.test(path)) {
     const aksi = path.slice("/x/admin/".length);
     return json(200, aksi === "akun" ? await adminAkun(req) : aksi === "reset" ? await adminReset(req) : await adminPurge(req));

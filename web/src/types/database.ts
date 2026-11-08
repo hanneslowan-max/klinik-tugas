@@ -1331,6 +1331,10 @@ export type Database = {
       web_anggota: { Args: Record<PropertyKey, never>; Returns: Json };
       web_arsip: { Args: { p_arsip: boolean; p_task: string }; Returns: Json };
       web_atur_kategori: { Args: { p_kategori: string | null; p_task: string }; Returns: Json };
+      web_berita: { Args: { p?: Json }; Returns: Json };
+      web_berita_semua: { Args: { p?: Json }; Returns: Json };
+      web_berita_tanda: { Args: { p: Json }; Returns: Json };
+      web_berita_tersimpan: { Args: Record<PropertyKey, never>; Returns: Json };
       web_buat_tugas: { Args: { p_body: Json; p_list: string }; Returns: Json };
       web_cari: { Args: { p_q: string; p_space?: string }; Returns: Json };
       web_daftar: {

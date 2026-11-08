@@ -1,4 +1,4 @@
-import { Bell, CheckSquare, LayoutGrid, Search, Settings, Target, Trash2, type LucideIcon } from "lucide-react";
+import { Bell, CheckSquare, LayoutGrid, Newspaper, Search, Settings, Target, Trash2, type LucideIcon } from "lucide-react";
 
 export type ItemNav = {
   href: string;
@@ -16,6 +16,8 @@ export const NAV_UTAMA: ItemNav[] = [
   { href: "/jelajah", label: "Jelajah", Ikon: LayoutGrid, cocok: (p) => p.startsWith("/jelajah") || p.startsWith("/l/") },
   { href: "/cari", label: "Cari", Ikon: Search, cocok: (p) => p.startsWith("/cari") },
   { href: "/pipeline", label: "Pipeline", Ikon: Target, pipelineSaja: true, cocok: (p) => p.startsWith("/pipeline") },
+  // Berita (7 Nov 2026): pantauan berita kurasi Claude, khusus owner (hak sebenarnya dicek web_berita* di DB)
+  { href: "/berita", label: "Berita", Ikon: Newspaper, ownerSaja: true, cocok: (p) => p.startsWith("/berita") },
 ];
 
 export const NAV_LAIN: ItemNav[] = [
