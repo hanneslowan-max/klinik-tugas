@@ -669,6 +669,21 @@ Rincian lengkap (alur, kontrak edisi, sumber, prompt routine, deploy): `docs/BER
   jadi tarik feed sungguhan diuji dengan parser + `x_berita_simpan` langsung: 36 feed asli → 1.254 item, 1.201 baru,
   53 dobel lintas sumber, 260 ms; ulang → 0 baru.
 
+## Klik iklan Google → ORDER (8 Nov 2026, ACC Hannes 4 Nov "lanjut kerjakan rancangan ukur sampai order"; PR branch `claude/iklan-klik-order`, BELUM deploy)
+Brief rhj-brain `deliverables/anvil/BRIEF-KLIK-IKLAN-SAMPAI-ORDER.md`. Kontrak `docs/KONTRAK-DB.md` §13, rute
+`supabase/functions/api/README.md`.
+- DB `20261108120000_iklan_klik.sql` (aditif): tabel `iklan_klik` (kode ↔ ID klik, tanpa data pribadi, RLS tanpa hak tabel),
+  `x_iklan_klik_catat` (publik lewat Edge; idempoten, tabrakan kode → 409, rem 1000 baru/jam, hapus > 90 hari),
+  `x_iklan_unggah` (pencocokan ORDER ↔ klik untuk CSV), `web_/x_iklan_ringkas` (admin/baca), `x_rawat_iklan_klik`.
+- Edge `api`: `POST /x/iklan/klik` (publik, CORS khusus 4 origin situs, batas laju per origin, 204), `GET /x/iklan/unggah.csv`
+  (env `TOKEN_UNGGAH_IKLAN`, Bearer/Basic), `GET /x/iklan/ringkas`, `POST /x/rawat/iklan-klik`. Bagian murni di `iklan.ts`.
+- Retensi: oportunistik di setiap kiriman + langkah kedua `rawat.yml` (`node impor/rawat.mjs --iklan-klik`, 02:30 WIB,
+  ikut `RAWAT_AKTIF`).
+- Web: kartu "Klik iklan → order" di layar Ringkasan Pipeline (`kartu-klik-iklan.tsx`).
+- Keterbatasan: gbraid/wbraid tidak masuk CSV (dihitung); "Lead berkualitas" (aksi sekunder kedua) belum; nilai order yang
+  diubah sesudah diunggah tidak dikoreksi di Google (CSV = keadaan sekarang, Google menolak baris ganda).
+- Tes lokal: lihat deskripsi PR.
+
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)
 Prasyarat dari Hannes: project Supabase baru `rhj-tugas` (akun/org baru, Sydney `ap-southeast-2` per keputusan 30/9, Free); env cloud `SUPABASE_ACCESS_TOKEN` (PAT akun baru) + `SUPABASE_PROJECT_REF`; `CLICKUP_API_TOKEN` (sudah ada); sesi baru supaya env terbaca. Semua langkah ke ClickUp **GET saja**. Tidak memakai MCP Supabase (itu ERP).
 

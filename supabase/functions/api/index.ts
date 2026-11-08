@@ -11,9 +11,15 @@
 //   impor = + /x/impor/* dan /x/export. DELETE hanya role owner. token_id diteruskan ke DB lewat header
 //   x-token-id (activity.token_id + cek scope lapis kedua).
 // Auth sesi (UI owner, hanya /x/admin/*, termasuk /x/admin/berita-tarik): header `x-sesi: <access_token>` → GoTrue /auth/v1/user.
+// Rute TANPA token app (iklan.ts, migrasi 20261108120000_iklan_klik): POST /x/iklan/klik (publik, CORS khusus dua situs,
+//   batas laju per origin) dan GET /x/iklan/unggah.csv (token env TOKEN_UNGGAH_IKLAN: Bearer atau Basic password).
 // Galat: {err, ECODE} + status HTTP (PT4xx dari DB dipetakan apa adanya).
 
 import { ringkasTarik, tarikSemua, type SumberFeed } from "./berita.ts";
+import {
+  argKlik, asalIklanBoleh, type BarisUnggah, buatEmber, csvUnggah, MAKS_BODY_KLIK, MIN_TOKEN_UNGGAH, normalKlik, PATH_KLIK,
+  tokenUnggahCocok,
+} from "./iklan.ts";
 
 type Obj = Record<string, unknown>;
 type Scope = "baca" | "tulis" | "impor";
@@ -193,7 +199,9 @@ async function denganCors(req: Request, res: Response): Promise<Response> {
   if (!origin) return res;
   const h = new Headers(res.headers);
   h.append("vary", "Origin");
-  if (await originBoleh(origin)) {
+  // Rute penerima klik memakai allow-list dua situs (iklan.ts); rute lain tetap hanya app + localhost.
+  const klik = normalPath(new URL(req.url).pathname) === PATH_KLIK;
+  if (klik ? asalIklanBoleh(origin) : await originBoleh(origin)) {
     h.set("access-control-allow-origin", origin);
     h.set("access-control-expose-headers", "retry-after, x-ratelimit-reset, x-ratelimit-remaining");
   }
@@ -488,6 +496,72 @@ async function adminBeritaTarik(req: Request): Promise<unknown> {
   return await beritaTarik(Number(member.id));
 }
 
+// ---------------------------------------------------------------- iklan (20261108120000_iklan_klik.sql, iklan.ts)
+// Penerima klik dari situs: kapasitas 30 kiriman sekaligus per origin, isi ulang 30/menit (lalu lintas iklan asli
+// ±60 klik/hari). Unggah CSV: percobaan token SALAH dibatasi 10 sekaligus, isi ulang 10/menit (token benar tidak dibatasi
+// ember ini, jadi pengirim token salah tidak bisa menghalangi unggahan Google).
+const emberKlik = buatEmber(30, 30);
+const emberUnggahSalah = buatEmber(10, 10);
+
+function galatLaju(tunggu: number): GalatApi {
+  return new GalatApi(429, "Rate limit", "APP_002", {
+    "retry-after": String(Math.max(1, Math.ceil(tunggu / 1000))), "x-ratelimit-remaining": "0",
+  });
+}
+
+async function iklanKlik(req: Request, method: string): Promise<Response> {
+  const origin = req.headers.get("origin");
+  if (method === "OPTIONS") {
+    if (!asalIklanBoleh(origin)) return json(403, { err: "Origin tidak diizinkan", ECODE: "ACCESS_001" });
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "access-control-allow-origin": origin!, "access-control-allow-methods": "POST, OPTIONS",
+        "access-control-allow-headers": "content-type", "access-control-max-age": "600", vary: "Origin",
+      },
+    });
+  }
+  if (method !== "POST") throw new GalatApi(405, `Method ${method} tidak didukung untuk ${PATH_KLIK}`, "APP_001");
+  // Browser selalu mengirim Origin pada POST lintas situs (fetch maupun sendBeacon). Tanpa/asing → tolak.
+  if (!asalIklanBoleh(origin)) throw new GalatApi(403, "Origin tidak diizinkan", "ACCESS_001");
+  const j = emberKlik(`klik:${origin}`);
+  if (!j.ok) throw galatLaju(j.tunggu);
+  if (Number(req.headers.get("content-length") ?? 0) > MAKS_BODY_KLIK) throw new GalatApi(413, "Body terlalu besar", "INPUT_001");
+  // content-type tidak diperiksa: text/plain (sendBeacon, tanpa preflight) dan application/json sama-sama JSON.
+  const text = await req.text();
+  if (text.length > MAKS_BODY_KLIK) throw new GalatApi(413, "Body terlalu besar", "INPUT_001");
+  let body: unknown;
+  try { body = JSON.parse(text); } catch { throw new GalatApi(400, "Body bukan JSON yang sah", "INPUT_001"); }
+  const n = normalKlik(body, { origin });
+  if (!n.ok) throw new GalatApi(400, n.pesan, "INPUT_001");
+  await rpc("x_iklan_klik_catat", { p: argKlik(n.klik) });   // 409 bila kode dipakai kunjungan lain (dipetakan rpc)
+  return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
+}
+
+async function iklanUnggah(req: Request, method: string): Promise<Response> {
+  if (method !== "GET" && method !== "HEAD") throw new GalatApi(405, `Method ${method} tidak didukung`, "APP_001");
+  const harap = Deno.env.get("TOKEN_UNGGAH_IKLAN") ?? "";
+  if (!(await tokenUnggahCocok(req.headers.get("authorization"), harap))) {
+    if (harap.trim().length < MIN_TOKEN_UNGGAH) {
+      console.error(`TOKEN_UNGGAH_IKLAN belum disetel (atau < ${MIN_TOKEN_UNGGAH} karakter): unggah CSV ditolak`);
+    }
+    const j = emberUnggahSalah("unggah");
+    if (!j.ok) throw galatLaju(j.tunggu);
+    // Jawaban sama untuk token salah / tidak ada / env kosong: tidak membocorkan ada-tidaknya data.
+    throw new GalatApi(401, "Token tidak sah", "OAUTH_019", { "www-authenticate": 'Basic realm="Anvil unggah iklan", charset="UTF-8"' });
+  }
+  const data = (await rpc("x_iklan_unggah", {})) as { baris?: BarisUnggah[]; dilewati_braid?: number; ditunda?: number };
+  const { csv, n } = csvUnggah(data?.baris ?? []);
+  return new Response(method === "HEAD" ? null : csv, {
+    status: 200,
+    headers: {
+      "content-type": "text/csv; charset=utf-8", "cache-control": "no-store",
+      "content-disposition": 'inline; filename="unggah-konversi-order.csv"',
+      "x-baris": String(n), "x-dilewati-braid": String(data?.dilewati_braid ?? 0), "x-ditunda": String(data?.ditunda ?? 0),
+    },
+  });
+}
+
 // ---------------------------------------------------------------- rute token
 type Handler = (c: Ctx, g: string[]) => Promise<unknown>;
 interface Rute { m: string; p: RegExp; perlu: Scope; owner?: boolean; h: Handler }
@@ -732,6 +806,17 @@ const RUTE: Rute[] = [
     h: (c) => rpc("x_pipeline_ringkas", { p_aktor: A(c), p: {
       dasar: c.q.get("dasar") ?? undefined, bulan: c.q.get("bulan") ?? undefined } }, T(c)),
   },
+  // Ringkasan keutuhan kode klik iklan (admin/baca Pipeline, ditegakkan DB): klik 7/30 hari per domain, kode yang muncul
+  // di lead, order + nilai, gbraid/wbraid dilewati, isi CSV unggah saat ini.
+  { m: "GET", p: /^\/x\/iklan\/ringkas$/, perlu: "baca", h: (c) => rpc("x_iklan_ringkas", { p_aktor: A(c) }, T(c)) },
+  {
+    // Retensi klik iklan (job terjadwal rawat.yml, owner/bot): hapus baris iklan_klik > 90 hari. Body opsional {dry?:bool}.
+    m: "POST", p: /^\/x\/rawat\/iklan-klik$/, perlu: "impor",
+    h: async (c) => {
+      const b = (await c.body().catch(() => ({}))) as Obj;
+      return rpc("x_rawat_iklan_klik", { p_aktor: A(c), p_dry: b.dry === true }, T(c));
+    },
+  },
   {
     // Perawatan lampiran (job terjadwal, owner/bot): hapus BERKAS lampiran app pada kartu selesai > N hari (setelan
     // app_settings.rawat_lampiran.hari, default 7). Baris di-soft-delete (jejak di riwayat) oleh x_rawat_lampiran;
@@ -884,6 +969,10 @@ async function tangani(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const method = req.method.toUpperCase();
   const path = normalPath(url.pathname);
+
+  // Rute tanpa token app (sebelum preflight umum & loop RUTE): penerima klik situs + CSV unggah Google Ads.
+  if (path === PATH_KLIK) return await iklanKlik(req, method);
+  if (/^\/x\/iklan\/unggah(?:\.csv)?$/.test(path)) return await iklanUnggah(req, method);
 
   if (method === "OPTIONS") {
     const origin = req.headers.get("origin");

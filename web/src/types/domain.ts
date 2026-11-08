@@ -666,6 +666,31 @@ export type RingkasPipeline = {
   per_alasan_batal: RingkasPerAlasan[];
 };
 
+// -------------------------------------------------------------------- klik iklan → order (20261108120000_iklan_klik)
+/** Satu jendela (7 / 30 hari menurut waktu klik) untuk satu domain. */
+export type JendelaKlikIklan = {
+  klik: number;
+  /** klik ber-jenis gbraid/wbraid (iOS): tidak bisa masuk CSV unggah */
+  braid: number;
+  /** klik yang kodenya muncul di ≥1 lead (sumber_bukti_kode) */
+  kode_di_lead: number;
+  lead: number;
+  order: number;
+  nilai: number;
+};
+
+/** Hasil web_iklan_ringkas (admin/baca Pipeline): keutuhan kode Ref unik situs ↔ lead ↔ order. */
+export type RingkasKlikIklan = {
+  per_domain: { domain: "rodahammerindo.com" | "palletmeshindonesia.com"; singkat: "RH" | "OY"; h7: JendelaKlikIklan; h30: JendelaKlikIklan }[];
+  /** lead masuk 30 hari terakhir ber-kode GA-xx-XXXX yang tidak ada di iklan_klik */
+  lead_kode_tanpa_klik: number;
+  /** semua baris iklan_klik (≤ 90 hari) */
+  tersimpan: number;
+  /** isi CSV unggah Google Ads saat ini */
+  unggah: { baris: number; dilewati_braid: number; ditunda: number; nilai: number };
+  dibuat: string;
+};
+
 // -------------------------------------------------------------------- akses modul (admin owner)
 /** Satu baris akses Pipeline (web_pipeline_akses_daftar / _simpan). */
 export type AksesPipelineRow = {
@@ -1016,6 +1041,7 @@ export type HasilRpc = {
   web_pipeline_dasbor_ids: IdsDasbor;
   web_pipeline_dasbor_lanjut: DasborLanjut;
   web_pipeline_biaya_iklan_set: HasilBiayaIklan;
+  web_iklan_ringkas: RingkasKlikIklan;
   web_berita: DataBerita;
   web_berita_semua: SemuaBerita;
   web_berita_tersimpan: { items: PilihanBerita[] };

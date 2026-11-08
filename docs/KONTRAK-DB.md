@@ -670,3 +670,42 @@ sama persis + `bayar_belum_lunas`, `order_tanpa_bayar`, `nama_kosong`, `sumber_l
 Hak: `x_pipeline_biaya_iklan_set` → service_role; `web_pipeline_dasbor_lanjut`, `web_pipeline_biaya_iklan_set` → authenticated;
 `inti_pipeline_dasbor_lanjut`, `inti_pipeline_biaya_iklan_set`, `pipeline_dasbor_batal` internal. Fungsi `web_*` kini 67,
 `api_/x_/impor_` 37 (tes 09).
+
+## 13. Klik iklan Google → ORDER (8 Nov 2026)
+Migrasi `20261108120000_iklan_klik.sql`, tes `uji/db/37_iklan_klik.sql` (+ Edge `uji/iklan/jalankan.mjs` murni Node dan
+`uji/iklan/kontrak.mjs` lokal). ACC Hannes 4 Nov ("lanjut kerjakan rancangan ukur sampai order"); brief rhj-brain
+`deliverables/anvil/BRIEF-KLIK-IKLAN-SAMPAI-ORDER.md`.
+
+**Tabel `iklan_klik`** (PK `kode`): `kode` `^GA-(RH|OY)-[A-Z0-9]{4}$`, `id_klik` `[A-Za-z0-9_.~-]{8,200}`, `jenis_id`
+gclid/gbraid/wbraid, `waktu_klik`, `domain` rodahammerindo.com/palletmeshindonesia.com (CHECK: GA-RH ↔ rodahammerindo.com,
+GA-OY ↔ palletmeshindonesia.com), `halaman` (path saja, tanpa query/fragmen/spasi, ≤ 300), `dibuat_pada`. **Tanpa** IP, user
+agent, cookie, nama, telepon. RLS aktif, tanpa hak tabel untuk role API mana pun (service_role pun lewat fungsi). Indeks
+`waktu_klik` (retensi, jendela ringkasan) + `lead (sumber_bukti_kode)` parsial. Tidak ikut `x_export`/backup.
+
+**`x_iklan_klik_catat(p jsonb)`** (service_role; Edge `POST /x/iklan/klik`, rute publik → tanpa `p_aktor`, seperti
+`api_token_cek`): `p = {kode, id_klik, jenis_id, domain, waktu_klik?, halaman?}`. Dirapikan: kode trim + huruf besar,
+jenis & domain huruf kecil, awalan `www.` dibuang, halaman dipotong di `#`/`?` lalu 300 karakter (kosong = `/`).
+`waktu_klik` kosong = `now()`; ISO dengan zona, ≤ 3 hari lalu, ≤ 5 menit ke depan. Kunci lain / nilai bukan teks → `PT400`.
+Kode ada + id_klik sama → `{"baru":false}` (idempoten); kode ada + id_klik beda → `PT409 KONFLIK_001` (tabrakan kode acak
+antar-pengunjung; baris pertama tetap, situs membuat kode baru). Baru → `{"baru":true}`. Setiap panggilan menghapus baris
+`waktu_klik < now() − 90 hari`. Rem global: > 1000 baris baru dalam 1 jam (menurut `dibuat_pada`) → kode baru ditolak
+`PT429 APP_002` (batas laju Edge hanya per isolate dan Origin bisa dipalsukan di luar browser).
+
+**`x_iklan_unggah()`** (service_role; Edge `GET /x/iklan/unggah.csv`, token env diperiksa Edge):
+`{"baris":[{lead_id, kode, id_klik, nama, waktu, nilai}], "dilewati_braid":n, "ditunda":n}`. Baris = lead `tahap = ORDER`,
+`tanggal_sp` & `nilai_transaksi` terisi, `sumber_bukti_kode = iklan_klik.kode` (≤ 1 baris per lead karena kode unik; ubah
+lead tidak menggandakan), `tanggal_sp ≥ tanggal WIB klik`, `tanggal_sp 12:00 WIB ≤ waktu_klik + 90 hari`. `waktu` =
+`tanggal_sp 12:00:00` WIB (`YYYY-MM-DD HH24:MI:SS`), atau `waktu_klik + 1 menit` bila 12:00 jatuh sebelum klik (Google
+menolak konversi sebelum klik). `nama` "Order SP RH" / "Order SP OY" dari awalan kode. Hanya `gclid`; gbraid/wbraid →
+`dilewati_braid`; waktu konversi di masa depan → `ditunda` (ikut unggahan berikutnya). Urut waktu konversi.
+
+**`web_iklan_ringkas()`** / **`x_iklan_ringkas(p_aktor)`** (scope baca): peran Pipeline `admin`/`baca` (sama dengan
+`boleh_ringkas`); rep / tanpa akses → `PT403`. Hasil `{per_domain:[{domain, singkat, h7, h30}], lead_kode_tanpa_klik,
+tersimpan, unggah:{baris, dilewati_braid, ditunda, nilai}, dibuat}`; tiap jendela `{klik, braid, kode_di_lead, lead, order,
+nilai}` menurut `waktu_klik` (definisi di kepala migrasi). Web: kartu "Klik iklan → order" di layar Ringkasan Pipeline.
+
+**`x_rawat_iklan_klik(p_aktor, p_dry default false)`** (scope impor, owner/bot; Edge `POST /x/rawat/iklan-klik`, job
+`rawat.yml` → `impor/rawat.mjs --iklan-klik`): hapus (atau hitung bila dry) baris > 90 hari → `{hari:90, dihapus, dry}`.
+
+Hak: `x_iklan_klik_catat`, `x_iklan_unggah`, `x_iklan_ringkas`, `x_rawat_iklan_klik` → service_role; `web_iklan_ringkas` →
+authenticated; `inti_iklan_*` internal. Fungsi `web_*` kini 72, `api_/x_/impor_` 45 (tes 09).

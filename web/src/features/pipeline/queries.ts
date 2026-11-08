@@ -65,6 +65,15 @@ export function usePipelineRingkas(arg: { bulan: string; dasar: "sp" | "lead" })
   });
 }
 
+/** Keutuhan kode klik iklan (admin/baca; ditegakkan server): klik 7/30 hari per domain, kode di lead, order, CSV unggah. */
+export function useIklanRingkas() {
+  return useQuery({
+    queryKey: kunci.pipelineIklanRingkas,
+    queryFn: () => rpc(klienBrowser(), "web_iklan_ringkas"),
+    staleTime: 5 * 60_000,
+  });
+}
+
 /** Dasbor Tahap 1: bulan 'YYYY-MM' (kosong = bulan berjalan). Cakupan (penuh / milik saya) ditentukan server. */
 export function useDasborPipeline(bulan: string) {
   return useQuery({

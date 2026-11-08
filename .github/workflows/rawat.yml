@@ -1,6 +1,8 @@
 # Perawatan lampiran (impor/rawat.mjs): hapus BERKAS lampiran app pada kartu yang sudah selesai > N hari (setelan
 # app_settings.rawat_lampiran.hari, default 7) demi hemat ruang Storage. Hanya lampiran buatan app; salinan ClickUp
 # dibiarkan. Baris di-soft-delete (jejak di riwayat); berkas fisik dihapus service role.
+# Langkah kedua (impor/rawat.mjs --iklan-klik): hapus baris iklan_klik > 90 hari (ID klik Google Ads; privasi + batas
+# unggah Google). Jalan walau langkah lampiran gagal. Penerima klik juga menghapus baris > 90 hari tiap ada kiriman baru.
 # Jadwal: 02:30 WIB (19:30 UTC), terpisah dari backup (03:15) & sinkron (05:45) dan di luar jendela routine 07:00–09:15.
 # HANYA jalan bila Variables repo RAWAT_AKTIF == '1'. Mematikan cepat cukup lewat setelan (rawat_lampiran.aktif=false)
 # tanpa mengubah workflow ini.
@@ -70,3 +72,13 @@ jobs:
             *) echo "::error::Perawatan lampiran gagal (kode $kode)." ;;
           esac
           exit "$kode"
+
+      - name: Bersihkan klik iklan > 90 hari
+        if: ${{ !cancelled() }}
+        env:
+          DRY: ${{ inputs.dry_run && '1' || '' }}
+        run: |
+          set -uo pipefail
+          args=(--iklan-klik)
+          if [ -n "$DRY" ]; then args+=(--dry); fi
+          node impor/rawat.mjs "${args[@]}"
