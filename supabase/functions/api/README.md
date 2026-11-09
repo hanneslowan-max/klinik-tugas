@@ -18,6 +18,14 @@ REST untuk agent, CLI, dan importer. Meniru ClickUp v2 dan menambah endpoint `/x
   - `impor`: ditambah `/x/impor/*` dan `/x/export`.
   - DELETE hanya untuk token dengan role owner.
 - **Admin:** hanya `/x/admin/*` (akun, reset, purge, berita-tarik), memakai header `x-sesi: <access_token user>`. JWT dicek lewat GoTrue, dan pemiliknya wajib owner aktif.
+- **Tanpa token app (klik iklan, `iklan.ts`, migrasi `20261108120000_iklan_klik`):**
+  - `POST /x/iklan/klik` publik untuk dua situs. Wajib header `Origin` salah satu dari `https://rodahammerindo.com`,
+    `https://www.rodahammerindo.com`, `https://palletmeshindonesia.com`, `https://www.palletmeshindonesia.com` (lainnya 403).
+    Batas laju per isolate per origin (kapasitas 30, isi ulang 30/menit) → 429 + `Retry-After`. IP tidak dibaca/disimpan.
+  - `GET /x/iklan/unggah.csv` (alias `/x/iklan/unggah`): env `TOKEN_UNGGAH_IKLAN` (≥ 24 karakter) lewat
+    `Authorization: Bearer <token>` ATAU Basic auth (username bebas, password = token; untuk unggah terjadwal HTTPS Google
+    Ads). Dibandingkan waktu-konstan (hash sha256 + XOR). Token salah / tidak ada / env kosong → `401 OAUTH_019` +
+    `WWW-Authenticate: Basic` (jawaban sama, tanpa isi data); percobaan salah dibatasi 10 sekaligus, isi 10/menit.
 - **Burst:** ember per token (hash) per isolate, kapasitas `TUGAS_API_BURST` (40), isi ulang `TUGAS_API_LAJU` (20/detik). Bila habis: `429 {err:"Rate limit", ECODE:"APP_002"}` dengan header `Retry-After` dan `x-ratelimit-reset`. Batas ini tidak global lintas instance.
 
 ## Galat
@@ -61,6 +69,10 @@ Jelajah web; daftar kategori diatur owner di Admin → Kategori.
 | GET | `/x/berita/kandidat?jam=&batas=` (aktor owner/bot) | `x_berita_kandidat`: item sejak edisi terakhir (− 30 mnt, maks 48 jam; `jam` 1–48 menimpa), tanpa yang sudah dipilih 48 jam, maks `batas` (400) + `edisi_terakhir`, `umpan_balik` owner (disimpan/kurang relevan), `sumber_galat` |
 | POST | `/x/berita/edisi` (scope tulis; aktor owner/bot) `{garis_besar, pantau?, kandidat?, catatan?, pilihan:[1–30]}` | `x_berita_edisi_simpan`: satu edisi kurasi (semua-atau-tidak; galat menyebut `pilihan[i]`). Kontrak item di komentar fungsi & `docs/BERITA.md`. Balas `{id, dibuat_at, pilihan}` |
 | POST | `/x/admin/berita-tarik` (sesi owner, `x-sesi`) | Tombol "Tarik terbaru" di /berita: sama dengan `/x/berita/tarik` dengan aktor = owner |
+| POST | `/x/iklan/klik` (publik, Origin dua situs; body JSON ≤ 2 KB, `content-type` bebas: `application/json` atau `text/plain` ala `sendBeacon`) `{kode, id_klik, jenis_id, domain, waktu_klik?, halaman?}` | Catat pasangan kode Ref ↔ ID klik: `x_iklan_klik_catat`. Validasi `kode` `^GA-(RH\|OY)-[A-Z0-9]{4}$` (awalan sesuai `domain`, `domain` sesuai `Origin`), `id_klik` `[A-Za-z0-9_.~-]{8,200}`, `jenis_id` gclid/gbraid/wbraid, `waktu_klik` ISO dengan zona ≤ 3 hari lalu (kosong = waktu server), `halaman` path saja (query/fragmen dibuang, ≤ 300). Balas **204 tanpa isi**; kirim ulang kode + id sama → 204 (idempoten); kode sama dengan id beda → `409 KONFLIK_001` (situs buat kode baru); tidak sah → `400 INPUT_001`; > 1000 klik baru/jam (rem DB) → `429` |
+| GET / HEAD | `/x/iklan/unggah.csv` (token `TOKEN_UNGGAH_IKLAN`, lihat Auth) | `x_iklan_unggah` → `text/csv` impor konversi offline Google Ads: `Parameters:TimeZone=Asia/Jakarta`, header `Google Click ID,Conversion Name,Conversion Time,Conversion Value,Conversion Currency`, satu baris per lead ORDER ber-kode cocok (gclid saja; "Order SP RH"/"Order SP OY", tanggal SP 12:00:00 WIB, nilai_transaksi, IDR). Header respons `x-baris`, `x-dilewati-braid`, `x-ditunda`. Rincian `docs/KONTRAK-DB.md` §13 |
+| GET | `/x/iklan/ringkas` (scope baca; aktor admin/baca Pipeline) | `x_iklan_ringkas`: klik 7/30 hari per domain, kode di lead, lead, order + nilai, gbraid/wbraid, lead ber-kode tanpa klik, isi CSV saat ini |
+| POST | `/x/rawat/iklan-klik` (scope impor, owner/bot; body opsional `{dry?:bool}`) | `x_rawat_iklan_klik`: hapus baris `iklan_klik` > 90 hari. Balas `{hari:90, dihapus, dry}`. Dipanggil job terjadwal `rawat.yml` (`node impor/rawat.mjs --iklan-klik`) |
 | POST | `/x/rawat/lampiran` (scope impor, owner/bot; body opsional `{hari?:int, dry?:bool}`) | Perawatan: `x_rawat_lampiran` men-soft-delete lampiran app pada kartu selesai > N hari (setelan `app_settings.rawat_lampiran` `{aktif,hari}`, default 7; hanya `sumber=app`, salinan ClickUp dibiarkan), lalu service role menghapus BERKAS-nya. `dry` → hanya hitung. Balas `{hari, dihapus, berkas_dihapus, berkas_sisa, berkas_gagal}` (atau `{dilewati:true}` bila setelan `aktif=false`). Dipanggil job terjadwal `rawat.yml` |
 | GET | `/x/file/{attachment_id}` | 302 ke signed URL (atau `clickup_url`) |
 | POST | `/x/impor/batch` `{jenis, rows, mode?, at_awal?}` | `impor_batch` |
@@ -74,6 +86,8 @@ Jelajah web; daftar kategori diatur owner di Admin → Kategori.
 ## CORS
 - Origin yang diizinkan: origin `app_settings.app_base_url` (cache 5 menit) serta `http://localhost:*` dan `http://127.0.0.1:*`.
 - Preflight dari origin lain → 403.
+- Pengecualian satu-satunya: `/x/iklan/klik` memakai allow-list dua situs (4 origin di atas, `POST, OPTIONS`, header
+  `content-type`) dan TIDAK menerima origin app/localhost. Rute lain tidak menerima origin situs.
 - **Di lokal**, Kong menjawab preflight sendiri dan memasang `access-control-allow-origin: *` di semua respons `/functions/v1/*`. Jadi CORS milik fungsi hanya terlihat di cloud, atau bila runtime diakses langsung (`http://<ip kontainer edge>:8081/api/...`, dipakai `uji/kontrak`).
 
 ## Env opsional
@@ -81,4 +95,5 @@ Jelajah web; daftar kategori diatur owner di Admin → Kategori.
 |---|---|---|
 | `TUGAS_API_BURST` | 40 | Kapasitas ember burst per token |
 | `TUGAS_API_LAJU` | 20 | Isi ulang ember, per detik |
+| `TOKEN_UNGGAH_IKLAN` | (kosong = unggah CSV selalu 401) | Token GET `/x/iklan/unggah.csv` untuk unggah terjadwal Google Ads. Secret Edge, BUKAN di repo; ≥ 24 karakter acak. Lokal: `supabase functions serve --env-file uji/iklan/serve.env` (nilai tiruan) |
 | `TUGAS_PUBLIC_SUPABASE_URL` | lihat keterangan | URL publik untuk signed URL. Default: `SUPABASE_URL`; di lokal `http://127.0.0.1:<port>` |

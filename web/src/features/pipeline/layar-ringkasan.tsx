@@ -3,12 +3,14 @@
 // Ringkasan pipeline (§4) via web_pipeline_ringkas. Hanya untuk pengguna boleh_ringkas (admin/baca).
 // Metrik per bulan (leads/order/omzet + per rep), win-rate (semua + Pallet Mesh per qty), siklus rata-rata.
 // Dasar omzet: SP (default, K2) atau tanggal lead (cocok-silang sheet lama).
+// + kartu "Klik iklan → order" (web_iklan_ringkas, dimuat terpisah; tidak bergantung pada dasar omzet).
 import { useState } from "react";
 
 import { IsiHalaman } from "@/components/layout/isi-halaman";
 import { KepalaHalaman } from "@/components/layout/kepala-halaman";
 import { GalatMuat, Kosong, MemuatDaftar } from "@/components/umum/keadaan";
 import { GerbangPipeline } from "@/features/pipeline/gerbang";
+import { KartuKlikIklan } from "@/features/pipeline/kartu-klik-iklan";
 import { rupiah } from "@/features/pipeline/konstanta";
 import { usePipelineRingkas } from "@/features/pipeline/queries";
 import { cn } from "@/lib/utils";
@@ -186,6 +188,7 @@ function IsiRingkas() {
             kolom={["Sumber", "Lead", "Order", "Omzet"]}
             baris={q.data.per_sumber.map((s) => [s.sumber, s.leads, s.order, rupiah(s.omzet)])}
           />
+          <KartuKlikIklan />
           <Tabel
             judul="Per produk"
             kolom={["Produk", "Lead", "Order", "Omzet"]}

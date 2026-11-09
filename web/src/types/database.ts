@@ -1343,6 +1343,7 @@ export type Database = {
       };
       web_detail: { Args: { p_task: string }; Returns: Json };
       web_hapus: { Args: { p_task: string }; Returns: Json };
+      web_iklan_ringkas: { Args: Record<PropertyKey, never>; Returns: Json };
       web_kategori_kerja: { Args: Record<PropertyKey, never>; Returns: Json };
       web_komentar: {
         Args: {

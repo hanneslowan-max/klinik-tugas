@@ -119,7 +119,10 @@ Admin (owner): `web_admin_anggota_simpan(p jsonb)`, `web_admin_status_simpan(p_l
 - Route = tabel riset §4.3 (termasuk `POST /v2/task/{id}/attachment`: scope `tulis`, `multipart/form-data` field `file`; service role mengunggah ke Storage `t/<task>/<rand>-<nama>` lalu `x_lampiran_catat`; objek yatim dibersihkan bila pencatatan gagal) + `/api/x/impor/batch`, `/api/x/impor/hilang`, `/api/x/impor/run`, `/api/x/impor/upload-url` (signed upload URL Storage), `/api/x/tenggat`, `/api/x/sensus`, `/api/x/export`, `/api/x/rawat/lampiran` (perawatan: hapus berkas lampiran app kartu selesai > N hari, scope impor owner/bot; service role menghapus storage_paths dari `x_rawat_lampiran`).
 - Admin akun (dipanggil UI dengan JWT user owner, header `x-sesi: <access_token>`): `POST /api/x/admin/akun` {member_id, email, password_sementara} → buat/ubah user Auth (admin API) + tautkan `members.auth_user_id` + `harus_ganti_password=true`. `POST /api/x/admin/reset` {member_id, password_sementara}. Verifikasi JWT via `auth.getUser`, wajib owner.
 - DB: panggil RPC PostgREST dengan service role (env bawaan `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`). Attachments: ganti `url` dengan signed URL 24 jam (`createSignedUrls`).
-- CORS: hanya origin app (`app_base_url`) + localhost dev.
+- CORS: hanya origin app (`app_base_url`) + localhost dev. Pengecualian: `POST /x/iklan/klik` (publik, tanpa token) memakai
+  allow-list dua situs (`https://[www.]rodahammerindo.com`, `https://[www.]palletmeshindonesia.com`) + batas laju per origin;
+  `GET /x/iklan/unggah.csv` memakai token env `TOKEN_UNGGAH_IKLAN` (Bearer/Basic), bukan token app. Rincian
+  `supabase/functions/api/README.md` dan `docs/KONTRAK-DB.md` §13.
 
 ## 9. CLI `cli/tugas.mjs`
 - Salin `rhj-brain/tools/clickup.mjs` (baca-saja dari `/home/user/rhj-brain/tools/clickup.mjs`). Dua mode: default ditentukan nama file (`tugas.mjs` → tugas; `clickup.mjs` → clickup), override `TUGAS_BACKEND=tugas|clickup`.

@@ -50,6 +50,8 @@ export const kunci = {
   pipelineRingkas: (bulan: string, dasar: string) => ["pipeline", "ringkas", bulan, dasar] as const,
   /** akar semua varian ringkasan bulanan */
   semuaPipelineRingkas: ["pipeline", "ringkas"] as const,
+  /** keutuhan kode klik iklan → lead → order (web_iklan_ringkas) */
+  pipelineIklanRingkas: ["pipeline", "iklan", "ringkas"] as const,
   pipelineDasbor: (bulan: string) => ["pipeline", "dasbor", bulan] as const,
   pipelineDasborIds: (metrik: string, pemilik: string, bulan: string) => ["pipeline", "dasbor", "ids", metrik, pemilik, bulan] as const,
   pipelineDasborLanjut: (bulan: string) => ["pipeline", "dasbor", "lanjut", bulan] as const,
