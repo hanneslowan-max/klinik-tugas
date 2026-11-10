@@ -782,3 +782,43 @@ pemilik, pemilik_nama, cara, hasil_akhir, dibuat_pada, diubah_pada}]}` terbaru d
 
 Hak: tiga `x_` → service_role; `inti_*`, `pipeline_luar_*`, `pipeline_erp_terapkan`, `pipeline_sales_dari_sp`,
 `pipeline_sumber_sah`/`_produk_sah`/`_produk_baku` internal. Fungsi `api_/x_/impor_` kini 48 (tes 09); `web_*` tetap 72.
+
+## 15. Bot WA 0878 luar jam kerja (10 Nov 2026)
+Migrasi `20261110180000_wa_bot.sql`, tes `uji/db/39_wa_bot.sql` (+ `uji/wa/jalankan.mjs` murni Node, `uji/wa/kontrak.mjs`
+Edge lokal dengan Kapso/Claude/Telegram tiruan). Rincian alur, aturan, deploy: `docs/WA-BOT.md`. Keputusan Hannes 10 Nov
+(pop-up B24 rhj-brain). Ekstensi `pg_net` + `pg_cron` dipasang migrasi ini.
+
+**Skema `wa`** (tanpa USAGE untuk anon/authenticated/service_role; RLS ON; tanpa hak tabel/sequence; fungsi `wa.*`
+internal): `pengaturan` (1 baris; saklar `mati|kirim` default `mati`, `saklar_alasan` awal|manual|pemutus, model
+`claude-sonnet-5-5`, max_token 400, tunda 10/2 mnt, batas 3/periode & 4/24 jam, jam 08.00–17.00, maks 700 karakter, pemutus
+3 tolak/hari & 5 gagal/jam, harga $2/$10 per juta token, `kunci_hash` acak), `antrean` (≤ 1 aktif per nomor; dihapus
+> 7 hari), `log` (metadata + `teks_bot`, nomor = HMAC `kunci_hash`; dihapus > 90 hari), `kejadian` (idem 7 hari), `diam`,
+`kata_manusia` (kosong), `peringatan`, `detak`. Waktu acuan semua pintu = `p.sekarang` bila dikirim (Edge hanya
+meneruskannya bila env `WA_IZINKAN_JAM_UJI=1`, uji lokal), selain itu `now()`.
+
+**Pintu service_role tanpa `p_aktor`** (rute Edge publik/token env, seperti `x_iklan_klik_catat`):
+- `x_wa_webhook(p)` `{kunci_idem?, items:[{id_pesan, arah masuk|keluar, asal, nomor, percakapan?, waktu, jenis, stop?, tes?, otomatis?}] (≤ 100)}`
+  → `{dobel, diproses, antrean}`. Kunci idem sama → dobel tanpa menulis; id pesan sudah tercatat → dilewati;
+  `history_sync` dilewati. Keluar: `business_app` + otomatis → `keluar_aplikasi`; `business_app` → `keluar_sales` + antrean
+  tunggu batal `sales_membalas`; lainnya → `keluar_api`. Masuk: jam kerja / > 24 jam lalu → catat saja; `wa.diam` → diam;
+  stop → `wa.diam` minta_berhenti; reaksi/stiker/tes → diam; sedang diproses → catat; selain itu antrean (lihat WA-BOT.md).
+- `x_wa_ambil(p)` `{batas? 1–20}` → `{saklar, pengaturan:{model, max_token, maks_karakter}, kata_manusia:[pola], items:[{antrean_id,
+  nomor, percakapan, pesan_pertama_pada, pesan_terakhir_pada, periode, hari, bot_periode, sisa, percobaan, id_bot}], batal:{alasan:n}}`.
+  Mengunci (`skip locked`) antrean tunggu jatuh tempo + proses macet > 5 mnt; aturan gagal → batal + log.
+- `x_wa_hasil(p)` `{antrean_id, keputusan kirim|diam|batal|tolak|gagal|tunda, alasan?, id_pesan?, teks_bot?, token_masuk?, token_keluar?,
+  model?, diam_nomor?}` → `{ok, status, pemutus}`. Antrean wajib `proses` (selain itu `PT409`). kirim butuh id_pesan + teks_bot
+  (log `keluar_bot`, baris `keluar_api` ber-id sama dihapus). tunda → tunggu +2 mnt, percobaan ke-3 → batal `tunda_habis`.
+  tolak/gagal → pemutus (saklar `mati`, alasan `pemutus`).
+- `x_wa_jaga(p)` → data jaga (saklar, akhir_pekan, macet, gagal/tolak 15 mnt + alasan, terakhir_webhook/proses); menjalankan `wa.rawat()`.
+- `x_wa_peringatan(p)` `{kunci}` → `{kirim}` (true bila kunci itu belum dikirim 3 jam terakhir; dicatat).
+
+**Pintu token app** (aktor owner/bot aktif, selain itu `PT403`): `x_wa_ringkas(p_aktor, p)` scope baca `{hari? 1–90}` →
+hitungan masuk/antre/kirim/tolak/gagal, `per_alasan` (`<keputusan>:<alasan>`), token, biaya, 5 contoh teks bot, detak (tanpa
+nomor/isi chat); `x_wa_saklar(p_aktor, p)` scope tulis `{status mati|kirim, catatan?}` (alasan `manual`);
+`x_wa_diam(p_aktor, p)` scope tulis `{nomor, alasan internal|pemasok|ekspedisi|minta_berhenti|lain, catatan?, hapus?}` (nomor → 62…;
+antrean tunggu nomor itu batal).
+
+**Cron:** `wa-proses` tiap menit `wa.picu('proses')` (hanya bila ada antrean jatuh tempo), `wa-jaga` tiap 15 menit, `wa-rawat`
+02.41 WIB. `wa.picu` membaca Vault `wa_api_url` + `wa_token_proses`; tanpa keduanya → null (tidak memanggil apa pun).
+
+Hak: 8 `x_wa_*` → service_role saja. Fungsi `api_/x_/impor_` kini 56 (tes 09); `web_*` tetap 72.

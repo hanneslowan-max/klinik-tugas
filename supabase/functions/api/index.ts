@@ -13,6 +13,8 @@
 // Auth sesi (UI owner, hanya /x/admin/*, termasuk /x/admin/berita-tarik): header `x-sesi: <access_token>` → GoTrue /auth/v1/user.
 // Rute TANPA token app (iklan.ts, migrasi 20261108120000_iklan_klik): POST /x/iklan/klik (publik, CORS khusus dua situs,
 //   batas laju per origin) dan GET /x/iklan/unggah.csv (token env TOKEN_UNGGAH_IKLAN: Bearer atau Basic password).
+// Rute bot WA 0878 (wa.ts, migrasi 20261110180000_wa_bot): POST /x/wa/webhook (publik, tanda tangan Kapso
+//   X-Webhook-Signature wajib), POST /x/wa/proses & /x/wa/jaga (env TOKEN_WA_PROSES, dipanggil pg_cron lewat pg_net).
 // Galat: {err, ECODE} + status HTTP (PT4xx dari DB dipetakan apa adanya).
 
 import { ringkasTarik, tarikSemua, type SumberFeed } from "./berita.ts";
@@ -20,6 +22,7 @@ import {
   argKlik, asalIklanBoleh, type BarisUnggah, buatEmber, csvUnggah, MAKS_BODY_KLIK, MIN_TOKEN_UNGGAH, normalKlik, PATH_KLIK,
   tokenUnggahCocok,
 } from "./iklan.ts";
+import { envDari, jagaBot, MAKS_BODY_WEBHOOK, prosesAntrean, tandaTanganCocok, tokenProsesCocok, uraiWebhook } from "./wa.ts";
 
 type Obj = Record<string, unknown>;
 type Scope = "baca" | "tulis" | "impor";
@@ -562,6 +565,54 @@ async function iklanUnggah(req: Request, method: string): Promise<Response> {
   });
 }
 
+// ---------------------------------------------------------------- bot WA 0878 (wa.ts, 20261110180000_wa_bot.sql)
+// Waktu acuan tiruan (header x-wa-sekarang) HANYA bila env WA_IZINKAN_JAM_UJI=1 (uji lokal, uji/wa/serve.env).
+const emberWaSalah = buatEmber(20, 20);
+function waSekarang(req: Request): { sekarang?: string } {
+  if (Deno.env.get("WA_IZINKAN_JAM_UJI") !== "1") return {};
+  const v = (req.headers.get("x-wa-sekarang") ?? "").trim();
+  return v ? { sekarang: v } : {};
+}
+const waEnv = () => envDari((k) => Deno.env.get(k));
+const waRpc = (fn: string, args: Obj) => rpc(fn, args);
+
+async function waWebhook(req: Request, method: string): Promise<Response> {
+  if (method !== "POST") throw new GalatApi(405, `Method ${method} tidak didukung untuk /x/wa/webhook`, "APP_001");
+  if (Number(req.headers.get("content-length") ?? 0) > MAKS_BODY_WEBHOOK) throw new GalatApi(413, "Body terlalu besar", "INPUT_001");
+  const text = await req.text();
+  if (text.length > MAKS_BODY_WEBHOOK) throw new GalatApi(413, "Body terlalu besar", "INPUT_001");
+  const rahasia = Deno.env.get("KAPSO_WEBHOOK_SECRET") ?? "";
+  if (!(await tandaTanganCocok(text, req.headers.get("x-webhook-signature"), rahasia))) {
+    if (rahasia.trim().length < 16) console.error("KAPSO_WEBHOOK_SECRET belum disetel (atau < 16 karakter): webhook WA ditolak");
+    const j = emberWaSalah("webhook");
+    if (!j.ok) throw galatLaju(j.tunggu);
+    throw new GalatApi(401, "Tanda tangan tidak sah", "OAUTH_019");
+  }
+  let body: unknown;
+  try { body = JSON.parse(text); } catch { throw new GalatApi(400, "Body bukan JSON yang sah", "INPUT_001"); }
+  const env = waEnv();
+  const { items, dilewati } = uraiWebhook(body, req.headers.get("x-webhook-event"), env.pnid);
+  const idem = (req.headers.get("x-idempotency-key") ?? "").trim().slice(0, 200);
+  const r = (await rpc("x_wa_webhook", { p: { kunci_idem: idem || undefined, items, ...waSekarang(req) } })) as Obj;
+  return json(200, { ok: true, ...r, dilewati });
+}
+
+async function waTokenProses(req: Request) {
+  if (!(await tokenProsesCocok(req.headers.get("authorization"), Deno.env.get("TOKEN_WA_PROSES")))) {
+    if ((Deno.env.get("TOKEN_WA_PROSES") ?? "").trim().length < 24) console.error("TOKEN_WA_PROSES belum disetel (atau < 24 karakter)");
+    const j = emberWaSalah("proses");
+    if (!j.ok) throw galatLaju(j.tunggu);
+    throw new GalatApi(401, "Token tidak sah", "OAUTH_019");
+  }
+}
+
+async function waProsesJaga(req: Request, method: string, jenis: "proses" | "jaga"): Promise<Response> {
+  if (method !== "POST") throw new GalatApi(405, `Method ${method} tidak didukung`, "APP_001");
+  await waTokenProses(req);
+  const deps = { rpc: waRpc, fetch: (u: string, i?: RequestInit) => fetch(u, i), env: waEnv(), ...waSekarang(req) };
+  return json(200, jenis === "proses" ? await prosesAntrean(deps) : await jagaBot(deps));
+}
+
 // ---------------------------------------------------------------- rute token
 type Handler = (c: Ctx, g: string[]) => Promise<unknown>;
 interface Rute { m: string; p: RegExp; perlu: Scope; owner?: boolean; h: Handler }
@@ -879,6 +930,13 @@ const RUTE: Rute[] = [
     m: "POST", p: /^\/x\/berita\/edisi$/, perlu: "tulis",
     h: async (c) => rpc("x_berita_edisi_simpan", { p_aktor: A(c), p: await c.body() }, T(c)),
   },
+  // ---- Bot WA 0878 (owner/bot, ditegakkan DB): ringkasan tanpa isi chat/nomor, saklar mati|kirim, daftar diam.
+  {
+    m: "GET", p: /^\/x\/wa\/ringkas$/, perlu: "baca",
+    h: (c) => rpc("x_wa_ringkas", { p_aktor: A(c), p: { hari: intQ(c.q, "hari") } }, T(c)),
+  },
+  { m: "POST", p: /^\/x\/wa\/saklar$/, perlu: "tulis", h: async (c) => rpc("x_wa_saklar", { p_aktor: A(c), p: await c.body() }, T(c)) },
+  { m: "POST", p: /^\/x\/wa\/diam$/, perlu: "tulis", h: async (c) => rpc("x_wa_diam", { p_aktor: A(c), p: await c.body() }, T(c)) },
   // ---- x/impor (scope impor)
   {
     m: "POST", p: /^\/x\/impor\/batch$/, perlu: "impor",
@@ -990,6 +1048,8 @@ async function tangani(req: Request): Promise<Response> {
   // Rute tanpa token app (sebelum preflight umum & loop RUTE): penerima klik situs + CSV unggah Google Ads.
   if (path === PATH_KLIK) return await iklanKlik(req, method);
   if (/^\/x\/iklan\/unggah(?:\.csv)?$/.test(path)) return await iklanUnggah(req, method);
+  if (path === "/x/wa/webhook") return await waWebhook(req, method);
+  if (path === "/x/wa/proses" || path === "/x/wa/jaga") return await waProsesJaga(req, method, path === "/x/wa/proses" ? "proses" : "jaga");
 
   if (method === "OPTIONS") {
     const origin = req.headers.get("origin");
