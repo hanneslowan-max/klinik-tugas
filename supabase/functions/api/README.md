@@ -26,6 +26,13 @@ REST untuk agent, CLI, dan importer. Meniru ClickUp v2 dan menambah endpoint `/x
     `Authorization: Bearer <token>` ATAU Basic auth (username bebas, password = token; untuk unggah terjadwal HTTPS Google
     Ads). Dibandingkan waktu-konstan (hash sha256 + XOR). Token salah / tidak ada / env kosong → `401 OAUTH_019` +
     `WWW-Authenticate: Basic` (jawaban sama, tanpa isi data); percobaan salah dibatasi 10 sekaligus, isi 10/menit.
+- **Bot WA 0878 (`wa.ts`, migrasi `20261110180000_wa_bot`, `docs/WA-BOT.md`):**
+  - `POST /x/wa/webhook` publik untuk webhook Kapso. Wajib `X-Webhook-Signature` = HMAC-SHA256 hex atas body mentah dengan env
+    `KAPSO_WEBHOOK_SECRET` (≥ 16 karakter; kosong = semua ditolak), dibandingkan waktu-konstan; salah → `401 OAUTH_019`
+    (percobaan salah dibatasi 20 sekaligus, isi 20/menit). Body ≤ 256 KB.
+  - `POST /x/wa/proses`, `POST /x/wa/jaga`: `Authorization: Bearer <TOKEN_WA_PROSES>` (env ≥ 24 karakter), dipanggil pg_cron
+    lewat pg_net (token dari Vault). Salah → `401`.
+  - Header `x-wa-sekarang` (waktu tiruan) HANYA dihormati bila env `WA_IZINKAN_JAM_UJI=1` (uji lokal; jangan di produksi).
 - **Burst:** ember per token (hash) per isolate, kapasitas `TUGAS_API_BURST` (40), isi ulang `TUGAS_API_LAJU` (20/detik). Bila habis: `429 {err:"Rate limit", ECODE:"APP_002"}` dengan header `Retry-After` dan `x-ratelimit-reset`. Batas ini tidak global lintas instance.
 
 ## Galat
@@ -77,6 +84,12 @@ Jelajah web; daftar kategori diatur owner di Admin → Kategori.
 | GET | `/x/iklan/ringkas` (scope baca; aktor admin/baca Pipeline) | `x_iklan_ringkas`: klik 7/30 hari per domain, kode di lead, lead, order + nilai, gbraid/wbraid, lead ber-kode tanpa klik, isi CSV saat ini |
 | POST | `/x/rawat/iklan-klik` (scope impor, owner/bot; body opsional `{dry?:bool}`) | `x_rawat_iklan_klik`: hapus baris `iklan_klik` > 90 hari. Balas `{hari:90, dihapus, dry}`. Dipanggil job terjadwal `rawat.yml` (`node impor/rawat.mjs --iklan-klik`) |
 | POST | `/x/rawat/lampiran` (scope impor, owner/bot; body opsional `{hari?:int, dry?:bool}`) | Perawatan: `x_rawat_lampiran` men-soft-delete lampiran app pada kartu selesai > N hari (setelan `app_settings.rawat_lampiran` `{aktif,hari}`, default 7; hanya `sumber=app`, salinan ClickUp dibiarkan), lalu service role menghapus BERKAS-nya. `dry` → hanya hitung. Balas `{hari, dihapus, berkas_dihapus, berkas_sisa, berkas_gagal}` (atau `{dilewati:true}` bila setelan `aktif=false`). Dipanggil job terjadwal `rawat.yml` |
+| POST | `/x/wa/webhook` (publik, tanda tangan Kapso, lihat Auth; header `X-Webhook-Event`, `X-Idempotency-Key`) | Payload Kapso v2 (`whatsapp.message.received` / `.sent`, tunggal atau batch buffering) → `uraiWebhook` (metadata + tanda stop/tes/otomatis; isi pesan TIDAK ke DB) → `x_wa_webhook`. Balas `200 {ok, dobel, diproses, antrean, dilewati}`; DB gagal → 500 (Kapso mengulang, kunci idem menolak dobel) |
+| POST | `/x/wa/proses` (Bearer `TOKEN_WA_PROSES`) | `x_wa_ambil` → per antrean: API pesan Kapso (`GET /meta/whatsapp/v24.0/{pnid}/messages?conversation_id=…&limit=20&fields=kapso()`) → cek ulang → Claude → validator → `POST /meta/whatsapp/v24.0/{pnid}/messages` (maks 3 percobaan) → `x_wa_hasil`. Balas `{saklar, diambil, batal, hasil:[{antrean_id, keputusan, alasan}]}` |
+| POST | `/x/wa/jaga` (Bearer `TOKEN_WA_PROSES`) | `x_wa_jaga` + cek webhook Kapso (`GET /platform/v1/whatsapp/phone_numbers/{pnid}/webhooks`) + chat baru tanpa webhook > 3 jam → Telegram (`x_wa_peringatan`, 3 jam per masalah). Balas `{saklar, masalah:[kunci], dikirim:[kunci]}` |
+| GET | `/x/wa/ringkas?hari=` (scope baca; aktor owner/bot) | `x_wa_ringkas`: masuk/antre/kirim/tolak/gagal, per alasan, token & biaya AI, 5 contoh teks bot, detak. Tanpa nomor/isi chat |
+| POST | `/x/wa/saklar` (scope tulis; owner/bot) `{status: mati\|kirim, catatan?}` | `x_wa_saklar` |
+| POST | `/x/wa/diam` (scope tulis; owner/bot) `{nomor, alasan: internal\|pemasok\|ekspedisi\|minta_berhenti\|lain, catatan?, hapus?}` | `x_wa_diam` (nomor → 62…) |
 | GET | `/x/file/{attachment_id}` | 302 ke signed URL (atau `clickup_url`) |
 | POST | `/x/impor/batch` `{jenis, rows, mode?, at_awal?}` | `impor_batch` |
 | POST | `/x/impor/hilang` `{jenis, ids_ada, mode?, lingkup?}` | `impor_tandai_hilang` |
@@ -99,4 +112,11 @@ Jelajah web; daftar kategori diatur owner di Admin → Kategori.
 | `TUGAS_API_BURST` | 40 | Kapasitas ember burst per token |
 | `TUGAS_API_LAJU` | 20 | Isi ulang ember, per detik |
 | `TOKEN_UNGGAH_IKLAN` | (kosong = unggah CSV selalu 401) | Token GET `/x/iklan/unggah.csv` untuk unggah terjadwal Google Ads. Secret Edge, BUKAN di repo; ≥ 24 karakter acak. Lokal: `supabase functions serve --env-file uji/iklan/serve.env` (nilai tiruan) |
+| `KAPSO_WEBHOOK_SECRET` | (kosong = webhook WA selalu 401) | Secret tanda tangan webhook Kapso (sama dengan `secret_key` saat mendaftar webhook) |
+| `KAPSO_API_KEY` | (kosong = proses mencatat gagal) | Kunci API Kapso (baca pesan, kirim, cek webhook) |
+| `KAPSO_PHONE_NUMBER_ID` | `1286905201167228` | Phone number id WA 0878 |
+| `ANTHROPIC_API_KEY_WA` | (kosong = gagal `ai_kunci_kosong`) | Kunci Claude khusus bot (batas belanja bulanan) |
+| `TOKEN_WA_PROSES` | (kosong = proses/jaga selalu 401) | Token pg_cron → `/x/wa/proses` & `/x/wa/jaga` (juga di Vault `wa_token_proses`) |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_HANNES`, `TELEGRAM_CHAT_MARKETING` | (kosong = tanpa peringatan) | Peringatan jaga |
+| `KAPSO_API_URL`, `ANTHROPIC_API_URL`, `TELEGRAM_API_URL`, `WA_IZINKAN_JAM_UJI` | (kosong) | HANYA uji lokal (`uji/wa/serve.env`): arahkan ke server tiruan / izinkan waktu tiruan. Jangan disetel di produksi |
 | `TUGAS_PUBLIC_SUPABASE_URL` | lihat keterangan | URL publik untuk signed URL. Default: `SUPABASE_URL`; di lokal `http://127.0.0.1:<port>` |

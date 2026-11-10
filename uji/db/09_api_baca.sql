@@ -22,8 +22,8 @@ select uji.cek(not exists (
 select uji.sama((select count(*)::int from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname ~ '^web_'), 72,
   '72 fungsi web_* (kontrak §7: 33 + 11 web_pipeline_* + 3 web_pipeline_kategori* + web_pipeline_order_ubah + web_pipeline_cek_duplikat + 7 web_pipeline_pelanggan* + 5 kategori kerja + web_pipeline_sales/_ganti_sales + web_pipeline_dasbor/_dasbor_ids + web_pipeline_dasbor_lanjut/_biaya_iklan_set + 4 web_berita* + web_iklan_ringkas)');
 select uji.sama((select count(*)::int from pg_proc p where p.pronamespace = 'public'::regnamespace
-                  and p.proname ~ '^(api|x|impor)_'), 48,
-  '48 fungsi api_/x_/impor_ (kontrak §6 + x_admin_akun + x_lampiran_catat + x_rawat_lampiran + 9 x_pipeline_* + 4 x_berita_* + 3 x_iklan_* + x_rawat_iklan_klik)');
+                  and p.proname ~ '^(api|x|impor)_'), 56,
+  '56 fungsi api_/x_/impor_ (kontrak §6 + x_admin_akun + x_lampiran_catat + x_rawat_lampiran + 9 x_pipeline_* + 4 x_berita_* + 3 x_iklan_* + x_rawat_iklan_klik + 8 x_wa_*)');
 select uji.cek(not exists (
   select 1 from pg_proc p
    where p.pronamespace = 'public'::regnamespace

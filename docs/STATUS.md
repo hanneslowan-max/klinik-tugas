@@ -719,6 +719,21 @@ routine rhj-brain (token app scope tulis, role bot). Kontrak `docs/KONTRAK-DB.md
   manual). (4) Lead ERP baru bersumber `Lainnya`/`Repeat order` (asal iklan tidak diketahui dari ERP).
 - Tes lokal: lihat deskripsi PR.
 
+## Bot WA 0878 luar jam dengan AI (10 Nov 2026, keputusan Hannes 10 Nov pop-up B24; PR ini, BELUM DEPLOY)
+Brief rhj-brain `deliverables/anvil/BRIEF-WA-BOT-AI.md`. Rincian `docs/WA-BOT.md`, kontrak `docs/KONTRAK-DB.md` §15, rute
+`supabase/functions/api/README.md`.
+- DB `20261110180000_wa_bot.sql` (aditif): ekstensi `pg_net` + `pg_cron`, skema `wa` (8 tabel, tertutup untuk role API),
+  8 pintu `x_wa_*` (service_role), cron `wa-proses` (tiap menit), `wa-jaga` (15 menit), `wa-rawat` (harian). Cron memanggil
+  Edge lewat pg_net dengan URL + token dari Vault; tanpa Vault → tidak memanggil apa pun. Saklar default `mati`.
+- Edge `api`: `POST /x/wa/webhook` (publik, tanda tangan Kapso wajib), `POST /x/wa/proses` & `/x/wa/jaga` (env
+  `TOKEN_WA_PROSES`), `GET /x/wa/ringkas` (baca), `POST /x/wa/saklar` & `/x/wa/diam` (tulis). Logika di `wa.ts`
+  (fetch & rpc disuntik → bisa diuji Node dengan tiruan).
+- CLI `cli/tugas.mjs`: `wa ringkas [--hari]`, `wa saklar <mati|kirim>`, `wa diam --nomor --alasan [--hapus]`. Salinan
+  rhj-brain `tools/tugas.mjs` belum diperbarui.
+- Belum: deploy (migrasi, secret, Vault, Edge), daftar webhook Kapso, isi `wa.kata_manusia`, daftar nomor internal. Langkah
+  urut: `docs/WA-BOT.md` § Deploy.
+- Tes lokal: lihat deskripsi PR.
+
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)
 Prasyarat dari Hannes: project Supabase baru `rhj-tugas` (akun/org baru, Sydney `ap-southeast-2` per keputusan 30/9, Free); env cloud `SUPABASE_ACCESS_TOKEN` (PAT akun baru) + `SUPABASE_PROJECT_REF`; `CLICKUP_API_TOKEN` (sudah ada); sesi baru supaya env terbaca. Semua langkah ke ClickUp **GET saja**. Tidak memakai MCP Supabase (itu ERP).
 

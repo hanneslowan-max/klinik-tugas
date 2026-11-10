@@ -38,6 +38,11 @@
 //                                                                     chat {kunci_luar, hp, sumber, pelanggan?, produk?, pemilik?,
 //                                                                     alasan_pemilik?, …}, maks 100; hasil per item
 //   node tools/tugas.mjs pipeline tautan [--jenis erp_sp|wa] [--sejak YYYY-MM-DD] [--batas n]   audit sinkron (tanpa nomor HP)
+//   node tools/tugas.mjs wa ringkas [--hari 7]                         bot WA 0878 luar jam: masuk/kirim/diam per alasan,
+//                                                                     biaya AI, contoh teks bot (tanpa isi chat/nomor); owner/bot
+//   node tools/tugas.mjs wa saklar <mati|kirim> [--catatan "..."]      nyalakan/matikan bot (scope tulis, owner/bot)
+//   node tools/tugas.mjs wa diam --nomor 0812… --alasan internal|pemasok|ekspedisi|minta_berhenti|lain [--hapus]
+//                                                                     daftar nomor yang tidak dibalas bot (scope tulis)
 //   audit-free tidak berlaku di mode tugas.
 //   node tools/<tugas|clickup>.mjs backend                             (KEDUA mode) backend aktif + asal pilihan mode
 //
@@ -313,6 +318,29 @@ const EKSTRA = {
       return api("GET", `${BASE_X}/pipeline/tautan?${qs({ jenis, sejak: wajibNilai("pipeline", "sejak"), batas: wajibNilai("pipeline", "batas") })}`);
     }
     throw new Error("pipeline: subperintah harus list | get <lead_id> | summary | fu-set | bukti-set | biaya-set | order-erp | lead-otomatis | tautan");
+  },
+  // Bot WA 0878 luar jam (migrasi 20261110180000_wa_bot): ringkas | saklar <mati|kirim> | diam --nomor --alasan [--hapus].
+  async wa() {
+    const sub = pos[0];
+    if (sub === "ringkas") {
+      const hari = wajibNilai("wa ringkas", "hari");
+      if (hari && !/^\d{1,2}$/.test(hari)) throw new Error("wa ringkas: --hari harus angka 1–90");
+      return api("GET", `${BASE_X}/wa/ringkas?${qs({ hari })}`);
+    }
+    if (sub === "saklar") {
+      const status = pos[1];
+      if (!["mati", "kirim"].includes(status)) throw new Error("wa saklar: <mati|kirim> wajib");
+      return api("POST", `${BASE_X}/wa/saklar`, { status, catatan: wajibNilai("wa saklar", "catatan") });
+    }
+    if (sub === "diam") {
+      const nomor = wajibNilai("wa diam", "nomor");
+      if (!nomor) throw new Error("wa diam: --nomor wajib");
+      if (opt.hapus) return api("POST", `${BASE_X}/wa/diam`, { nomor, hapus: true });
+      const alasan = wajibNilai("wa diam", "alasan");
+      if (!alasan) throw new Error("wa diam: --alasan internal|pemasok|ekspedisi|minta_berhenti|lain wajib");
+      return api("POST", `${BASE_X}/wa/diam`, { nomor, alasan, catatan: wajibNilai("wa diam", "catatan") });
+    }
+    throw new Error("wa: subperintah harus ringkas | saklar <mati|kirim> | diam --nomor --alasan");
   },
 };
 
