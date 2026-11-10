@@ -792,6 +792,23 @@ const RUTE: Rute[] = [
     m: "POST", p: /^\/x\/pipeline\/biaya-iklan$/, perlu: "tulis",
     h: async (c) => rpc("x_pipeline_biaya_iklan_set", { p_aktor: A(c), p: await c.body() }, T(c)),
   },
+  // Sinkron dari luar (20261110120000_pipeline_sinkron_luar, keputusan Hannes 10 Nov): routine rhj-brain mengirim SP ERP
+  // (→ ORDER, idempoten per erp_so_id) dan chat WA calon pembeli (→ lead otomatis, idempoten per kunci_luar). Body = satu
+  // item ATAU {items:[…]} maks 100 (hasil per item, item gagal tidak membatalkan yang lain). Aktor owner/bot/admin
+  // Pipeline (DB). Tautan = audit sinkron (tanpa nomor/nama pelanggan).
+  {
+    m: "POST", p: /^\/x\/pipeline\/order-erp$/, perlu: "tulis",
+    h: async (c) => rpc("x_pipeline_order_erp", { p_aktor: A(c), p: await c.body() }, T(c)),
+  },
+  {
+    m: "POST", p: /^\/x\/pipeline\/lead-otomatis$/, perlu: "tulis",
+    h: async (c) => rpc("x_pipeline_lead_otomatis", { p_aktor: A(c), p: await c.body() }, T(c)),
+  },
+  {
+    m: "GET", p: /^\/x\/pipeline\/tautan$/, perlu: "baca",
+    h: (c) => rpc("x_pipeline_tautan", { p_aktor: A(c), p: {
+      jenis: c.q.get("jenis") || undefined, sejak: c.q.get("sejak") || undefined, batas: c.q.get("batas") || undefined } }, T(c)),
+  },
   {
     m: "GET", p: /^\/x\/pipeline\/leads$/, perlu: "baca",
     h: (c) => rpc("x_pipeline_daftar", { p_aktor: A(c), p: {

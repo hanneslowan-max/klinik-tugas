@@ -28,6 +28,16 @@
 //                                                                     scope tulis, token owner/bot. Berkas = {"items":[…]} atau array
 //                                                                     [{tanggal, platform google|meta, campaign, biaya, klik?, tayang?,
 //                                                                     konversi?}], maks 1000; per (tanggal, platform) = keadaan lengkap
+//   node tools/tugas.mjs pipeline order-erp --file <sp.json> [--dry-run]   SP ERP → ORDER (idempoten per erp_so_id); scope tulis,
+//                                                                     token owner/bot. Berkas = {"items":[…]} / array / satu SP
+//                                                                     {erp_so_id, no_sp, tanggal_sp, nilai, batal?, no_po?, sales?,
+//                                                                     pelanggan?, hp?, kota?, items?, produk?}, maks 100; hasil per item
+//   node tools/tugas.mjs pipeline lead-otomatis --file <chat.json> [--dry-run]   chat WA calon pembeli → lead (idempoten per
+//                                                                     kunci_luar wa:K-xxxxxx:YYYY-MM-DD; nomor ber-lead terbuka tidak
+//                                                                     dibuat dobel); scope tulis. Berkas = {"items":[…]} / array / satu
+//                                                                     chat {kunci_luar, hp, sumber, pelanggan?, produk?, pemilik?,
+//                                                                     alasan_pemilik?, …}, maks 100; hasil per item
+//   node tools/tugas.mjs pipeline tautan [--jenis erp_sp|wa] [--sejak YYYY-MM-DD] [--batas n]   audit sinkron (tanpa nomor HP)
 //   audit-free tidak berlaku di mode tugas.
 //   node tools/<tugas|clickup>.mjs backend                             (KEDUA mode) backend aktif + asal pilihan mode
 //
@@ -277,7 +287,32 @@ const EKSTRA = {
       if (opt["dry-run"]) return { dry_run: true, method: "POST", path: "/x/pipeline/biaya-iklan", url: `${BASE_X}/pipeline/biaya-iklan`, jumlah: items.length, body: { items } };
       return api("POST", `${BASE_X}/pipeline/biaya-iklan`, { items });
     }
-    throw new Error("pipeline: subperintah harus list | get <lead_id> | summary | fu-set | bukti-set | biaya-set");
+    if (sub === "order-erp" || sub === "lead-otomatis") {
+      // Sinkron dari luar (routine rhj-brain). order-erp: SP ERP-dev → ORDER (dibuat/diperbarui/tidak_berubah/
+      // dilewati_bukan_online/dilewati_batal). lead-otomatis: chat WA 0878 calon pembeli → lead (dibuat/sudah_ada/
+      // lead_terbuka_ada). Server memvalidasi; tiap item diproses sendiri (item gagal → {ok:false, status_http, err}).
+      // Idempoten → kirim ulang aman. --dry-run: tanpa request.
+      const jalur = sub === "order-erp" ? "/x/pipeline/order-erp" : "/x/pipeline/lead-otomatis";
+      const pengenal = sub === "order-erp" ? "erp_so_id" : "kunci_luar";
+      const berkas = wajibNilai("pipeline", "file");
+      if (!berkas) throw new Error(`pipeline ${sub}: --file <berkas.json> wajib`);
+      let isi;
+      try { isi = JSON.parse(fs.readFileSync(berkas, "utf8")); } catch (e) { throw new Error(`pipeline ${sub}: ${berkas} tidak terbaca sebagai JSON (${e.message})`); }
+      const satu = isi && typeof isi === "object" && !Array.isArray(isi) && pengenal in isi;
+      const items = satu ? [isi] : Array.isArray(isi) ? isi : isi?.items;
+      if (!Array.isArray(items)) throw new Error(`pipeline ${sub}: isi berkas harus {"items":[…]}, array item, atau satu objek ber-${pengenal}`);
+      if (!items.length) throw new Error(`pipeline ${sub}: items kosong`);
+      if (items.length > 100) throw new Error(`pipeline ${sub}: maks 100 item per panggilan (berkas berisi ${items.length}); pecah berkasnya`);
+      const body = satu ? isi : { items };
+      if (opt["dry-run"]) return { dry_run: true, method: "POST", path: jalur, url: `${BASE_X}${jalur.slice(2)}`, jumlah: items.length, body };
+      return api("POST", `${BASE_X}${jalur.slice(2)}`, body);
+    }
+    if (sub === "tautan") {
+      const jenis = wajibNilai("pipeline", "jenis");
+      if (jenis && !["erp_sp", "wa"].includes(jenis)) throw new Error("pipeline tautan: --jenis harus erp_sp atau wa");
+      return api("GET", `${BASE_X}/pipeline/tautan?${qs({ jenis, sejak: wajibNilai("pipeline", "sejak"), batas: wajibNilai("pipeline", "batas") })}`);
+    }
+    throw new Error("pipeline: subperintah harus list | get <lead_id> | summary | fu-set | bukti-set | biaya-set | order-erp | lead-otomatis | tautan");
   },
 };
 
