@@ -191,6 +191,7 @@ function regexAman(pola: string): RegExp | null {
  * otomatis aplikasi HP (A1/A2), selebihnya = sales/manusia. Aturan:
  *   - pesan keluar manusia ≥ pesan pertama pelanggan periode ini → batal sales_membalas; < 24 jam sebelumnya → chat_berjalan
  *   - pesan masuk periode ini cocok stop → diam minta_berhenti (+ masuk wa.diam); cocok kata_manusia → diam manusia_saja
+ *   - lawan tampak balasan otomatis (≥ 3 pesan masuk identik / ≥ 3 balasan < 5 dtk sesudah bot) → diam auto_reply (+ wa.diam)
  *   - semua pesan masuk periode ini hanya reaksi/stiker/tes → batal hanya_reaksi
  *   - API belum memuat pesan pelanggan periode ini → tunda (coexistence kadang terlambat)
  * Transkrip: ≤ 20 pesan terakhir (teks; media → label), urut waktu.
@@ -225,6 +226,22 @@ export function nilaiChat(pesan: PesanKapso[], it: ItemAntrean, kataManusia: str
     const teks = teksPesan(x.m as Obj);
     if (POLA_STOP.test(teks)) return { lanjut: false, keputusan: "diam", alasan: "minta_berhenti", diam_nomor: "minta_berhenti" };
     if (pola.some((r) => r.test(teks))) return { lanjut: false, keputusan: "diam", alasan: "manusia_saja" };
+  }
+  // Pengaman lingkaran (batas 100/24 jam, revisi Hannes 10 Nov malam): lawan yang tampak balasan otomatis → diam.
+  // (a) ≥ 3 pesan masuk ber-teks identik dalam 24 jam; (b) ≥ 3 kali pesan masuk < 5 detik sesudah pesan bot.
+  const hitung = new Map<string, number>();
+  for (const x of msgs) {
+    if (x.arah === "outbound" || x.t < pertama - 24 * 3600_000) continue;
+    const k = teksPesan(x.m as Obj).toLowerCase().replace(/\s+/g, " ").trim();
+    if (k.length < 2) continue;
+    hitung.set(k, (hitung.get(k) ?? 0) + 1);
+  }
+  let cepat = 0;
+  for (let i = 1; i < msgs.length; i++) {
+    if (msgs[i].arah !== "outbound" && golong(msgs[i - 1]) === "bot" && msgs[i].t - msgs[i - 1].t < 5_000) cepat++;
+  }
+  if ([...hitung.values()].some((n) => n >= 3) || cepat >= 3) {
+    return { lanjut: false, keputusan: "diam", alasan: "auto_reply", diam_nomor: "auto_reply" };
   }
   const berisi = masukKini.filter((x) => {
     const j = String(x.m.type ?? "");
@@ -351,6 +368,23 @@ export async function mintaBalasan(f: Fetch, env: EnvWa, model: string, maxToken
 // ---------------------------------------------------------------- validator
 const NEGASI = /\b(tidak|tdk|belum|bukan|tak)\b/iu;
 const kalimat = (s: string) => s.split(/(?<=[.!?])\s+|\n+/u).map((x) => x.trim()).filter(Boolean);
+// Angka bertitik yang MENEMPEL satuan ukur atau "x" → ukuran, bukan harga ("1.200 x 1.000 mm", "1.000 kg").
+// Revisi Hannes 10 Nov malam. Angka bertitik lain (mis. "1.250.000") tetap dianggap harga.
+const SESUDAH_UKUR = /^\s*(mm|cm|m|meter|kg|ton|inch|inci|"|[x×]\s*\d)(?![a-z])/iu;
+const SEBELUM_UKUR = /\d\s*[x×]\s*$/iu;
+function adaAngkaHarga(teks: string): boolean {
+  for (const m of teks.matchAll(/\b\d{1,3}(?:[.,]\d{3})+\b/gu)) {
+    const i = m.index ?? 0;
+    const j = i + m[0].length;
+    const sesudah = teks.slice(j, j + 12);
+    const sebelum = teks.slice(Math.max(0, i - 12), i);
+    if (!SESUDAH_UKUR.test(sesudah) && !SEBELUM_UKUR.test(sebelum)) return true;
+  }
+  return false;
+}
+// "lemari … tidak (bisa) custom" = fakta yang benar, bukan tawaran custom lemari.
+const LEMARI_TIDAK_CUSTOM = /\b(tidak|tdk|tak)\s+(bisa\s+|dapat\s+)?(di)?custom/iu;
+const lolosRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Isi [HARI] lalu periksa. Hasil {ok, teks (sudah diisi), alasan[]}. Semua aturan wajib (brief §6). */
 export function periksaTeks(mentah: string, hari: string, maksKarakter = 700): { ok: boolean; teks: string; alasan: string[] } {
@@ -360,13 +394,15 @@ export function periksaTeks(mentah: string, hari: string, maksKarakter = 700): {
   if (teks.length > maksKarakter) a.push("terlalu_panjang");
   if (!teks.endsWith(PENANDA)) a.push("tanpa_penanda");
   if (/\[[A-Z_]+\]/.test(teks)) a.push("placeholder");
-  if (/\brp\.?\s*\d|\brp\b|\bidr\b|rupiah/iu.test(teks) || /\b\d{1,3}(?:[.,]\d{3})+\b/.test(teks)
+  if (/\brp\.?\s*\d|\brp\b|\bidr\b|rupiah/iu.test(teks) || adaAngkaHarga(teks)
       || /\b\d+(?:[.,]\d+)?\s*(rb|ribu|jt|juta|k)\b/iu.test(teks)) a.push("harga");
   if (/\b(diskon|potongan|promo|cashback|gratis ongkir|nego)\b/iu.test(teks)) a.push("diskon");
   if (/https?:|www\.|\b[a-z0-9-]+\.(com|co\.id|id|net|org|shop|store|xyz|io|me|link|ly)\b/iu.test(teks)) a.push("tautan");
   if (/distributor/iu.test(teks)) a.push("distributor");
   if (/galvan/iu.test(teks)) a.push("galvanis");
-  if (/lemari[^.!?\n]{0,40}custom|custom[^.!?\n]{0,40}lemari/iu.test(teks)) a.push("lemari_custom");
+  for (const k of kalimat(teks)) {
+    if (/lemari[^.!?\n]{0,40}custom|custom[^.!?\n]{0,40}lemari/iu.test(k) && !LEMARI_TIDAK_CUSTOM.test(k)) { a.push("lemari_custom"); break; }
+  }
   for (const k of kalimat(teks)) {
     if (/teflon|scaffold|pintu geser|\bpagar\b/iu.test(k) && !NEGASI.test(k)) { a.push("produk_tidak_dijual"); break; }
   }
@@ -375,15 +411,17 @@ export function periksaTeks(mentah: string, hari: string, maksKarakter = 700): {
   if (/\b(rekening|no\.?\s*rek|transfer ke|virtual account|bca|mandiri|bri|bni)\b/iu.test(teks)) a.push("rekening");
   for (const k of kalimat(teks)) {
     if (/\b(ready|ready stock|in stock|stok ada|stock ada|ada stok|ada stock|siap kirim)\b/iu.test(k)) { a.push("janji_stok"); break; }
-    if (/\btersedia\b/iu.test(k) && !/\b(tidak|tdk|belum|tak)\s+(\w+\s+)?tersedia\b/iu.test(k)) { a.push("janji_stok"); break; }
+    if (/\btersedia\b/iu.test(k) && !/\b(tidak|tdk|tak)\s+(\w+\s+)?tersedia\b/iu.test(k)) { a.push("janji_stok"); break; }
   }
-  for (const k of kalimat(teks)) {
+  // Label [HARI] dari server ("besok pagi", "Senin 17 November pagi") = jam balas sales, bukan janji kirim.
+  const tanpaHari = hari ? teks.replace(new RegExp(lolosRegex(hari), "giu"), " ") : teks;
+  for (const k of kalimat(tanpaHari)) {
     if (/\b(pengiriman|dikirim|terkirim|diantar|sampai|tiba)\b/iu.test(k)
         && /\b(hari ini|besok|lusa|\d+\s*(hari|minggu|jam)|minggu (ini|depan)|tanggal|tgl)\b/iu.test(k)
         && !/\b(foto|ukuran|data|gambar|detail)\b/iu.test(k)) { a.push("janji_kirim"); break; }
   }
-  if (/\b\d{1,2}\s*(jan|feb|mar|apr|mei|jun|jul|agu|agt|sep|okt|nov|des)[a-z]*\b/iu.test(teks)
-      || /\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/.test(teks)) a.push("janji_kirim");
+  if (/\b\d{1,2}\s*(jan|feb|mar|apr|mei|jun|jul|agu|agt|sep|okt|nov|des)[a-z]*\b/iu.test(tanpaHari)
+      || /\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/.test(tanpaHari)) a.push("janji_kirim");
   return { ok: a.length === 0, teks, alasan: [...new Set(a)] };
 }
 

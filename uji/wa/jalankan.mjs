@@ -107,6 +107,21 @@ const lama = Array.from({ length: 30 }, (_, i) => pin(`l${i}`, new Date(Date.par
 n = nilaiChat([...lama, pin("a", P1, "Halo lagi")], it(), []);
 cek("kontak lama: transkrip ≤ 20 pesan terakhir, pesan baru ikut", n.lanjut && n.jumlah === 20 && /Halo lagi$/.test(n.transkrip) && !/pesan lama 9\b/.test(n.transkrip), n.jumlah);
 
+// pengaman lingkaran (batas 100/24 jam)
+const BOT = (id, waktu) => pout(id, waktu, `Terima kasih, sales kami membalas Senin pagi.\n${PENANDA}`, "cloud_api");
+const AUTO = "Terima kasih telah menghubungi Toko Tiruan, pesan Anda akan kami balas segera.";
+n = nilaiChat([pin("a1", P1, AUTO), BOT("b1", "2026-11-06T19:10:00+07:00"), pin("a2", "2026-11-06T19:10:02+07:00", AUTO),
+  BOT("b2", "2026-11-06T19:12:05+07:00"), pin("a3", "2026-11-06T19:12:07+07:00", AUTO)], it(), []);
+cek("lawan auto-reply (3 pesan identik) → diam auto_reply + daftar diam", !n.lanjut && n.alasan === "auto_reply" && n.diam_nomor === "auto_reply", n);
+n = nilaiChat([pin("a1", P1, "halo"), BOT("b1", "2026-11-06T19:10:00+07:00"), pin("a2", "2026-11-06T19:10:01+07:00", "menu 1"),
+  BOT("b2", "2026-11-06T19:12:00+07:00"), pin("a3", "2026-11-06T19:12:02+07:00", "menu 2"),
+  BOT("b3", "2026-11-06T19:14:00+07:00"), pin("a4", "2026-11-06T19:14:03+07:00", "menu 3")], it(), []);
+cek("lawan membalas < 5 detik sesudah bot 3x → diam auto_reply", !n.lanjut && n.alasan === "auto_reply", n);
+n = nilaiChat([pin("a1", P1, "Halo, butuh pallet mesh"), BOT("b1", "2026-11-06T19:10:00+07:00"),
+  pin("a2", "2026-11-06T19:13:00+07:00", "Stocky 5, 20 unit"), BOT("b2", "2026-11-06T19:15:00+07:00"),
+  pin("a3", "2026-11-06T19:20:00+07:00", "Kirim ke Surabaya")], it(), []);
+cek("pelanggan manusia (balasan beda, > 5 detik) → lanjut", n.lanjut, n);
+
 // ---------------------------------------------------------------- validator
 bagian("Validator");
 const baik = "Selamat malam Bapak/Ibu, terima kasih sudah menghubungi RHJ.\nSaat ini di luar jam kerja (Senin–Jumat 08.00–17.00). Sales kami akan membalas [HARI].\nBoleh dibantu ukuran pallet mesh (standar Stocky 2/3/5/7/9 atau custom), jumlah, dan kota pengiriman?\n(pesan otomatis)";
@@ -137,7 +152,26 @@ tolak("Sales kami membalas [HARI].", "tanpa_penanda");
 tolak(T("x".repeat(700)), "terlalu_panjang");
 tolak(T("Sales membalas [BESOK]."), "placeholder");
 cek("roda teflon dengan penolakan sopan → ok", periksaTeks(T("Mohon maaf, roda teflon tidak tersedia di RHJ."), "Senin pagi").ok);
-cek("'tidak tersedia' bukan janji stok; jam 08.00 bukan harga", periksaTeks(T("Roda scaffolding belum tersedia. Jam kerja 08.00–17.00."), "x").ok);
+cek("'tidak tersedia' bukan janji stok; jam 08.00 bukan harga", periksaTeks(T("Roda scaffolding tidak tersedia. Jam kerja 08.00–17.00."), "x").ok);
+// Revisi Hannes 10 Nov malam (pop-up): bentuk negatif lolos, pola sempit, label [HARI] bukan janji kirim.
+const lolos = (teks, hari = "besok pagi") => { const r = periksaTeks(T(teks), hari); cek(`lolos: ${teks.slice(0, 60)}`, r.ok, r); };
+lolos("Kota pengiriman di mana, Bapak/Ibu?");
+lolos("Ukuran 1.200 x 1.000 mm sudah kami catat.");
+lolos("Beban 1.000 kg per pallet, betul Bapak/Ibu?");
+lolos("Untuk Stocky 5, berapa unit yang dibutuhkan?");
+lolos("Roda 6 inch beban 200 kg, untuk troli apa?");
+lolos("Mohon maaf, lemari arsip tidak custom, hanya ukuran standar.");
+lolos("Lemari arsip kami tidak bisa custom.");
+lolos("Sales kami membalas [HARI], boleh info kota pengiriman?");
+lolos("Sales kami membalas [HARI]. Boleh info kota pengiriman?", "Senin 17 November pagi");
+tolak(T("Rp 1.250.000"), "harga");
+tolak(T("Harga 1.250.000 untuk ukuran 1.200 x 1.000 mm."), "harga");
+tolak(T("Harganya 1,2 jt."), "harga");
+tolak(T("Stok ready, bisa dikirim besok."), "janji_stok");
+tolak(T("Bisa dikirim besok pagi."), "janji_kirim");
+tolak(T("Lemari bisa custom."), "lemari_custom");
+tolak(T("Lemari arsip tidak hanya standar, bisa custom juga."), "lemari_custom");
+tolak(T("Roda scaffolding belum tersedia, segera ada."), "janji_stok");
 cek("pertanyaan harga ditunda ke sales → ok", periksaTeks(T("Untuk harga akan dijawab sales [HARI]."), "Senin pagi").ok);
 cek("700 karakter pas → ok", periksaTeks(T("a".repeat(700 - 17)), "x").ok);
 

@@ -317,13 +317,16 @@ try {
   await proses("2026-11-07 22:11");
   cek("foto/voice → AI melihat [foto]/[voice note] → balasan menanyakan produk", T.kirim.length === 1 && /produk yang dibutuhkan/.test(teksTerkirim()[0]), teksTerkirim());
 
-  console.log("== batas 3 pesan per periode");
+  console.log("== batas 100/24 jam (produksi) + mekanisme batas (diuji dengan 3/periode)");
+  cek("batas terpasang 100/periode & 100/24 jam", sql("select maks_per_periode || '/' || maks_per_24jam from wa.pengaturan") === "100/100");
+  sql("update wa.pengaturan set maks_per_periode = 3");
   kosongkan();
   for (let i = 0; i < 4; i++) {
     await webhook(NOM(27), pesanMasuk(NOM(27), `2026-11-07 1${i}:00`, `pertanyaan ${i + 1}`), { sekarang: `2026-11-07 1${i}:00` });
     await proses(`2026-11-07 1${i}:10`);
   }
   cek("4 putaran → 3 kiriman, ke-4 batal batas_periode", T.kirim.length === 3 && sql("select alasan from wa.log where keputusan = 'batal'") === "batas_periode");
+  sql("update wa.pengaturan set maks_per_periode = 100");
 
   console.log("== saklar mati → tidak ada kiriman");
   kosongkan();
