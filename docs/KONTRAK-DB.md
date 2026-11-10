@@ -709,3 +709,76 @@ nilai}` menurut `waktu_klik` (definisi di kepala migrasi). Web: kartu "Klik ikla
 
 Hak: `x_iklan_klik_catat`, `x_iklan_unggah`, `x_iklan_ringkas`, `x_rawat_iklan_klik` → service_role; `web_iklan_ringkas` →
 authenticated; `inti_iklan_*` internal. Fungsi `web_*` kini 72, `api_/x_/impor_` 45 (tes 09).
+
+## 14. Sinkron dari luar: SP ERP → ORDER, chat WA → lead otomatis (10 Nov 2026)
+Migrasi `20261110120000_pipeline_sinkron_luar.sql`, tes `uji/db/38_pipeline_sinkron_luar.sql` (+ Edge lokal
+`uji/sinkron/kontrak.mjs`). Keputusan Hannes 10 Nov (LOG-PAGAR rhj-brain, "biar mereka ga kerja 2 kali"): SP yang dibuat
+Riksa/Michael di ERP-dev otomatis jadi ORDER saat SP DIBUAT (bukan saat disetujui), SP batal di ERP → batal di Anvil,
+nomor SP Anvil = nomor ERP; calon pembeli WA 0878 tanpa lead terbuka dibuatkan lead oleh agent. Yang memanggil = routine
+rhj-brain (token app scope tulis, role bot). Routine belum dinyalakan sampai nomor SP ERP-dev dibetulkan Hannes.
+
+**Tabel `pipeline_tautan_luar`** (PK `kunci_luar`): `jenis` erp_sp | wa, `lead_id` (FK lead, cascade), `sidik` (md5 32 hex),
+`cara` no_sp | hp | baru | hp_terbuka, `hasil_akhir` dibuat | diperbarui | tidak_berubah | lead_terbuka_ada, `dibuat_pada`,
+`diubah_pada`. Format kunci (CHECK): `erp-sp:<so_id>` (`[A-Za-z0-9_-]{1,64}`, id baris `sales_orders` ERP) dan
+`wa:K-<kode chat>:<YYYY-MM-DD>` (kode K-xxxxxx rhj-brain = HMAC nomor, `[0-9A-Za-z]{4,16}`; tanggal WIB chat). Satu lead
+paling banyak satu tautan erp_sp (indeks unik parsial); lead boleh punya banyak tautan wa (satu per hari chat). **Tanpa**
+nomor HP / nama pelanggan. RLS ON, tanpa hak tabel untuk role API mana pun.
+
+**`x_pipeline_order_erp(p_aktor, p)`** (scope tulis; peran Pipeline `admin` = owner/bot/admin, selain itu `PT403`; Edge
+`POST /x/pipeline/order-erp`, CLI `pipeline order-erp --file`). Satu SP:
+`{erp_so_id, no_sp, tanggal_sp, nilai, batal?, no_po?, sales?, pelanggan?, hp?, kota?, items?:[{deskripsi?, qty?, jenis?, produk?}], produk?}`.
+- Wajib: `erp_so_id` (teks/angka), `no_sp` (spasi dibuang, huruf besar), `tanggal_sp` YYYY-MM-DD ≤ hari ini WIB, `nilai`
+  rupiah ≥ 0 (dibulatkan; SP aktif wajib > 0). `batal` boolean (default false). `no_po` ≤ 60 (kosong = No PO Anvil tidak
+  diubah). `hp` → 62… 8–15 digit. Kunci lain / tipe salah → `PT400`.
+- Sales: kode di `no_sp` (`NNN/<KODE>/…`) → anggota `pipeline_akses.kode_sp` yang sah sebagai sales (RSG = Riksa, MCE =
+  Michael); tanpa kode terbaca → `sales` dicocokkan dengan username/nama (utuh atau kata pertama, tepat satu). Bukan tim
+  online → `{status:"dilewati_bukan_online"}` tanpa menulis (juga untuk SP batal). Tim online → `no_sp` wajib
+  `^\d+/(RSG|MCE)/<romawi>/20YY$`.
+- Sudah tertaut (`erp-sp:<so_id>`): sidik (`no_sp, tanggal_sp, nilai, no_po, batal`) sama → `tidak_berubah` tanpa membaca
+  lead. Beda → `pipeline_erp_terapkan`: lead ORDER → `inti_pipeline_order_ubah` HANYA untuk kolom yang berbeda (catatan
+  "Data order diubah: …" dari fungsi itu; tak ada yang beda → `tidak_berubah`); SP batal + lead ORDER →
+  `inti_pipeline_tahap` `batal_order` (alasan "SP <no_sp> dibatalkan di ERP (sinkron otomatis)"); lead sudah "Order
+  dibatalkan" + SP batal → `tidak_berubah`; + SP aktif lagi → `PT409` (batal order final, periksa manual).
+- Belum tertaut: (a) lead ber-`no_sp` sama (non-periksa dulu, terbaru) — sudah tertaut SP ERP lain → `PT409`; (b) SP batal
+  tanpa lead (a) → `{status:"dilewati_batal"}` tanpa menulis; (c) lead TERBUKA (BARU/PENAWARAN) ber-kontak HP sama:
+  utamakan pemilik = sales SP, lalu tanggal masuk terbaru; (d) tidak ada → lead baru lewat `inti_pipeline_lead_buat`:
+  sumber `Repeat order` bila HP pernah punya lead ORDER, selain itu `Lainnya`; pelanggan & kontak lama bernomor sama
+  dipakai ulang (selain itu pelanggan baru, nama kosong → "-"); tanggal masuk = tanggal SP; periksa false; produk dari
+  `items` (kategori = `item.produk` / `item.jenis` bila PRODUK, selain itu `produk` atas bila tepat satu, selain itu
+  Lainnya; qty dijumlah per kategori, qty kosong/≤ 0 dilewati, spesifikasi = deskripsi digabung ≤ 500; tanpa baris →
+  satu item qty 1). Lead (a)/(c)/(d) yang belum ORDER: pemilik = sales SP (riwayat pemilik oleh trigger), lalu
+  `inti_pipeline_tahap` `order` (No SP, tanggal, nilai; bayar BELUM), No PO, satu aktivitas Catatan
+  "SP <no_sp> dari ERP (otomatis): Rp…, tanggal SP DD-MM-YYYY; <cara>" (rencana FU dipertahankan). Lead (a) yang sudah
+  ORDER diperlakukan seperti pembaruan (hanya kolom berbeda).
+- Hasil `{status, lead_id, kode, cara?}`; status `dibuat` | `diperbarui` | `tidak_berubah` | `dilewati_bukan_online` |
+  `dilewati_batal`. Kunci dikunci advisory per `kunci_luar` (dua run bersamaan tidak dobel).
+
+**`x_pipeline_lead_otomatis(p_aktor, p)`** (scope tulis; peran `admin`; Edge `POST /x/pipeline/lead-otomatis`, CLI
+`pipeline lead-otomatis --file`). Satu chat:
+`{kunci_luar, hp, sumber, pelanggan?, kontak_nama?, kota?, produk?:[{produk, qty?, satuan?, spesifikasi?}], kebutuhan?, catatan?, sumber_bukti?, sumber_bukti_kode?, chat_pada?, pemilik?, alasan_pemilik?}`.
+- Wajib: `kunci_luar` `wa:K-…:<tgl>` (tanggal ≤ hari ini = tanggal masuk lead), `hp` (→ 62…, 8–15 digit), `sumber` (nilai
+  SUMBER sah). `pelanggan` ≤ 200 (kosong → "-"), `kontak_nama`/`kota` ≤ 100, `kebutuhan` ≤ 500, `catatan` ≤ 1000.
+  `produk` ≤ 10, kategori PRODUK (tanpa peka huruf), `qty` > 0 (kosong → 1 + spesifikasi "(qty belum pasti)"), `satuan`
+  unit|set|pcs; tanpa produk → Lainnya. `sumber_bukti*`/`chat_pada` lewat `inti_pipeline_sumber_bukti_set` (aturan §11;
+  kode/chat_pada hanya bersama kelas). `pemilik` = id sales sah (`pipeline_sales_sah`, role owner/member) atau null;
+  `alasan_pemilik` balasan | giliran | pelanggan_lama, wajib bila pemilik diisi dan dilarang bila tidak.
+- Kunci sudah tertaut → `{status:"sudah_ada", lead_id, kode, pemilik}` tanpa menulis. HP punya lead TERBUKA → tidak membuat
+  lead; aktivitas WA "Chat WA baru DD-MM-YYYY (agent)" bila belum ada untuk tanggal kunci itu (rencana FU dipertahankan);
+  tautan dicatat → `{status:"lead_terbuka_ada", lead_id, kode, pemilik, aktivitas_baru}`. Selain itu lead dibuat lewat
+  `inti_pipeline_lead_buat` (pelanggan lama bernomor sama dipakai ulang), aktivitas WA pertama "Lead otomatis dari WA
+  0878 (agent), pemilik: <nama> (ditebak dari nama sales di balasan | bergiliran | pemilik lead lama nomor ini)" atau
+  "pemilik: belum ditentukan" → `{status:"dibuat", lead_id, kode, pemilik}`. Galat di tengah (mis. kode bukti tidak cocok)
+  membatalkan seluruh item (tidak ada lead setengah jadi).
+
+**Batch (kedua rute):** body `{items:[…]}` (1–100) TANPA kunci pengenal (`erp_so_id` / `kunci_luar`) di tingkat atas — SP
+punya field `items` sendiri (baris barang), jadi objek ber-`erp_so_id` selalu satu SP. Tiap item di sub-transaksi sendiri;
+hasil `{diproses, ok, gagal, per_status:{<status>|gagal: n}, items:[{i, ok:true, status, …} | {i, ok:false, status_http,
+err:"items[i]: …", ECODE}]}`. Satu item → hasil item langsung, galatnya = galat panggilan (`PT4xx` → HTTP 4xx).
+
+**`x_pipeline_tautan(p_aktor, p)`** (scope baca; peran `admin`; Edge `GET /x/pipeline/tautan?jenis=&sejak=&batas=`, CLI
+`pipeline tautan`): `jenis` erp_sp|wa, `sejak` YYYY-MM-DD (00:00 WIB) atau ISO dengan zona (default 7 hari lalu, menurut
+`diubah_pada`), `batas` 1–1000 (default 200) → `{total, sejak, items:[{kunci_luar, jenis, lead_id, kode, tahap, no_sp,
+pemilik, pemilik_nama, cara, hasil_akhir, dibuat_pada, diubah_pada}]}` terbaru dulu. Tanpa nomor/nama pelanggan.
+
+Hak: tiga `x_` → service_role; `inti_*`, `pipeline_luar_*`, `pipeline_erp_terapkan`, `pipeline_sales_dari_sp`,
+`pipeline_sumber_sah`/`_produk_sah`/`_produk_baku` internal. Fungsi `api_/x_/impor_` kini 48 (tes 09); `web_*` tetap 72.

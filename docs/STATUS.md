@@ -684,6 +684,40 @@ Brief rhj-brain `deliverables/anvil/BRIEF-KLIK-IKLAN-SAMPAI-ORDER.md`. Kontrak `
   diubah sesudah diunggah tidak dikoreksi di Google (CSV = keadaan sekarang, Google menolak baris ganda).
 - **Deploy 9 Nov 2026 ±10.15 WIB (ACC Hannes di sesi rhj-brain "ok jalankan deploy sekarang"; GitHub Actions kena limit, jadi tanpa CI):** migrasi `20261108120000_iklan_klik` diterapkan lewat `alat/sql-proyek.sh --migrasi` (sebelumnya terakhir 20261107120000; DB 42 MB); cek: `iklan_klik` RLS ON, hak tabel hanya `postgres`, 0 baris, 7 fungsi `*iklan*` baru, indeks `lead_sumber_bukti_kode_idx`. Edge `api` di-deploy dari `claude/iklan-klik-order` (d2c4f51, CLI 3.0.0 `--use-api --no-verify-jwt`). Cek produksi tanpa menulis data: OPTIONS `/x/iklan/klik` Origin rodahammerindo 204 + ACAO, origin asing 403, POST `{}` 400; `/x/iklan/unggah.csv` 401; `/x/iklan/ringkas` 200 (0 klik); `/v2/user` tanpa token 401; `/x/pipeline/ringkas` 200; `/x/berita/kandidat` tanpa token 401. `TOKEN_UNGGAH_IKLAN` BELUM dipasang (CSV selalu 401 sampai dipasang; dipasang saat Yosie menyiapkan unggah terjadwal Google Ads). `rawat.yml` ikut mati selama kuota Actions habis; retensi 90 hari tetap jalan di setiap kiriman klik.
 - Tes lokal: lihat deskripsi PR.
+- **Deploy 10 Nov 2026 (ACC Hannes di sesi rhj-brain: "Deploy sekarang"; GitHub Actions kena limit, jadi tanpa CI):** migrasi
+  `20261110120000_pipeline_sinkron_luar` diterapkan lewat `alat/sql-proyek.sh --migrasi` (sebelumnya terakhir 20261108120000);
+  cek: `pipeline_tautan_luar` RLS ON, hak tabel hanya `postgres`, 0 baris, 5 fungsi kunci ada. Edge `api` di-deploy dari
+  `claude/sinkron-erp-lead-wa` (bd88a09, CLI 3.0.0 `--use-api --no-verify-jwt --yes`). Cek produksi tanpa menulis data:
+  POST `/x/pipeline/order-erp` & `/x/pipeline/lead-otomatis` tanpa token 401, body `{}` 400 (INPUT_001); GET `/x/pipeline/tautan`
+  200 (0 item); regresi `/x/iklan/ringkas` 200, `/x/pipeline/ringkas` 200, `/v2/user` tanpa token 401, OPTIONS `/x/iklan/klik` 204.
+  Keputusan Hannes 10 Nov: lead WA dinyalakan langsung (routine rhj-brain); sinkron SP ERP tetap MATI sampai Hannes mengabari nomor
+  SP sudah dibetulkan, lalu hanya SP yang dibuat sesudah tanggal mulai.
+
+## Sinkron ERP + lead WA otomatis (10 Nov 2026, ACC Hannes 10 Nov untuk MEMBANGUN; PR #36, DEPLOY 10 Nov)
+Keputusan Hannes 10 Nov di sesi rhj-brain (LOG-PAGAR "biar mereka ga kerja 2 kali"): SP Riksa/Michael di ERP-dev otomatis
+jadi ORDER di Anvil saat SP dibuat, SP batal → batal, nomor SP = nomor ERP; calon pembeli WA 0878 tanpa lead terbuka
+dibuatkan lead oleh agent (pemilik ditebak dari balasan, fallback bergiliran). PR ini = pintunya; yang menjalankan =
+routine rhj-brain (token app scope tulis, role bot). Kontrak `docs/KONTRAK-DB.md` §14, rute `supabase/functions/api/README.md`.
+- DB `20261110120000_pipeline_sinkron_luar.sql` (aditif): tabel `pipeline_tautan_luar` (kunci `erp-sp:<so_id>` /
+  `wa:K-xxxxxx:<tgl>`, sidik md5, tanpa nomor/nama; RLS tanpa hak tabel), `x_pipeline_order_erp`, `x_pipeline_lead_otomatis`
+  (satu item atau batch ≤ 100, hasil per item), `x_pipeline_tautan` (audit). Menulis lewat jalur yang sudah ada
+  (`inti_pipeline_lead_buat`, `inti_pipeline_tahap` order/batal_order, `inti_pipeline_order_ubah`,
+  `inti_pipeline_sumber_bukti_set`).
+- Edge `api`: `POST /x/pipeline/order-erp`, `POST /x/pipeline/lead-otomatis` (scope tulis), `GET /x/pipeline/tautan` (baca).
+- CLI `cli/tugas.mjs`: `pipeline order-erp --file`, `pipeline lead-otomatis --file` (+ `--dry-run`), `pipeline tautan`.
+  Salinan rhj-brain `tools/tugas.mjs` BELUM diperbarui (sudah berbeda dari `cli/tugas.mjs` sebelum PR ini; sinkronkan saat
+  routine dibangun).
+- **Belum dinyalakan:** nomor SP di ERP-dev sedang dibetulkan Hannes (LOG-PAGAR 10 Nov). SP tim online wajib berpola
+  `NNN/(RSG|MCE)/<romawi>/20YY`; nomor lain → 400 per item. Sidik memuat no_sp, jadi nomor yang dibetulkan sesudah tertaut
+  ikut diperbarui.
+- Prasyarat produksi (cek baca saja saat deploy): `pipeline_akses.kode_sp` RSG = Riksa (240260558), MCE = Michael
+  (240260567), keduanya peran rep; token bot scope tulis untuk routine.
+- Risiko/keputusan terbuka: (1) SP yang SUDAH diinput sales di Anvil dengan nomor lain (bukan nomor ERP) tidak tercocok
+  lewat No SP dan lead ORDER bukan lead terbuka → lead ORDER baru (dobel omzet); cek 10 Nov: 0 dari 7 SP ERP 9–10/11 ada di
+  Anvil. (2) ERP menang saat SP di ERP berubah: suntingan manual order di Anvil tertimpa pada perubahan ERP berikutnya
+  (sidik sama = tidak disentuh). (3) Order yang dibatalkan di Anvil final: SP ERP aktif lagi → 409 per item (periksa
+  manual). (4) Lead ERP baru bersumber `Lainnya`/`Repeat order` (asal iklan tidak diketahui dari ERP).
+- Tes lokal: lihat deskripsi PR.
 
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)
 Prasyarat dari Hannes: project Supabase baru `rhj-tugas` (akun/org baru, Sydney `ap-southeast-2` per keputusan 30/9, Free); env cloud `SUPABASE_ACCESS_TOKEN` (PAT akun baru) + `SUPABASE_PROJECT_REF`; `CLICKUP_API_TOKEN` (sudah ada); sesi baru supaya env terbaca. Semua langkah ke ClickUp **GET saja**. Tidak memakai MCP Supabase (itu ERP).
