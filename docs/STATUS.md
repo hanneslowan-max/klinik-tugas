@@ -730,6 +730,14 @@ routine rhj-brain (token app scope tulis, role bot). Kontrak `docs/KONTRAK-DB.md
   saklar mati + kata_manusia 7; `wa.picu('jaga')` → pg_net 200 `{saklar: mati, masalah: []}`; regresi `/v2/user` 401,
   `/x/iklan/ringkas` 200, `/x/pipeline/tautan` 200, OPTIONS `/x/iklan/klik` 204. **Belum:** webhook Kapso belum didaftar,
   kunci Anthropic belum dipasang, saklar belum `kirim` (langkah 5–7 docs/WA-BOT.md).
+- **Webhook Kapso didaftar 10 Nov ±22.19 WIB (ACC Hannes pop-up "Daftar sekarang", sesi rhj-brain diskusi bot WA):** id
+  `e74c41ab-…`, url `/x/wa/webhook`, event received + sent, buffer mati, `active: true` (cek GET webhooks).
+- **PR #38 DEPLOY 10 Nov ±22.40 WIB (ACC Hannes pop-up "Deploy sekarang"; saklar tetap MATI):** validator revisi (ukuran
+  bertitik + satuan lolos, "lemari … tidak custom" lolos, label [HARI] tidak dihitung janji kirim, "belum tersedia" ditolak),
+  pengaman auto-reply (`nilaiChat` → diam `auto_reply`), migrasi `20261110220000_wa_batas_100` (batas 3/4 → 100/100, sebelum:
+  3/4). Tes lokal: `uji/wa/jalankan.mjs` 111/111, `uji/wa/kontrak.mjs` 53/53, `uji/db` 2222 cek, `deno check wa.ts`. Edge `api`
+  dari `main` b71466e. Cek tanpa menulis: webhook tanpa tanda tangan 401, proses tanpa token 401, `/v2/user` 401,
+  `wa ringkas` 200 saklar mati. Rollback: Edge dari 8b17db0 + `update wa.pengaturan set maks_per_periode=3, maks_per_24jam=4`.
 Brief rhj-brain `deliverables/anvil/BRIEF-WA-BOT-AI.md`. Rincian `docs/WA-BOT.md`, kontrak `docs/KONTRAK-DB.md` §15, rute
 `supabase/functions/api/README.md`.
 - DB `20261110180000_wa_bot.sql` (aditif): ekstensi `pg_net` + `pg_cron`, skema `wa` (8 tabel, tertutup untuk role API),
