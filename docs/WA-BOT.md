@@ -40,9 +40,10 @@ Pelanggan → 0878 (HP sales + Kapso coexistence) → webhook Kapso (whatsapp.me
 | ambil | sudah jam kerja (mis. 07.55 → 08.05) | `jam_kerja` |
 | ambil | sales mengirim ≥ pesan pertama / < 24 jam sebelumnya (log webhook) | `sales_membalas` / `chat_berjalan` |
 | ambil | > 24 jam sejak pesan pelanggan terakhir (aturan Meta) | `jendela_24jam` |
-| ambil | ≥ 3 pesan bot di periode luar jam / ≥ 4 dalam 24 jam, dihitung sejak pesan sales terakhir | `batas_periode` / `batas_24jam` |
+| ambil | ≥ 100 pesan bot dalam 24 jam (dan ≥ 100 per periode), dihitung sejak pesan sales terakhir (revisi Hannes 10 Nov malam; dulu 3/periode & 4/24 jam, migrasi `20261110220000_wa_batas_100.sql`) | `batas_periode` / `batas_24jam` |
 | cek ulang API | pesan keluar manusia di API pesan Kapso (bukan id bot, tidak diakhiri "(pesan otomatis)", bukan teks otomatis aplikasi "Terima kasih telah/sudah menghubungi…") | `sales_membalas` / `chat_berjalan` |
 | cek ulang API | pesan pelanggan periode ini cocok `wa.kata_manusia` (regex, tanpa beda huruf) | diam `manusia_saja` |
+| cek ulang API | lawan tampak balasan otomatis: ≥ 3 pesan masuk ber-teks identik dalam 24 jam, atau ≥ 3 kali pesan masuk < 5 detik sesudah pesan bot → masuk `wa.diam` (alasan `lain`) | diam `auto_reply` |
 | cek ulang API | API belum memuat pesan pelanggan (coexistence terlambat) → coba lagi 2 mnt, maks 3 kali | `tunda` → `tunda_habis` |
 | AI | `kirim=false`, refusal, terpotong, JSON tidak sah → diam; 429/5xx → tunda; 4xx → gagal | `ai_*` |
 | validator | lihat di bawah → TIDAK dikirim, teks bot disimpan untuk QA, peringatan | `validator: <aturan>` |
@@ -65,10 +66,13 @@ tanpa data lain. Prompt sistem: `PROMPT_SISTEM` di `wa.ts` (peran, tujuan, fakta
 ≤ 20 pesan terakhir (teks; foto/voice/video/dokumen → label; referral iklan Meta → "[datang dari iklan: …]") dibungkus
 `<data_chat>` sebagai data; tag penutup palsu di isi chat dinetralkan.
 
-**Validator** (`periksaTeks`, sesudah `[HARI]` diisi): `Rp`/IDR/rupiah, angka berformat harga (1.250.000, 900 ribu, 2 jt),
-diskon/potongan/promo/cashback/nego, `http`/`www`/domain, "distributor", "galvanis", "custom" dekat "lemari", teflon /
+**Validator** (`periksaTeks`, sesudah `[HARI]` diisi): `Rp`/IDR/rupiah, angka berformat harga (1.250.000, 900 ribu, 2 jt;
+angka bertitik yang menempel satuan ukur mm/cm/m/kg/ton/inch/" atau "x" = ukuran, lolos: "1.200 x 1.000 mm", "1.000 kg"),
+diskon/potongan/promo/cashback/nego, `http`/`www`/domain, "distributor", "galvanis", "custom" dekat "lemari" (kecuali
+"tidak (bisa) custom" di kalimat itu), teflon /
 scaffolding / pintu geser / pagar dalam kalimat tanpa penolakan (tidak/belum/bukan), nomor telepon, email, rekening/bank,
-janji stok (ready, stok ada, "tersedia" tanpa "tidak"), janji kirim/tanggal, > 700 karakter, tidak diakhiri
+janji stok (ready, stok ada, "tersedia" tanpa "tidak/tdk/tak"; "belum tersedia" ditolak), janji kirim/tanggal (dicek
+SESUDAH label `[HARI]` dibuang, jadi "membalas besok pagi, … kota pengiriman?" / "Senin 17 November pagi" lolos), > 700 karakter, tidak diakhiri
 "(pesan otomatis)", sisa placeholder `[…]`.
 
 ## Data (skema `wa`, RLS ON, tanpa hak tabel/skema untuk role API)

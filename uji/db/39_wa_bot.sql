@@ -12,6 +12,10 @@ begin;
 delete from wa.antrean; delete from wa.log; delete from wa.kejadian; delete from wa.diam; delete from wa.peringatan;
 delete from wa.kata_manusia;
 update wa.pengaturan set saklar = 'mati', saklar_alasan = 'awal';
+-- batas 100/24 jam (migrasi 20261110220000, revisi Hannes 10 Nov malam); logika batas di bawah diuji dengan 3/4.
+select uji.cek((select maks_per_periode = 100 and maks_per_24jam = 100 from wa.pengaturan), 'batas terpasang 100/periode & 100/24 jam');
+select uji.galat($$update wa.pengaturan set maks_per_24jam = 101$$, '23514', 'batas 24 jam > 100 ditolak constraint');
+update wa.pengaturan set maks_per_periode = 3, maks_per_24jam = 4;
 delete from public.hari_libur where tanggal between '2026-11-01' and '2026-12-31';
 insert into public.api_tokens (id, member_id, nama, prefix, token_hash, scope) values
   ('b0b0b0b0-0000-4000-8000-000000000391', 900000000002, 'bot tulis (uji 39)', 'rtk_b391', uji.sha('rtk_uji39_tulis'), 'tulis'),
