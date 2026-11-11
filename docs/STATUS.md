@@ -901,3 +901,12 @@ Laporan ke Hannes: angka sensus per list, status lampiran, jawaban probe (termas
   ke seluruh Indonesia." → 400 `ongkir_luar_jabodetabek`. Fakta id 18 (urutan 45) "Gratis ongkir untuk pengiriman area
   Jabodetabek, semua produk, tanpa minimal pembelian…" ditambahkan lewat API.
 
+## Kartu "Asal lead per situs" — DEPLOY 11 Nov 2026 (ACC Hannes pop-up "Deploy sekarang"; PR #42)
+- Branch digabung dengan main terbaru dulu (perubahan bot WA #39/#41/#43 tidak tertimpa). Migrasi `20261111150000_pipeline_asal_situs`
+  lewat `alat/sql-proyek.sh --migrasi`; cek hak: `web_pipeline_asal_situs` authenticated, `x_pipeline_asal_situs` service_role,
+  `pipeline_asal_lead` postgres saja. Edge `api` di-deploy dari `claude/asal-lead-situs` (sudah memuat main).
+- Cek produksi tanpa menulis data: `GET /x/pipeline/asal-situs` tanpa token 401; token baca, Pallet Mesh sejak 21 Okt → 200:
+  situs_rh 13 (organik 6, google_ads 7; 2 order Rp4.747.500), situs_oy 1 (google_ads), meta 41, tanpa_kode 17 (2 order
+  Rp24.214.818), belum 1 (order Rp7.260.000). Regresi: `/x/wa/ringkas` 200, `/x/pipeline/ringkas` 200, `/v2/user` 401,
+  `/x/wa/webhook` tanpa tanda tangan 401. Tes ulang sesudah gabung: `uji/wa/jalankan.mjs` 122/0, web typecheck OK, vitest asal-situs 9/9.
+
