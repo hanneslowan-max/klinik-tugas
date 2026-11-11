@@ -73,7 +73,7 @@ select uji.cek(not has_schema_privilege('anon', 'wa', 'USAGE') and not has_schem
                and not has_schema_privilege('service_role', 'wa', 'USAGE'), 'skema wa tanpa USAGE untuk role API');
 select uji.cek(not exists (select 1 from pg_class c where c.relnamespace = 'wa'::regnamespace and c.relkind = 'r' and not c.relrowsecurity),
   'RLS ON di semua tabel wa');
-select uji.sama((select count(*)::int from pg_class c where c.relnamespace = 'wa'::regnamespace and c.relkind = 'r'), 8, '8 tabel wa');
+select uji.sama((select count(*)::int from pg_class c where c.relnamespace = 'wa'::regnamespace and c.relkind = 'r'), 9, '9 tabel wa (+ pengetahuan, migrasi 20261111100000)');
 select uji.cek(not exists (select 1 from pg_class c, unnest(array['anon', 'authenticated', 'service_role']) r(rol)
                  where c.relnamespace = 'wa'::regnamespace and c.relkind in ('r', 'S')
                    and (has_table_privilege(r.rol, c.oid, 'SELECT') or has_table_privilege(r.rol, c.oid, 'INSERT'))),

@@ -90,6 +90,8 @@ Jelajah web; daftar kategori diatur owner di Admin → Kategori.
 | GET | `/x/wa/ringkas?hari=` (scope baca; aktor owner/bot) | `x_wa_ringkas`: masuk/antre/kirim/tolak/gagal, per alasan, token & biaya AI, 5 contoh teks bot, detak. Tanpa nomor/isi chat |
 | POST | `/x/wa/saklar` (scope tulis; owner/bot) `{status: mati\|kirim, catatan?}` | `x_wa_saklar` |
 | POST | `/x/wa/diam` (scope tulis; owner/bot) `{nomor, alasan: internal\|pemasok\|ekspedisi\|minta_berhenti\|lain, catatan?, hapus?}` | `x_wa_diam` (nomor → 62…) |
+| GET | `/x/wa/pengetahuan` (scope baca; owner/bot) | `x_wa_pengetahuan_daftar` (fakta + contoh balasan bot, aktif & nonaktif) |
+| POST | `/x/wa/pengetahuan` (scope tulis; owner/bot) `{id?, jenis: fakta\|contoh, situasi?, teks?, aktif?, urutan?}` | teks/situasi dicek validator bot (`periksaPengetahuan`, 400 bila melanggar) → `x_wa_pengetahuan_simpan` |
 | GET | `/x/file/{attachment_id}` | 302 ke signed URL (atau `clickup_url`) |
 | POST | `/x/impor/batch` `{jenis, rows, mode?, at_awal?}` | `impor_batch` |
 | POST | `/x/impor/hilang` `{jenis, ids_ada, mode?, lingkup?}` | `impor_tandai_hilang` |

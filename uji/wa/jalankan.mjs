@@ -6,7 +6,7 @@
 // Exit 0 = lulus, 1 = ada gagal.
 import { createHmac } from "node:crypto";
 import {
-  bodyClaude, envDari, jagaBot, kirimTeks, mintaBalasan, nilaiChat, normNomor, PENANDA, periksaTeks, pesanUntukAi,
+  bodyClaude, envDari, jagaBot, periksaPengetahuan, promptSistem, kirimTeks, mintaBalasan, nilaiChat, normNomor, PENANDA, periksaTeks, pesanUntukAi,
   prosesAntrean, PROMPT_SISTEM, tandaTanganCocok, teksPeringatan, tokenProsesCocok, uraiWebhook,
 } from "../../supabase/functions/api/wa.ts";
 
@@ -173,6 +173,13 @@ tolak(T("Lemari bisa custom."), "lemari_custom");
 tolak(T("Lemari arsip tidak hanya standar, bisa custom juga."), "lemari_custom");
 tolak(T("Roda scaffolding belum tersedia, segera ada."), "janji_stok");
 cek("pertanyaan harga ditunda ke sales → ok", periksaTeks(T("Untuk harga akan dijawab sales [HARI]."), "Senin pagi").ok);
+cek("pengetahuan: fakta sah → ok", periksaPengetahuan("fakta", "Lemari arsip TIDAK bisa custom.").length === 0
+  && periksaPengetahuan("fakta", "Pallet mesh Stocky 5 ukuran 1.200 x 1.000 mm, beban 1.000 kg.").length === 0);
+cek("pengetahuan: fakta berisi harga / tautan / janji stok → ditolak", periksaPengetahuan("fakta", "Harga troli Rp 750.000.").includes("harga")
+  && periksaPengetahuan("fakta", "Katalog di rodahammerindo.com").includes("tautan") && periksaPengetahuan("fakta", "Roda 6 inch stok ready.").includes("janji_stok"));
+cek("pengetahuan: contoh sah (penanda ditambahkan otomatis) → ok", periksaPengetahuan("contoh", "Baik Bapak/Ibu, sales kami membalas [HARI]. Untuk troli apa?", "Pelanggan tanya roda").length === 0);
+cek("pengetahuan: contoh dengan janji kirim / situasi berisi harga → ditolak", periksaPengetahuan("contoh", "Bisa dikirim besok.", "Tanya").includes("janji_kirim")
+  && periksaPengetahuan("contoh", "Baik Bapak/Ibu.", "Tanya harga Rp 500.000").includes("situasi:harga"));
 cek("700 karakter pas → ok", periksaTeks(T("a".repeat(700 - 17)), "x").ok);
 
 // ---------------------------------------------------------------- Claude: body & panggilan tiruan
@@ -233,11 +240,12 @@ cek("400 (jendela 24 jam) → tidak diulang", !k.ok && ke === 1 && k.alasan === 
 
 // ---------------------------------------------------------------- prosesAntrean (rpc + fetch tiruan)
 bagian("Satu putaran proses (DB, Kapso, Claude tiruan)");
-function dunia({ items, pesan, jawabAi, kirim = () => jsonRes(200, { messages: [{ id: "wamid.bot.baru" }] }), kata = [], saklar = "kirim" }) {
+function dunia({ items, pesan, jawabAi, kirim = () => jsonRes(200, { messages: [{ id: "wamid.bot.baru" }] }), kata = [], saklar = "kirim", pengetahuan }) {
   const lapor = [], log = { kapsoGet: [], ai: [], kirim: [] };
   const rpc = async (fn, args) => {
     if (fn === "x_wa_ambil") return { saklar, pengaturan: { model: "claude-sonnet-5-5", max_token: 400, maks_karakter: 700 }, kata_manusia: kata, items, batal: {} };
     if (fn === "x_wa_hasil") { lapor.push(args.p); return { ok: true }; }
+    if (fn === "x_wa_pengetahuan_aktif" && pengetahuan) return pengetahuan;
     throw new Error(`rpc tak terduga ${fn}`);
   };
   const fetch = async (url, init = {}) => {
@@ -255,6 +263,17 @@ let r = await prosesAntrean(w.deps);
 cek("form situs Jumat 19.00 → terkirim, [HARI] = Senin pagi", w.log.kirim.length === 1 && w.log.kirim[0].text.body.includes("membalas Senin pagi.")
   && w.lapor[0].keputusan === "kirim" && w.lapor[0].id_pesan === "wamid.bot.baru" && w.lapor[0].token_masuk === 1450, { r, lapor: w.lapor });
 cek("Kapso dibaca per percakapan, ≤ 20 pesan", /conversation_id=conv_uji_1/.test(w.log.kapsoGet[0]) && /limit=20/.test(w.log.kapsoGet[0]));
+cek("tanpa tabel pengetahuan (rpc gagal) → prompt = fakta bawaan", w.log.ai[0].system === PROMPT_SISTEM && PROMPT_SISTEM === promptSistem());
+{
+  const pg = { fakta: ["Troli platform kapasitas standar 150 kg dan 300 kg."], contoh: [{ situasi: "Pelanggan tanya troli", teks: "Baik Bapak/Ibu, troli untuk barang apa dan bebannya kira-kira berapa kg?\n(pesan otomatis)" }] };
+  const w2 = dunia({ items: [it()], pesan: [pin("a", P1, "Halo, cari troli")], pengetahuan: pg,
+    jawabAi: () => pesanAi({ kirim: true, alasan: "tanya", teks: "Selamat malam Bapak/Ibu. Sales kami membalas [HARI]. Troli untuk barang apa?\n(pesan otomatis)" }) });
+  await prosesAntrean(w2.deps);
+  const sys = w2.log.ai[0]?.system ?? "";
+  cek("fakta & contoh dari wa.pengetahuan masuk prompt; fakta bawaan diganti", sys.includes("- Troli platform kapasitas standar 150 kg dan 300 kg.")
+    && sys.includes("CONTOH BALASAN") && sys.includes("Situasi: Pelanggan tanya troli") && !sys.includes("Stocky 2, 3, 5") && sys.includes("LARANGAN"), sys.slice(0, 300));
+  cek("fakta kosong → fakta bawaan tetap", promptSistem({ fakta: [], contoh: [] }) === PROMPT_SISTEM);
+}
 cek("isi form masuk ke AI hanya di dalam <data_chat>", w.log.ai[0].messages[0].content.includes("PT Contoh Tiruan") && !w.log.ai[0].system.includes("PT Contoh Tiruan"));
 
 w = dunia({ items: [it()], pesan: [pin("a", P1, injeksi)], jawabAi: () => pesanAi({ kirim: true, alasan: "harga", teks: "Daftar harga: pallet mesh Rp 900.000.\n(pesan otomatis)" }) });

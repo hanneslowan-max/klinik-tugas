@@ -43,6 +43,9 @@
 //   node tools/tugas.mjs wa saklar <mati|kirim> [--catatan "..."]      nyalakan/matikan bot (scope tulis, owner/bot)
 //   node tools/tugas.mjs wa diam --nomor 0812… --alasan internal|pemasok|ekspedisi|minta_berhenti|lain [--hapus]
 //                                                                     daftar nomor yang tidak dibalas bot (scope tulis)
+//   node tools/tugas.mjs wa pengetahuan                                fakta + contoh balasan bot (aktif & nonaktif)
+//   node tools/tugas.mjs wa fakta --teks "..." [--urutan n]            tambah fakta terkunci (ubah: --id n [--teks] [--nonaktif|--aktif])
+//   node tools/tugas.mjs wa contoh --situasi "..." --teks "..."        tambah contoh balasan (ubah: --id n …); teks dicek validator bot
 //   audit-free tidak berlaku di mode tugas.
 //   node tools/<tugas|clickup>.mjs backend                             (KEDUA mode) backend aktif + asal pilihan mode
 //
@@ -340,7 +343,26 @@ const EKSTRA = {
       if (!alasan) throw new Error("wa diam: --alasan internal|pemasok|ekspedisi|minta_berhenti|lain wajib");
       return api("POST", `${BASE_X}/wa/diam`, { nomor, alasan, catatan: wajibNilai("wa diam", "catatan") });
     }
-    throw new Error("wa: subperintah harus ringkas | saklar <mati|kirim> | diam --nomor --alasan");
+    // Fakta & contoh balasan bot (tabel wa.pengetahuan, migrasi 20261111100000): tanpa deploy; teks dicek validator bot.
+    if (sub === "pengetahuan") return api("GET", `${BASE_X}/wa/pengetahuan`);
+    if (sub === "fakta" || sub === "contoh") {
+      const id = wajibNilai(`wa ${sub}`, "id");
+      if (id && !/^\d+$/.test(id)) throw new Error(`wa ${sub}: --id harus angka`);
+      const teks = wajibNilai(`wa ${sub}`, "teks");
+      const situasi = sub === "contoh" ? wajibNilai("wa contoh", "situasi") : undefined;
+      const urutan = wajibNilai(`wa ${sub}`, "urutan");
+      if (!id && !teks) throw new Error(`wa ${sub}: --teks wajib untuk baris baru`);
+      if (sub === "contoh" && !id && !situasi) throw new Error("wa contoh: --situasi wajib untuk baris baru");
+      const body = { jenis: sub };
+      if (id) body.id = Number(id);
+      if (teks) body.teks = teks;
+      if (situasi) body.situasi = situasi;
+      if (urutan) body.urutan = Number(urutan);
+      if (opt.nonaktif) body.aktif = false;
+      if (opt.aktif) body.aktif = true;
+      return api("POST", `${BASE_X}/wa/pengetahuan`, body);
+    }
+    throw new Error("wa: subperintah harus ringkas | saklar <mati|kirim> | diam --nomor --alasan | pengetahuan | fakta | contoh");
   },
 };
 
