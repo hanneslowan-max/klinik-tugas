@@ -1056,6 +1056,34 @@ async function ujiAdminPurge() {
 // Perawatan lampiran: POST /x/rawat/lampiran (owner/bot, scope impor). Ditaruh sesudah purge supaya run nyata (hari=0,
 // menyasar SEMUA kartu app selesai) tidak mengganggu seksi lain yang membaca berkas. Seed tak punya lampiran app yang
 // memenuhi syarat (0), jadi efek hanya ke data uji — yang ikut dibersihkan di bersihkan().
+// Bot WA: simpan fakta/contoh dari halaman web (sesi owner) lewat Edge, dicek validator bot (20261111120000_wa_web.sql).
+async function ujiAdminWaPengetahuan() {
+  bagian("Admin Bot WA: /x/admin/wa-pengetahuan (x-sesi owner + validator bot)");
+  const kirim = (jwt, body) => http("POST", `${cfg.fnBase}/x/admin/wa-pengetahuan`, { headers: jwt ? { "x-sesi": jwt } : {}, body });
+  let x = await kirim(null, { jenis: "fakta", teks: "Troli platform kapasitas 300 kg." });
+  sama("tanpa x-sesi → 401", x.status, 401);
+  x = await kirim(st.jwt.citra, { jenis: "fakta", teks: "Troli platform kapasitas 300 kg." });
+  sama("sesi member → 403", x.status, 403);
+  x = await kirim(st.jwt.budi, { jenis: "fakta", teks: "Harga troli Rp 750.000." });
+  cek("fakta berisi harga → 400 ditolak validator", x.status === 400 && /harga/.test(x.text), x.text);
+  x = await kirim(st.jwt.budi, { jenis: "contoh", situasi: "Tanya roda", teks: "Siap, bisa dikirim besok." });
+  cek("contoh berisi janji kirim → 400", x.status === 400 && /janji_kirim/.test(x.text), x.text);
+  x = await kirim(st.jwt.budi, { teks: "Tanpa jenis." });
+  sama("tanpa jenis → 400", x.status, 400);
+  x = await kirim(st.jwt.budi, { jenis: "contoh", situasi: "Uji kontrak (sintetis)", teks: "Baik Bapak/Ibu, troli untuk barang apa?" });
+  cek("contoh sah → 200, aktor owner", x.status === 200 && x.json?.jenis === "contoh" && x.json?.aktif === true, x.text);
+  const id = x.json?.id;
+  const daftar = await rpcWeb(cfg, st.jwt.budi, "web_wa_pengetahuan_daftar");
+  cek("web_wa_pengetahuan_daftar memuat contoh baru", Array.isArray(daftar) && daftar.some((d) => d.id === id && d.oleh === ID.budi), daftar);
+  x = await kirim(st.jwt.budi, { id, jenis: "contoh", aktif: false });
+  cek("nonaktifkan → 200 aktif false", x.status === 200 && x.json?.aktif === false, x.text);
+  let gagal = null;
+  try { await rpcWeb(cfg, st.jwt.citra, "web_wa_ringkas", { p: { hari: 7 } }); } catch (e) { gagal = e; }
+  sama("web_wa_ringkas sebagai member → 403", gagal?.status, 403);
+  const r = await rpcWeb(cfg, st.jwt.budi, "web_wa_ringkas", { p: { hari: 7 } });
+  cek("web_wa_ringkas sebagai owner → 200", typeof r?.saklar === "string", r);
+}
+
 async function ujiRawatLampiran() {
   bagian("POST /x/rawat/lampiran: hapus lampiran kartu selesai lama (owner/bot)");
   const imp = apiEdge(cfg, st.tok.impor);
@@ -1150,7 +1178,7 @@ async function utama() {
   try {
     await siapkan();
     for (const f of [ujiModeDanPesan, ujiWhoami, ujiCreate, ujiUpdate, ujiComment, ujiMove, ujiDelete, ujiBaca, ujiAgenda,
-      ujiTambahan, ujiToken, ujiImporLampiran, ujiLampiranApi, ujiHttp, ujiAdmin, ujiAdminPurge, ujiRawatLampiran,
+      ujiTambahan, ujiToken, ujiImporLampiran, ujiLampiranApi, ujiHttp, ujiAdmin, ujiAdminPurge, ujiAdminWaPengetahuan, ujiRawatLampiran,
       ujiBanding, ujiRetry429]) {
       try {
         await f();

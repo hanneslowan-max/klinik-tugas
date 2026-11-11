@@ -919,6 +919,77 @@ export type EdisiBerita = {
   pilihan: PilihanBerita[];
 };
 export type RingkasEdisiBerita = { id: number; dibuat_at: string; jumlah: number; wajib: number };
+// ---- Bot WA 0878 (owner; 20261111120000_wa_web.sql). Tanpa isi chat pelanggan / nomor telepon.
+export type SaklarWa = "mati" | "kirim";
+export type KeputusanWa = "catat" | "kirim" | "diam" | "batal" | "tolak" | "gagal" | "tunda";
+
+/** Hasil web_wa_ringkas (wa.inti_ringkas). */
+export type RingkasBotWa = {
+  hari: number;
+  sejak: string;
+  saklar: SaklarWa;
+  saklar_alasan: string | null;
+  saklar_catatan: string | null;
+  saklar_diubah_pada: string | null;
+  model: string;
+  masuk: number;
+  masuk_luar_jam: number;
+  chat_antre: number;
+  kirim: number;
+  nomor_dibalas: number;
+  tolak: number;
+  gagal: number;
+  per_alasan: Record<string, number>;
+  token_masuk: number;
+  token_keluar: number;
+  biaya_usd: number;
+  panggilan_ai: number;
+  contoh: { waktu: string; keputusan: KeputusanWa; alasan: string | null; teks: string | null }[];
+  antrean_aktif: number;
+  daftar_diam: number;
+  kata_manusia: number;
+  terakhir_webhook: string | null;
+  terakhir_proses: string | null;
+  terakhir_jaga: string | null;
+  dibuat: string;
+};
+
+export type BarisLogWa = {
+  id: number;
+  waktu: string;
+  arah: "masuk" | "keluar_sales" | "keluar_aplikasi" | "keluar_api" | "keluar_bot" | "sistem";
+  jenis: string | null;
+  keputusan: KeputusanWa;
+  alasan: string | null;
+  periode: string | null;
+  teks_bot: string | null;
+  panjang: number | null;
+  token_masuk: number | null;
+  token_keluar: number | null;
+  biaya_usd: number | null;
+  model: string | null;
+  /** 8 karakter awal hash nomor (bukan nomor) — untuk mengelompokkan baris satu chat */
+  nomor: string | null;
+  /** id percakapan Kapso (dari antrean, ≤ 7 hari) */
+  percakapan: string | null;
+};
+
+/** Hasil web_wa_log. `berikut` = id penanda halaman berikut (null = habis). */
+export type LogBotWa = { items: BarisLogWa[]; berikut: number | null };
+
+export type SaklarBotWa = { saklar: SaklarWa; saklar_alasan: string | null; saklar_diubah_pada: string | null };
+
+export type PengetahuanBotWa = {
+  id: number;
+  jenis: "fakta" | "contoh";
+  situasi: string | null;
+  teks: string;
+  aktif: boolean;
+  urutan: number;
+  diubah_pada: string;
+  oleh: number | null;
+};
+
 /** Hasil web_berita. */
 export type DataBerita = {
   edisi: EdisiBerita | null;
@@ -1046,4 +1117,8 @@ export type HasilRpc = {
   web_berita_semua: SemuaBerita;
   web_berita_tersimpan: { items: PilihanBerita[] };
   web_berita_tanda: PilihanBerita;
+  web_wa_ringkas: RingkasBotWa;
+  web_wa_log: LogBotWa;
+  web_wa_saklar: SaklarBotWa;
+  web_wa_pengetahuan_daftar: PengetahuanBotWa[];
 };

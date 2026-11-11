@@ -825,6 +825,16 @@ scope baca owner/bot → semua baris; `x_wa_pengetahuan_simpan(p_aktor, p)` scop
 aktif?, urutan?}` (tanpa id = baru; batas aktif fakta ≤ 30, contoh ≤ 8, minimal 1 fakta). Isi teks dicek validator bot di Edge
 sebelum fungsi ini dipanggil. Isi awal = 3 fakta terkunci lama.
 
+**Halaman web Bot WA (migrasi `20261111120000_wa_web`, keputusan Hannes 11 Nov; owner saja, `mulai_web(true)` → member
+403, anon tanpa eksekusi):** `web_wa_ringkas(p)` = `wa.inti_ringkas` {hari 1–90}; `web_wa_log(p)` {hari? 1–90 (7), keputusan?
+catat|kirim|diam|batal|tolak|gagal|tunda, alasan? (awalan, `%`/`_` literal, ≤ 60), sebelum? (id), batas? 1–100 (50)} →
+`{items: [{id, waktu, arah, jenis, keputusan, alasan, periode, teks_bot, panjang, token_masuk, token_keluar, biaya_usd, model,
+nomor (8 karakter awal nomor_hash), percakapan (id Kapso dari antrean, ≤ 7 hari)}], berikut}` — tanpa nomor telepon dan
+tanpa isi chat; `web_wa_saklar(p)` = `wa.inti_saklar` {status mati|kirim, catatan?} (aktor = owner web);
+`web_wa_pengetahuan_daftar()`. **Tidak ada** `web_*` untuk menyimpan pengetahuan: web memanggil Edge
+`POST /x/admin/wa-pengetahuan` (header `x-sesi` owner) → validator bot (`periksaPengetahuan`) → `x_wa_pengetahuan_simpan`,
+supaya teks tidak bisa disimpan tanpa validator.
+
 **Cron:** `wa-proses` tiap menit `wa.picu('proses')` (hanya bila ada antrean jatuh tempo), `wa-jaga` tiap 15 menit, `wa-rawat`
 02.41 WIB. `wa.picu` membaca Vault `wa_api_url` + `wa_token_proses`; tanpa keduanya → null (tidak memanggil apa pun).
 
