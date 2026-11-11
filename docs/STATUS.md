@@ -870,3 +870,12 @@ Sumber: `docs/riset/baca-pagar.md` §2. Email Michael & Rengga = asumsi yang bis
 
 ### 9. Tutup sesi
 Laporan ke Hannes: angka sensus per list, status lampiran, jawaban probe (termasuk anggota space privat hasil `/list/{id}/member`), keputusan privasi space. Mode tetap `cermin`; routine tetap memakai ClickUp sampai cutover (F7).
+
+## Bot WA: gratis ongkir khusus Jabodetabek (11 Nov 2026, keputusan Hannes; PR #43, DEPLOY 11 Nov)
+- Validator `wa.ts`: "gratis ongkir" keluar dari daftar diskon; aturan per kalimat `ongkir_luar_jabodetabek` (gratis/free/bebas
+  ongkir wajib menyebut "Jabodetabek" di kalimat yang sama). Prompt LARANGAN: satu pengecualian gratis ongkir Jabodetabek.
+  Tes `uji/wa/jalankan.mjs` 122/0. Edge `api` di-deploy 11 Nov dari `claude/wa-ongkir-jabodetabek`; cek: webhook tanpa
+  tanda tangan 401, `/x/wa/ringkas` 200, `/v2/user` 401, `/x/iklan/ringkas` 200; `POST /x/wa/pengetahuan` "Gratis ongkir
+  ke seluruh Indonesia." → 400 `ongkir_luar_jabodetabek`. Fakta id 18 (urutan 45) "Gratis ongkir untuk pengiriman area
+  Jabodetabek, semua produk, tanpa minimal pembelian…" ditambahkan lewat API.
+
