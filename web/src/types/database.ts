@@ -1383,6 +1383,7 @@ export type Database = {
         Returns: Json;
       };
       web_pipeline_akses_simpan: { Args: { p: Json }; Returns: Json };
+      web_pipeline_asal_situs: { Args: { p: Json }; Returns: Json };
       web_pipeline_biaya_iklan_set: { Args: { p: Json }; Returns: Json };
       web_pipeline_cek_duplikat: { Args: { p_telepon: string }; Returns: Json };
       web_pipeline_daftar: { Args: { p: Json }; Returns: Json };

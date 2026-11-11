@@ -226,6 +226,7 @@ export const LABEL_METRIK: Record<MetrikDasbor, string> = {
   dibatalkan: "Lead dibatalkan",
   lead_dobel: "Pelanggan dengan >1 lead terbuka",
   pm_tanpa_nilai: "Lead PM terbuka tanpa nilai penawaran",
+  asal_situs: "Asal lead per situs",
 };
 
 /** Metrik yang dihitung per bulan dipilih (spanduk daftar menyebut bulannya). */

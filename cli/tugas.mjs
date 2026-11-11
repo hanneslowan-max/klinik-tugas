@@ -38,6 +38,10 @@
 //                                                                     chat {kunci_luar, hp, sumber, pelanggan?, produk?, pemilik?,
 //                                                                     alasan_pemilik?, …}, maks 100; hasil per item
 //   node tools/tugas.mjs pipeline tautan [--jenis erp_sp|wa] [--sejak YYYY-MM-DD] [--batas n]   audit sinkron (tanpa nomor HP)
+//   node tools/tugas.mjs pipeline asal-situs [--produk "Pallet Mesh"] [--sejak YYYY-MM-DD] [--sampai YYYY-MM-DD]   asal lead per
+//                                                                     situs (kode Ref chat WA): situs RH/OY (organik vs Google Ads),
+//                                                                     Meta, lain, tanpa kode, belum; = kartu dasbor. Bawaan sejak
+//                                                                     2026-10-21 s/d hari ini; READ-ONLY
 //   node tools/tugas.mjs wa ringkas [--hari 7]                         bot WA 0878 luar jam: masuk/kirim/diam per alasan,
 //                                                                     biaya AI, contoh teks bot (tanpa isi chat/nomor); owner/bot
 //   node tools/tugas.mjs wa saklar <mati|uji|kirim> [--catatan "..."]  matikan / mode uji (hanya nomor uji, kapan saja) / nyalakan
@@ -321,7 +325,15 @@ const EKSTRA = {
       if (jenis && !["erp_sp", "wa"].includes(jenis)) throw new Error("pipeline tautan: --jenis harus erp_sp atau wa");
       return api("GET", `${BASE_X}/pipeline/tautan?${qs({ jenis, sejak: wajibNilai("pipeline", "sejak"), batas: wajibNilai("pipeline", "batas") })}`);
     }
-    throw new Error("pipeline: subperintah harus list | get <lead_id> | summary | fu-set | bukti-set | biaya-set | order-erp | lead-otomatis | tautan");
+    if (sub === "asal-situs") {
+      const sejak = wajibNilai("pipeline", "sejak");
+      const sampai = wajibNilai("pipeline", "sampai");
+      for (const [k, v] of [["sejak", sejak], ["sampai", sampai]]) {
+        if (v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) throw new Error(`pipeline asal-situs: --${k} harus YYYY-MM-DD`);
+      }
+      return api("GET", `${BASE_X}/pipeline/asal-situs?${qs({ produk: wajibNilai("pipeline", "produk"), sejak, sampai })}`);
+    }
+    throw new Error("pipeline: subperintah harus list | get <lead_id> | summary | fu-set | bukti-set | biaya-set | order-erp | lead-otomatis | tautan | asal-situs");
   },
   // Bot WA 0878 luar jam (migrasi 20261110180000_wa_bot): ringkas | saklar <mati|kirim> | diam --nomor --alasan [--hapus].
   async wa() {

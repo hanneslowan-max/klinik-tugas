@@ -58,7 +58,10 @@ export const kunci = {
   /** keutuhan kode klik iklan → lead → order (web_iklan_ringkas) */
   pipelineIklanRingkas: ["pipeline", "iklan", "ringkas"] as const,
   pipelineDasbor: (bulan: string) => ["pipeline", "dasbor", bulan] as const,
-  pipelineDasborIds: (metrik: string, pemilik: string, bulan: string) => ["pipeline", "dasbor", "ids", metrik, pemilik, bulan] as const,
+  pipelineDasborIds: (metrik: string, pemilik: string, bulan: string, asal = "") =>
+    ["pipeline", "dasbor", "ids", metrik, pemilik, bulan, asal] as const,
+  /** kartu "Asal lead per situs" (web_pipeline_asal_situs) */
+  pipelineDasborAsal: (produk: string, sejak: string, sampai: string) => ["pipeline", "dasbor", "asal", produk, sejak, sampai] as const,
   pipelineDasborLanjut: (bulan: string) => ["pipeline", "dasbor", "lanjut", bulan] as const,
   /** akar dasbor (angka & id di baliknya) */
   semuaPipelineDasbor: ["pipeline", "dasbor"] as const,

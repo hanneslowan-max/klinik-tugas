@@ -6,7 +6,8 @@ import { useQuery } from "@tanstack/react-query";
 import { rpc } from "@/lib/api/rpc";
 import { kunci } from "@/lib/kunci-query";
 import { klienBrowser } from "@/lib/supabase/client";
-import type { MetrikDasbor, PipelineSaya, SaringPelanggan, UrutPelanggan } from "@/types/domain";
+import type { SaringAsal } from "@/features/pipeline/asal-situs";
+import type { MetrikDasbor, PipelineSaya, ProdukLead, SaringPelanggan, UrutPelanggan } from "@/types/domain";
 
 /**
  * Akses modul untuk pengguna ini (gerbang menu & layar, §6). `awal` = hasil server dari layout (app) (KerangkaApp
@@ -92,15 +93,40 @@ export function useDasborLanjut(bulan: string) {
   });
 }
 
-/** Id lead di balik satu angka bagian 2 dasbor (klik angka → daftar lead). pemilik: id | 'tanpa' | '' (semua). */
-export function useDasborIds(arg: { metrik: MetrikDasbor | null; pemilik: string; bulan: string }) {
+/** Parameter server metrik asal_situs (kosong = bawaan server). */
+function paramAsal(a: SaringAsal) {
+  return {
+    kelompok: a.kelompok,
+    jalur: a.jalur ?? undefined,
+    produk: a.produk ?? undefined,
+    sejak: a.sejak || undefined,
+    sampai: a.sampai || undefined,
+  };
+}
+
+/**
+ * Id lead di balik satu angka dasbor (klik angka → daftar lead). pemilik: id | 'tanpa' | '' (semua). asal = saringan kartu
+ * "Asal lead per situs" (hanya metrik asal_situs; bulan tidak dikirim, rentangnya sejak/sampai).
+ */
+export function useDasborIds(arg: { metrik: MetrikDasbor | null; pemilik: string; bulan: string; asal?: SaringAsal | null }) {
+  const pa = arg.metrik === "asal_situs" && arg.asal ? paramAsal(arg.asal) : null;
   return useQuery({
-    queryKey: kunci.pipelineDasborIds(arg.metrik ?? "", arg.pemilik, arg.bulan),
+    queryKey: kunci.pipelineDasborIds(arg.metrik ?? "", arg.pemilik, pa ? "" : arg.bulan, pa ? JSON.stringify(pa) : ""),
     queryFn: () =>
       rpc(klienBrowser(), "web_pipeline_dasbor_ids", {
-        p: { metrik: arg.metrik, pemilik: arg.pemilik || undefined, bulan: arg.bulan || undefined },
+        p: { metrik: arg.metrik, pemilik: arg.pemilik || undefined, ...(pa ?? { bulan: arg.bulan || undefined }) },
       }),
     enabled: arg.metrik != null,
+  });
+}
+
+/** Kartu "Asal lead per situs": produk null = semua; rentang tanggal masuk. Cakupan (semua / milik saya) ditentukan server. */
+export function useAsalSitus(arg: { produk: ProdukLead | null; sejak: string; sampai: string }) {
+  return useQuery({
+    queryKey: kunci.pipelineDasborAsal(arg.produk ?? "", arg.sejak, arg.sampai),
+    queryFn: () =>
+      rpc(klienBrowser(), "web_pipeline_asal_situs", { p: { produk: arg.produk ?? undefined, sejak: arg.sejak, sampai: arg.sampai } }),
+    placeholderData: (lama) => lama,
   });
 }
 
