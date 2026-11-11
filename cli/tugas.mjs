@@ -49,6 +49,9 @@
 //   node tools/tugas.mjs wa diam --nomor 0812… --alasan internal|pemasok|ekspedisi|minta_berhenti|lain [--hapus]
 //                                                                     daftar nomor yang tidak dibalas bot (scope tulis)
 //   node tools/tugas.mjs wa pengetahuan                                fakta + contoh balasan bot (aktif & nonaktif)
+//   node tools/tugas.mjs wa penugasan [--hari 3]                       pembagian seketika chat baru jam kerja: nomor, pemilik,
+//                                                                     status (MEMUAT nomor HP: hanya ke /tmp, jangan ke repo/memori)
+//   node tools/tugas.mjs wa bagi [--aktif|--mati] [--sales id,id] [--jeda detik]   setelan pembagian seketika (tanpa opsi = lihat)
 //   node tools/tugas.mjs wa fakta --teks "..." [--urutan n]            tambah fakta terkunci (ubah: --id n [--teks] [--nonaktif|--aktif])
 //   node tools/tugas.mjs wa contoh --situasi "..." --teks "..."        tambah contoh balasan (ubah: --id n …); teks dicek validator bot
 //   audit-free tidak berlaku di mode tugas.
@@ -381,7 +384,32 @@ const EKSTRA = {
       if (opt.aktif) body.aktif = true;
       return api("POST", `${BASE_X}/wa/pengetahuan`, body);
     }
-    throw new Error("wa: subperintah harus ringkas | saklar <mati|kirim> | diam --nomor --alasan | pengetahuan | fakta | contoh");
+    // Pembagian seketika chat baru jam kerja (migrasi 20261111170000): penugasan = daftar (MEMUAT nomor, jangan disalin
+    // ke repo/memori); bagi = setelan (tanpa opsi = lihat + hitungan hari ini tanpa nomor).
+    if (sub === "penugasan") {
+      const hari = wajibNilai("wa penugasan", "hari");
+      if (hari && !/^\d{1,2}$/.test(hari)) throw new Error("wa penugasan: --hari harus angka 1–30");
+      return api("GET", `${BASE_X}/wa/penugasan?${qs({ hari })}`);
+    }
+    if (sub === "bagi") {
+      const body = {};
+      if (opt.aktif && opt.mati) throw new Error("wa bagi: pilih --aktif atau --mati");
+      if (opt.aktif) body.aktif = true;
+      if (opt.mati) body.aktif = false;
+      const sales = wajibNilai("wa bagi", "sales");
+      if (sales) {
+        const ids = sales.split(",").map((x) => x.trim());
+        if (!ids.every((x) => /^\d{1,18}$/.test(x))) throw new Error("wa bagi: --sales = id anggota dipisah koma");
+        body.sales = ids.map(Number);
+      }
+      const jeda = wajibNilai("wa bagi", "jeda");
+      if (jeda) {
+        if (!/^\d{1,3}$/.test(jeda)) throw new Error("wa bagi: --jeda = detik 0–900");
+        body.jeda_detik = Number(jeda);
+      }
+      return Object.keys(body).length ? api("POST", `${BASE_X}/wa/bagi-setel`, body) : api("GET", `${BASE_X}/wa/bagi-setel`);
+    }
+    throw new Error("wa: subperintah harus ringkas | saklar <mati|kirim> | diam --nomor --alasan | pengetahuan | fakta | contoh | penugasan | bagi");
   },
 };
 

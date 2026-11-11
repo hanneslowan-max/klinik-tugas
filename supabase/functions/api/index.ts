@@ -22,6 +22,7 @@ import {
   argKlik, asalIklanBoleh, type BarisUnggah, buatEmber, csvUnggah, MAKS_BODY_KLIK, MIN_TOKEN_UNGGAH, normalKlik, PATH_KLIK,
   tokenUnggahCocok,
 } from "./iklan.ts";
+import { bagiProses } from "./bagi.ts";
 import { envDari, jagaBot, MAKS_BODY_WEBHOOK, periksaPengetahuan, prosesAntrean, tandaTanganCocok, tokenProsesCocok, uraiWebhook } from "./wa.ts";
 
 type Obj = Record<string, unknown>;
@@ -614,7 +615,23 @@ async function waWebhook(req: Request, method: string): Promise<Response> {
   const { items, dilewati } = uraiWebhook(body, req.headers.get("x-webhook-event"), env.pnid);
   const idem = (req.headers.get("x-idempotency-key") ?? "").trim().slice(0, 200);
   const r = (await rpc("x_wa_webhook", { p: { kunci_idem: idem || undefined, items, ...waSekarang(req) } })) as Obj;
-  return json(200, { ok: true, ...r, dilewati });
+  // Pembagian seketika (bagi.ts, 20261111170000): calon chat baru jam kerja. Gagal di sini TIDAK menggagalkan webhook.
+  let bagi: Obj | undefined;
+  if (r.dobel !== true && items.some((x) => x.arah === "masuk")) {
+    try {
+      bagi = (await rpc("x_wa_bagi_calon", { p: { items, ...waSekarang(req) } })) as Obj;
+    } catch (e) {
+      console.error("x_wa_bagi_calon gagal:", e instanceof Error ? e.message : String(e));
+    }
+  }
+  return json(200, { ok: true, ...r, dilewati, ...(bagi?.aktif ? { bagi_calon: bagi.calon } : {}) });
+}
+
+async function waBagi(req: Request, method: string): Promise<Response> {
+  if (method !== "POST") throw new GalatApi(405, `Method ${method} tidak didukung`, "APP_001");
+  await waTokenProses(req);
+  return json(200, await bagiProses({ rpc: waRpc, fetch: (u: string, i?: RequestInit) => fetch(u, i), env: waEnv(),
+                                      chatSales: Deno.env.get("TELEGRAM_CHAT_SALES") ?? "", ...waSekarang(req) }));
 }
 
 async function waTokenProses(req: Request) {
@@ -967,6 +984,14 @@ const RUTE: Rute[] = [
   { m: "POST", p: /^\/x\/wa\/diam$/, perlu: "tulis", h: async (c) => rpc("x_wa_diam", { p_aktor: A(c), p: await c.body() }, T(c)) },
   // Mode uji (saklar 'uji', migrasi 20261111130000): daftar nomor uji {nomor?, hapus?, catatan?}; tanpa nomor = lihat daftar.
   { m: "POST", p: /^\/x\/wa\/uji$/, perlu: "tulis", h: async (c) => rpc("x_wa_uji", { p_aktor: A(c), p: await c.body() }, T(c)) },
+  // Pembagian seketika chat baru jam kerja (20261111170000): daftar penugasan (MEMUAT nomor; routine Pantau WA Jam) dan
+  // setelan {aktif?, sales?:[id…], jeda_detik?, hari_baru?} (GET = lihat + hitungan hari ini tanpa nomor).
+  {
+    m: "GET", p: /^\/x\/wa\/penugasan$/, perlu: "baca",
+    h: (c) => rpc("x_wa_bagi_daftar", { p_aktor: A(c), p: { hari: intQ(c.q, "hari") } }, T(c)),
+  },
+  { m: "GET", p: /^\/x\/wa\/bagi-setel$/, perlu: "baca", h: (c) => rpc("x_wa_bagi_setel", { p_aktor: A(c), p: {} }, T(c)) },
+  { m: "POST", p: /^\/x\/wa\/bagi-setel$/, perlu: "tulis", h: async (c) => rpc("x_wa_bagi_setel", { p_aktor: A(c), p: await c.body() }, T(c)) },
   // Fakta & contoh balasan bot (wa.pengetahuan, keputusan Hannes 11 Nov): daftar (baca) / simpan (tulis). Teks dicek
   // validator yang sama dengan balasan bot SEBELUM disimpan; ditolak → 400 dengan daftar alasan.
   { m: "GET", p: /^\/x\/wa\/pengetahuan$/, perlu: "baca", h: (c) => rpc("x_wa_pengetahuan_daftar", { p_aktor: A(c), p: {} }, T(c)) },
@@ -1090,6 +1115,7 @@ async function tangani(req: Request): Promise<Response> {
   if (path === PATH_KLIK) return await iklanKlik(req, method);
   if (/^\/x\/iklan\/unggah(?:\.csv)?$/.test(path)) return await iklanUnggah(req, method);
   if (path === "/x/wa/webhook") return await waWebhook(req, method);
+  if (path === "/x/wa/bagi") return await waBagi(req, method);
   if (path === "/x/wa/proses" || path === "/x/wa/jaga") return await waProsesJaga(req, method, path === "/x/wa/proses" ? "proses" : "jaga");
 
   if (method === "OPTIONS") {
