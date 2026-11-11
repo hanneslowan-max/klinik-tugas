@@ -57,7 +57,7 @@ const srv = createServer(async (req, res) => {
     if (req.headers["x-api-key"] !== ENV.ANTHROPIC_API_KEY_WA || !req.headers["anthropic-version"]) return kirimJson(401, { error: {} });
     const b = JSON.parse(body);
     T.ai.push(b);
-    const o = T.aiJawab ? T.aiJawab(b) : { kirim: true, teks: "Terima kasih Bapak/Ibu. Saat ini di luar jam kerja, sales kami akan membalas [HARI].\nBoleh dibantu produk dan jumlahnya?\n(pesan otomatis)", alasan: "baku" };
+    const o = (T.aiJawab && T.aiJawab(b)) ?? { kirim: true, teks: "Terima kasih Bapak/Ibu. Saat ini di luar jam kerja, sales kami akan membalas [HARI].\nBoleh dibantu produk dan jumlahnya?\n(pesan otomatis)", alasan: "baku" };
     const masuk = Math.ceil((b.system.length + b.messages[0].content.length) / 3.2);
     return kirimJson(200, { id: "msg_uji", type: "message", model: b.model, stop_reason: "end_turn",
       content: [{ type: "text", text: JSON.stringify(o) }], usage: { input_tokens: masuk, output_tokens: Math.ceil(JSON.stringify(o).length / 3.2) } });
@@ -128,7 +128,7 @@ function bersihAkhir() {
   sql(`delete from public.api_tokens where id in ('${IDT.tulis}','${IDT.baca}');
        delete from wa.antrean; delete from wa.log; delete from wa.kejadian; delete from wa.diam; delete from wa.peringatan; delete from wa.kata_manusia;
        update wa.pengaturan set saklar = 'mati', saklar_alasan = 'awal';
-       delete from wa.penugasan; update wa.bagi_setel set aktif = false, sales = '{}';
+       delete from wa.penugasan; update wa.bagi_setel set aktif = false, sales = '{}', lead_aktif = false, lead_aktor = null;
        delete from public.hari_libur where tanggal = '${LIBUR}' and nama = 'Libur uji kontrak WA';
        delete from vault.secrets where name in ('wa_api_url', 'wa_token_proses');`);
 }
@@ -462,6 +462,47 @@ try {
   rj = await jalur("bagi", "2026-11-12 09:03", "salah");
   cek("/x/wa/bagi token salah → 401", rj.s === 401, rj.s);
   cek("picu_bagi tanpa calon jatuh tempo → null", sql("select wa.picu_bagi() is null") === "t");
+  console.log("== lead langsung saat dibagi (20261111190000)");
+  sql(`insert into public.pipeline_akses (member_id, peran, ditambah_oleh) values (100000002, 'rep', 100000001), (100000003, 'rep', 100000001)
+       on conflict (member_id) do update set peran = excluded.peran`);
+  sql("delete from wa.penugasan; delete from wa.log");
+  const cLead = JSON.parse(cli(["wa", "bagi", "--aktif", "--luar-jam", "ya", "--lead", "ya", "--aktor-lead", "900000000002"]));
+  sql("update wa.bagi_setel set lead_sejak = now() - interval '10 minutes'");   // waktu tiruan per menit bisa < lead_sejak
+  cek("CLI wa bagi --lead ya --aktor-lead", cLead.lead === true && cLead.lead_aktor === 900000000002, cLead);
+  T.tg = []; T.ai = [];
+  T.aiJawab = (b) => /^Kamu pemilah/.test(b.system ?? "")
+    ? (/pallet/i.test(b.messages[0].content)
+        ? { jenis: "calon_pembeli", produk: [{ produk: "Pallet Mesh", qty: 30, satuan: "unit", spesifikasi: "1200x1000" }], kota: "Bekasi",
+            kebutuhan: "Pallet mesh untuk gudang", perusahaan: "PT Kontrak Uji", alasan: "minta penawaran" }
+        : { jenis: "lain", produk: [], kota: null, kebutuhan: null, perusahaan: null, alasan: "sapaan" })
+    : null;
+  const nowWib = () => new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 16).replace("T", " ");
+  const w0 = nowWib();
+  await webhook(NOM(71), pesanMasuk(NOM(71), w0, "Halo, minta penawaran pallet mesh 30 unit. Ref: GA-OY-K7Q2"), { sekarang: w0 });
+  await webhook(NOM(72), pesanMasuk(NOM(72), w0, "Halo"), { sekarang: w0 });
+  sql("update wa.penugasan set masuk_pada = masuk_pada - interval '2 minutes' where status = 'calon'");
+  rj = await jalur("bagi", nowWib());
+  cek("/x/wa/bagi: 2 ditugaskan, lead dibuat 1 + tunggu 1", rj.s === 200 && rj.j.lead?.dibuat === 1 && rj.j.lead?.tunggu === 1, rj.j);
+  const ld = sql(`select l.kode || '|' || l.sumber || '|' || l.pemilik || '|' || p.nama || '|' || coalesce(l.sumber_bukti, '-')
+                  from public.lead l join public.kontak k on k.id = l.kontak_id join public.pelanggan p on p.id = l.pelanggan_id
+                  where k.telepon = '${NOM(71)}'`);
+  const pm71 = sql(`select pemilik from wa.penugasan where nomor = '${NOM(71)}'`);
+  cek("lead Anvil: Google Ads, pemilik = sales ditunjuk, PT dari AI, bukti ga-oy", /^L-\d+\|Google Ads\|\d+\|PT Kontrak Uji\|ga-oy$/.test(ld) && ld.split("|")[2] === pm71, { ld, pm71 });
+  cek("Telegram memuat kode lead + produk", T.tg.length === 1 && T.tg[0].text.includes(`${ld.split("|")[0]} Pallet Mesh`), T.tg);
+  cek("prompt AI lead: isi chat dalam <data_chat>, tanpa nomor", T.ai.some((b) => /^Kamu pemilah/.test(b.system) && b.messages[0].content.includes("<data_chat>")
+    && !b.messages[0].content.includes(NOM(71))), T.ai.map((b) => b.messages[0].content.slice(0, 120)));
+  // pelanggan 72 menulis lagi → dinilai ulang → lead dibuat
+  const w1 = nowWib();
+  await webhook(NOM(72), pesanMasuk(NOM(72), w1, "Butuh pallet mesh 30 unit"), { sekarang: w1 });
+  sql(`update wa.penugasan set lead_nilai_berikut = now() - interval '2 minutes' where nomor = '${NOM(72)}' and lead_status = 'tunggu'`);
+  T.tg = [];
+  rj = await jalur("bagi", nowWib());
+  cek("pesan baru → nilai ulang → lead dibuat, tanpa Telegram baru", rj.s === 200 && rj.j.lead?.dibuat === 1 && T.tg.length === 0, rj.j);
+  const cpl = JSON.parse(cli(["wa", "penugasan", "--hari", "1"]));
+  cek("CLI wa penugasan memuat lead_status/kode", cpl.items.filter((x) => x.lead_status === "dibuat" && /^L-/.test(x.lead_kode)).length === 2, cpl.items);
+  sql(`delete from public.pipeline_tautan_luar where kunci_luar like 'wa:%'; delete from public.lead_item where lead_id in (select l.id from public.lead l join public.kontak k on k.id = l.kontak_id where k.telepon in ('${NOM(71)}','${NOM(72)}'));`);
+  T.aiJawab = null;
+  JSON.parse(cli(["wa", "bagi", "--lead", "tidak", "--luar-jam", "tidak"]));
   JSON.parse(cli(["wa", "bagi", "--mati"]));
   sql("delete from wa.penugasan; update wa.bagi_setel set aktif = false, sales = '{}'");
 

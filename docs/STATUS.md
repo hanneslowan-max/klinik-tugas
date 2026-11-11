@@ -925,4 +925,11 @@ Laporan ke Hannes: angka sensus per list, status lampiran, jawaban probe (termas
 - Migrasi `20261111180000_wa_bagi_luar_jam` (`wa.bagi_setel.luar_jam`, bawaan false); bagi.ts: balasan bot tidak dihitung balasan
   sales, baris luar jam bertanda. CLI `wa bagi --luar-jam ya|tidak`. Tes: `uji/db` 45 berkas 2388 / 0 gagal (baru 45, 11 cek),
   `uji/wa/bagi.mjs` 22/0, `uji/wa/kontrak.mjs` 77/0, `uji/wa/jalankan.mjs` 124/0, `deno check` OK.
+- DEPLOY 11 Nov 17:17 WIB (rhj-tugas#46), `wa bagi --luar-jam ya`.
+
+## Lead Anvil langsung saat chat dibagi (11 Nov 2026, pop-up Hannes "AI nilai dulu, lalu langsung buat")
+- Migrasi `20261111190000_wa_bagi_lead` (setelan lead/lead_aktor, kolom lead_* di `wa.penugasan`, `x_wa_bagi_nilai_ambil`,
+  `x_wa_bagi_lead`); `bagi.ts` menilai chat dengan AI lalu membuat lead; baca Kapso dengan field arah/asal; pesan grup memuat kode lead.
+- Tes: `uji/db` 46 berkas 2426 / 0 gagal (baru 46, 38 cek; 09 → 69 fungsi), `uji/wa/bagi.mjs` 45/0, `uji/wa/kontrak.mjs` 84/0
+  (7 cek baru ujung-ke-ujung: lead dibuat, nilai ulang), `uji/wa/jalankan.mjs` 124/0, `deno check` OK.
 

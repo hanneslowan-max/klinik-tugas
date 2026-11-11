@@ -53,6 +53,7 @@
 //                                                                     status (MEMUAT nomor HP: hanya ke /tmp, jangan ke repo/memori)
 //   node tools/tugas.mjs wa bagi [--aktif|--mati] [--sales id,id] [--jeda detik] [--luar-jam ya|tidak]   setelan pembagian
 //                                                                     seketika (tanpa opsi = lihat; --luar-jam ya = chat luar jam juga)
+//                                                                     [--lead ya|tidak] [--aktor-lead id] = lead Anvil langsung (AI menilai)
 //   node tools/tugas.mjs wa fakta --teks "..." [--urutan n]            tambah fakta terkunci (ubah: --id n [--teks] [--nonaktif|--aktif])
 //   node tools/tugas.mjs wa contoh --situasi "..." --teks "..."        tambah contoh balasan (ubah: --id n …); teks dicek validator bot
 //   audit-free tidak berlaku di mode tugas.
@@ -407,6 +408,16 @@ const EKSTRA = {
       if (luar) {
         if (!["ya", "tidak"].includes(luar)) throw new Error("wa bagi: --luar-jam ya|tidak");
         body.luar_jam = luar === "ya";
+      }
+      const lead = wajibNilai("wa bagi", "lead");
+      if (lead) {
+        if (!["ya", "tidak"].includes(lead)) throw new Error("wa bagi: --lead ya|tidak");
+        body.lead = lead === "ya";
+      }
+      const aktor = wajibNilai("wa bagi", "aktor-lead");
+      if (aktor) {
+        if (!/^\d{1,18}$/.test(aktor)) throw new Error("wa bagi: --aktor-lead = id anggota agent/owner");
+        body.lead_aktor = Number(aktor);
       }
       const jeda = wajibNilai("wa bagi", "jeda");
       if (jeda) {
