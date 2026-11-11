@@ -373,6 +373,18 @@ try {
   const c3 = JSON.parse(cli(["wa", "diam", "--nomor", "081200000041", "--alasan", "pemasok"]));
   cek("CLI wa saklar / ringkas / diam", c1.saklar === "kirim" && c2.hari === 3 && c3.nomor === NOM(41), { c1, c2, c3 });
 
+  console.log("== mode uji (saklar uji, hanya nomor uji, kapan saja)");
+  kosongkan({ saklar: "mati" });
+  sql("delete from wa.uji");
+  const u1 = JSON.parse(cli(["wa", "uji", "--nomor", "081200000046", "--catatan", "HP uji"]));
+  const u2 = JSON.parse(cli(["wa", "saklar", "uji"]));
+  cek("CLI wa uji (nomor disamarkan) + saklar uji", u1.nomor?.[0]?.nomor === "...0046" && !JSON.stringify(u1).includes("6281200000046") && u2.saklar === "uji", { u1, u2 });
+  await webhook(NOM(46), pesanMasuk(NOM(46), "2026-11-11 13:00", "Halo, uji bot"), { sekarang: "2026-11-11 13:00" });
+  await webhook(NOM(47), pesanMasuk(NOM(47), "2026-11-11 13:00", "Halo, pelanggan"), { sekarang: "2026-11-11 13:00" });
+  await proses("2026-11-11 13:10");
+  cek("mode uji di jam kerja: hanya nomor uji dibalas (1 kiriman ke nomor uji)", T.kirim.length === 1 && T.kirim[0]?.to === NOM(46), T.kirim.map((x) => x.to));
+  sql("delete from wa.uji"); sql("update wa.pengaturan set saklar = 'kirim'");
+
   console.log("== fakta & contoh balasan (wa.pengetahuan)");
   r = await admin("GET", "/x/wa/pengetahuan", TOKEN.baca);
   cek("GET /x/wa/pengetahuan (bot baca) → 200, 3 fakta isi awal", r.s === 200 && Array.isArray(r.j)

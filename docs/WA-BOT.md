@@ -8,6 +8,12 @@ acuan nada `deliverables/growth/BEBAN-WA-NASKAH-FASE2-21Okt.md` §3 Jalur B.
 Migrasi `supabase/migrations/20261110180000_wa_bot.sql`, logika Edge `supabase/functions/api/wa.ts` (rute di `index.ts`),
 kontrak `docs/KONTRAK-DB.md` §15, tes `uji/db/39_wa_bot.sql`, `uji/wa/jalankan.mjs`, `uji/wa/kontrak.mjs`.
 
+**Mode uji (saklar `uji`, migrasi `20261111130000_wa_mode_uji.sql`, keputusan Hannes 11 Nov):** bot HANYA membalas nomor di
+`wa.uji`, kapan saja (termasuk jam kerja; [HARI] tetap dihitung dari waktu kirim); nomor lain → batal `saklar_uji`. Jalur sama
+dengan produksi (webhook, AI, validator, kirim Kapso), pemutus & jaga aktif. CLI: `wa uji --nomor 0812… [--catatan]`,
+`wa uji` (lihat, nomor disamarkan), `wa uji --nomor … --hapus` (daftar kosong → saklar mati), `wa saklar uji`. Catatan: nomor uji
+yang dichat sales < 24 jam terakhir tetap batal `chat_berjalan` (aturan sama).
+
 **Saklar default `mati`.** Selama mati, semua logika jalan (antrean tercatat, lalu batal `saklar_mati`), tidak ada AI
 dan tidak ada kiriman.
 

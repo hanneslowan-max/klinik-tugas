@@ -140,8 +140,15 @@ function TabRingkasan({ hari }: { hari: number }) {
   if (q.isError) return <GalatMuat galat={q.error} ulang={() => q.refetch()} />;
   const r: RingkasBotWa = q.data;
   const nyala = r.saklar === "kirim";
+  // mode uji (saklar 'uji', diatur lewat CLI `wa saklar uji`): bot hanya membalas nomor uji; tombol di sini = matikan
+  const uji = r.saklar === "uji";
 
   async function ubahSaklar() {
+    if (uji) {
+      const ok = await konfirmasi({ judul: "Akhiri mode uji?", pesan: "Bot berhenti membalas nomor uji. Saklar menjadi mati.", ya: "Matikan", bahaya: true });
+      if (ok) saklar.mutate("mati");
+      return;
+    }
     const ke = nyala ? "mati" : "kirim";
     const ok = await konfirmasi({
       judul: nyala ? "Matikan bot WA?" : "Nyalakan bot WA?",
@@ -160,8 +167,8 @@ function TabRingkasan({ hari }: { hari: number }) {
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3">
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex items-center gap-2">
-            <span className={cn("size-2.5 rounded-full", nyala ? "bg-sukses" : "bg-muted-foreground")} aria-hidden />
-            <span className="font-semibold" data-uji="status-saklar">{nyala ? "Bot menyala" : "Bot mati"}</span>
+            <span className={cn("size-2.5 rounded-full", nyala ? "bg-sukses" : uji ? "bg-telat" : "bg-muted-foreground")} aria-hidden />
+            <span className="font-semibold" data-uji="status-saklar">{nyala ? "Bot menyala" : uji ? "Mode uji (hanya nomor uji)" : "Bot mati"}</span>
             {r.saklar_alasan === "pemutus" ? <Chip nada="telat">dimatikan pemutus otomatis</Chip> : null}
           </div>
           <span className="text-xs text-muted-foreground">
@@ -170,14 +177,14 @@ function TabRingkasan({ hari }: { hari: number }) {
           </span>
         </div>
         <Button
-          variant={nyala ? "outline" : "default"}
+          variant={nyala || uji ? "outline" : "default"}
           className="pointer-coarse:h-11"
           disabled={saklar.isPending}
           onClick={() => void ubahSaklar()}
           data-uji="tombol-saklar"
         >
           <Power data-icon="inline-start" aria-hidden />
-          {nyala ? "Matikan" : "Nyalakan"}
+          {nyala || uji ? "Matikan" : "Nyalakan"}
         </Button>
       </div>
 

@@ -662,7 +662,7 @@ export async function jagaBot(d: DepsWa): Promise<Obj> {
   const j = (await d.rpc("x_wa_jaga", { p: { ...t } })) as Obj;
   const now = Date.parse(String(j.sekarang));
   const m: Masalah[] = [];
-  const nyala = j.saklar === "kirim";
+  const nyala = j.saklar === "kirim" || j.saklar === "uji";   // mode uji juga dijaga (kunci AI salah, gagal kirim)
   const pemutus = j.saklar === "mati" && j.saklar_alasan === "pemutus";
 
   if (pemutus) {

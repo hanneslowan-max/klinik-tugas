@@ -957,6 +957,8 @@ const RUTE: Rute[] = [
   },
   { m: "POST", p: /^\/x\/wa\/saklar$/, perlu: "tulis", h: async (c) => rpc("x_wa_saklar", { p_aktor: A(c), p: await c.body() }, T(c)) },
   { m: "POST", p: /^\/x\/wa\/diam$/, perlu: "tulis", h: async (c) => rpc("x_wa_diam", { p_aktor: A(c), p: await c.body() }, T(c)) },
+  // Mode uji (saklar 'uji', migrasi 20261111130000): daftar nomor uji {nomor?, hapus?, catatan?}; tanpa nomor = lihat daftar.
+  { m: "POST", p: /^\/x\/wa\/uji$/, perlu: "tulis", h: async (c) => rpc("x_wa_uji", { p_aktor: A(c), p: await c.body() }, T(c)) },
   // Fakta & contoh balasan bot (wa.pengetahuan, keputusan Hannes 11 Nov): daftar (baca) / simpan (tulis). Teks dicek
   // validator yang sama dengan balasan bot SEBELUM disimpan; ditolak → 400 dengan daftar alasan.
   { m: "GET", p: /^\/x\/wa\/pengetahuan$/, perlu: "baca", h: (c) => rpc("x_wa_pengetahuan_daftar", { p_aktor: A(c), p: {} }, T(c)) },

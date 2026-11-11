@@ -920,7 +920,7 @@ export type EdisiBerita = {
 };
 export type RingkasEdisiBerita = { id: number; dibuat_at: string; jumlah: number; wajib: number };
 // ---- Bot WA 0878 (owner; 20261111120000_wa_web.sql). Tanpa isi chat pelanggan / nomor telepon.
-export type SaklarWa = "mati" | "kirim";
+export type SaklarWa = "mati" | "kirim" | "uji";
 export type KeputusanWa = "catat" | "kirim" | "diam" | "batal" | "tolak" | "gagal" | "tunda";
 
 /** Hasil web_wa_ringkas (wa.inti_ringkas). */
