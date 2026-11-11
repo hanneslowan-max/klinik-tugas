@@ -153,9 +153,33 @@ jadi id percakapan disalin lalu dicari di inbox). Data: `web_wa_ringkas`, `web_w
 7. Menyalakan: Riksa/Michael mematikan pesan luar jam (A2) di aplikasi WA Business HP 0878 (supaya tidak dobel), lalu
    `node tools/tugas.mjs wa saklar kirim`. Mematikan: `wa saklar mati` + A2 dinyalakan lagi di HP.
 
+## Pembagian seketika chat baru jam kerja (20261111170000, keputusan Hannes 11 Nov 2026)
+
+Bukan bagian bot (bot tetap luar jam). Chat WA baru yang masuk di jam kerja langsung ditunjuk ke satu sales bergiliran
+dan diumumkan ke grup Telegram RHJ Online Sales dalam ±1–2 menit; lead Anvil tetap dibuat routine Pantau WA Jam
+(rhj-brain `tools/lead-wa-otomatis.py`) sesudah chat dinilai calon pembeli, dengan pemilik dari tabel ini.
+
+- Webhook: sesudah `x_wa_webhook`, Edge memanggil `x_wa_bagi_calon` (gagal tidak menggagalkan webhook). Calon = pesan masuk
+  jam kerja (hari kerja, `hari_libur` dihormati), ≤ 1 jam, bukan stiker/reaksi/tes/stop, nomor bukan `wa.diam`/`wa.uji`,
+  belum ada baris penugasan ≤ `hari_baru` (7) hari. Dicatat batal (tidak dicek ulang): `percakapan_berjalan` (jejak
+  `wa.log` ≤ 7 hari) dan `lead_ada` (kontak bernomor sama dengan lead BARU/PENAWARAN, atau lead apa pun ≤ 7 hari).
+- `wa-bagi` (pg_cron tiap menit) → `wa.picu_bagi()` → POST `/x/wa/bagi` (token `TOKEN_WA_PROSES`, Vault sama dengan
+  `wa.picu`) hanya bila saklar aktif dan ada calon lewat `jeda_detik` (60) atau pengumuman yang perlu diulang. Edge membaca
+  ≤ 20 pesan percakapan lewat API Kapso: ada pesan > 1 menit sebelum pesan pertama (≤ 7 hari) → batal
+  `percakapan_berjalan`; sales sudah membalas menyebut satu nama sales → ditunjuk ke dia (`sudah_membalas`), membalas tanpa
+  nama → batal `sudah_dibalas`; belum dibalas → giliran (penugasan 7 hari paling sedikit; seri → yang paling lama tidak
+  dapat → urutan setelan). Kapso gagal → tetap calon, > 15 menit → batal `kapso_gagal`.
+- Pengumuman: satu pesan Telegram ke `TELEGRAM_CHAT_SALES` ("Chat baru masuk, mohon langsung dibalas oleh:" + baris
+  `08xx… → Nama`). Nomor chat boleh di grup sales (keputusan Hannes 29 Okt); isi chat dan nama pelanggan tidak ikut. Gagal
+  → diulang ≤ 4x dalam 30 menit.
+- Saklar & setelan: `wa.bagi_setel` (bawaan MATI). CLI `wa bagi [--aktif|--mati] [--sales id,id] [--jeda detik]`, lihat
+  `wa bagi`; daftar `wa penugasan [--hari 3]` (MEMUAT nomor, owner/bot; jangan disalin ke repo/memori). Retensi 30 hari.
+- Deploy: migrasi `20261111170000_wa_bagi_seketika`, secret Edge `TELEGRAM_CHAT_SALES` (id grup RHJ Online Sales), deploy
+  Edge `api`, lalu `wa bagi --sales <Riksa>,<Michael> --aktif` (ACC Hannes).
+
 ## Tes lokal
 
 `supabase start` + `supabase db reset` + `supabase functions serve --env-file uji/wa/serve.env`, lalu:
-`bash uji/db/jalankan.sh` · `node uji/wa/jalankan.mjs` (murni Node, tiruan Kapso/Claude/Telegram/DB) ·
+`bash uji/db/jalankan.sh` · `node uji/wa/jalankan.mjs` (murni Node, tiruan Kapso/Claude/Telegram/DB) · `node uji/wa/bagi.mjs` (pembagian seketika) ·
 `node uji/wa/kontrak.mjs` (Edge + DB lokal, server tiruan 0.0.0.0:54398 lewat `host.docker.internal`, termasuk
 pg_net → Edge lewat Vault lokal). Tidak ada panggilan ke Kapso, Anthropic, atau Telegram sungguhan.

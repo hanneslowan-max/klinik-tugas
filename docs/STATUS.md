@@ -910,3 +910,12 @@ Laporan ke Hannes: angka sensus per list, status lampiran, jawaban probe (termas
   Rp24.214.818), belum 1 (order Rp7.260.000). Regresi: `/x/wa/ringkas` 200, `/x/pipeline/ringkas` 200, `/v2/user` 401,
   `/x/wa/webhook` tanpa tanda tangan 401. Tes ulang sesudah gabung: `uji/wa/jalankan.mjs` 122/0, web typecheck OK, vitest asal-situs 9/9.
 
+## Pembagian seketika chat WA baru jam kerja — PR (11 Nov 2026, keputusan Hannes pop-up "Hapus jeda sekarang + bangun versi seketika")
+- Migrasi `20261111170000_wa_bagi_seketika` (tabel `wa.bagi_setel`, `wa.penugasan`; 6 fungsi `x_wa_bagi_*`; cron `wa-bagi`),
+  `supabase/functions/api/bagi.ts` + rute `/x/wa/bagi` (token proses), `/x/wa/penugasan`, `/x/wa/bagi-setel`; webhook memanggil
+  `x_wa_bagi_calon` sesudah `x_wa_webhook` (gagal tidak menggagalkan webhook). CLI `wa penugasan`, `wa bagi`. Detail `docs/WA-BOT.md`.
+- Tes lokal: `uji/db` 44 berkas 2377 cek / 0 gagal (baru `44_wa_bagi_seketika.sql` 55 cek; hitungan 09 & 39 disesuaikan),
+  `uji/wa/bagi.mjs` 20/0, `uji/wa/jalankan.mjs` 124/0, `uji/wa/kontrak.mjs` 77/0 (14 cek baru ujung-ke-ujung), `deno check index.ts`.
+- Deploy BUTUH ACC Hannes: migrasi, secret Edge `TELEGRAM_CHAT_SALES`, deploy Edge dari branch yang sudah memuat main
+  terbaru, lalu `wa bagi --sales 240260558,240260567 --aktif`.
+

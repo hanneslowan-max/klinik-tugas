@@ -128,6 +128,7 @@ function bersihAkhir() {
   sql(`delete from public.api_tokens where id in ('${IDT.tulis}','${IDT.baca}');
        delete from wa.antrean; delete from wa.log; delete from wa.kejadian; delete from wa.diam; delete from wa.peringatan; delete from wa.kata_manusia;
        update wa.pengaturan set saklar = 'mati', saklar_alasan = 'awal';
+       delete from wa.penugasan; update wa.bagi_setel set aktif = false, sales = '{}';
        delete from public.hari_libur where tanggal = '${LIBUR}' and nama = 'Libur uji kontrak WA';
        delete from vault.secrets where name in ('wa_api_url', 'wa_token_proses');`);
 }
@@ -423,6 +424,46 @@ try {
   cek("picu dengan Vault → pg_net POST /x/wa/proses → 200 (antrean diproses dengan jam nyata)", status === "200"
     && sql("select status from wa.antrean") !== "tunggu", { idReq, status, antrean: sql("select status || ':' || coalesce(alasan,'') from wa.antrean") });
   sql("delete from vault.secrets where name in ('wa_api_url', 'wa_token_proses')");
+
+  console.log("== pembagian seketika chat baru jam kerja (bagi.ts, 20261111170000)");
+  kosongkan({ saklar: "mati" });
+  sql("delete from wa.penugasan; update wa.bagi_setel set aktif = false, sales = '{}', jeda_detik = 60, hari_baru = 7");
+  let rb = await webhook(NOM(60), pesanMasuk(NOM(60), "2026-11-12 09:00", "Halo, butuh pallet mesh"), { sekarang: "2026-11-12 09:00" });
+  cek("bagi mati → webhook 200 tanpa calon", rb.s === 200 && rb.j?.bagi_calon === undefined && sql("select count(*) from wa.penugasan") === "0", rb.j);
+  let sb = await admin("POST", "/x/wa/bagi-setel", TOKEN.baca, { aktif: true });
+  cek("bagi-setel pakai token baca → 403", sb.s === 403, sb.s);
+  const cb = JSON.parse(cli(["wa", "bagi", "--aktif", "--sales", "100000002,100000003"]));
+  cek("CLI wa bagi --aktif --sales", cb.aktif === true && cb.sales.map((x) => x.nama).join(",") === "Citra,Dodi", cb);
+  sb = await admin("GET", "/x/wa/bagi-setel", TOKEN.baca);
+  cek("GET bagi-setel (baca) tanpa nomor", sb.s === 200 && sb.j.aktif === true && !/62812000/.test(sb.raw), sb.j);
+  sql("delete from wa.log");
+  rb = await webhook(NOM(61), pesanMasuk(NOM(61), "2026-11-12 09:00", "Halo, mau tanya roda"), { sekarang: "2026-11-12 09:00" });
+  cek("chat baru jam kerja → bagi_calon 1", rb.s === 200 && rb.j?.bagi_calon === 1, rb.j);
+  await webhook(NOM(62), pesanMasuk(NOM(62), "2026-11-12 09:00", "Pagi, ada troli?"), { sekarang: "2026-11-12 09:00" });
+  await webhook(NOM(62), pesanKeluar(NOM(62), "2026-11-12 09:00", "Selamat pagi, dengan Dodi dari RHJ"), { sekarang: "2026-11-12 09:00" });
+  simpanKapso(NOM(63), pesanMasuk(NOM(63), "2026-11-10 10:00", "Pesanan kemarin"));   // riwayat sebelum webhook terpasang
+  await webhook(NOM(63), pesanMasuk(NOM(63), "2026-11-12 09:00", "Kapan dikirim?"), { sekarang: "2026-11-12 09:00" });
+  await webhook(NOM(64), pesanMasuk(NOM(64), "2026-11-12 18:00", "Halo malam"), { sekarang: "2026-11-12 18:00" });
+  cek("3 calon (luar jam tidak)", sql("select count(*) from wa.penugasan where status = 'calon'") === "3", sql("select string_agg(nomor || ':' || status, ',') from wa.penugasan"));
+  let rj = await jalur("bagi", "2026-11-12 09:00");
+  cek("/x/wa/bagi sebelum jeda → tidak menilai", rj.s === 200 && rj.j.dinilai === 0 && T.tg.length === 0, rj.j);
+  rj = await jalur("bagi", "2026-11-12 09:02");
+  cek("/x/wa/bagi sesudah jeda: giliran / sudah membalas / berjalan", rj.s === 200 && rj.j.dinilai === 3
+    && rj.j.keputusan["tugaskan"] === 1 && rj.j.keputusan["tugaskan:sudah_membalas"] === 1 && rj.j.keputusan["batal:percakapan_berjalan"] === 1
+    && rj.j.terkirim === true && !/62812000/.test(JSON.stringify(rj.j)), rj.j);
+  cek("satu pesan Telegram ke grup sales: nomor lokal → nama sales", T.tg.length === 1 && T.tg[0].chat_id === "-333"
+    && T.tg[0].text.includes("081200000061 → Citra") && T.tg[0].text.includes("081200000062 → Dodi") && !T.tg[0].text.includes("081200000063"), T.tg);
+  cek("isi chat tidak ikut ke Telegram", !/roda|troli|Kapan/.test(T.tg[0]?.text ?? ""), T.tg[0]?.text);
+  const pg = await admin("GET", "/x/wa/penugasan?hari=3", TOKEN.baca);
+  const p61 = pg.j?.items?.find((x) => x.nomor === NOM(61));
+  cek("GET /x/wa/penugasan: pemilik + diumumkan", pg.s === 200 && p61?.status === "ditugaskan" && p61?.pemilik === 100000002 && p61?.diumumkan === true, pg.j);
+  const cp = JSON.parse(cli(["wa", "penugasan", "--hari", "3"]));
+  cek("CLI wa penugasan", Array.isArray(cp.items) && cp.items.length === 3, cp);
+  rj = await jalur("bagi", "2026-11-12 09:03", "salah");
+  cek("/x/wa/bagi token salah → 401", rj.s === 401, rj.s);
+  cek("picu_bagi tanpa calon jatuh tempo → null", sql("select wa.picu_bagi() is null") === "t");
+  JSON.parse(cli(["wa", "bagi", "--mati"]));
+  sql("delete from wa.penugasan; update wa.bagi_setel set aktif = false, sales = '{}'");
 
   console.log("\n== perkiraan token dari tes (server tiruan menghitung ±3,2 karakter/token)");
   console.log(`  satu panggilan form situs: token masuk/keluar ${tok1}, biaya $${biaya1.toFixed(6)} (Sonnet 5.5 $2/$10 per juta)`);
