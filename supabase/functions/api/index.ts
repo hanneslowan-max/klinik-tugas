@@ -23,6 +23,7 @@ import {
   tokenUnggahCocok,
 } from "./iklan.ts";
 import { bagiProses } from "./bagi.ts";
+import { sapuProses } from "./sapu.ts";
 import { envDari, jagaBot, MAKS_BODY_WEBHOOK, periksaPengetahuan, prosesAntrean, tandaTanganCocok, tokenProsesCocok, uraiWebhook } from "./wa.ts";
 
 type Obj = Record<string, unknown>;
@@ -627,6 +628,12 @@ async function waWebhook(req: Request, method: string): Promise<Response> {
   return json(200, { ok: true, ...r, dilewati, ...(bagi?.aktif ? { bagi_calon: bagi.calon } : {}) });
 }
 
+async function waSapu(req: Request, method: string): Promise<Response> {
+  if (method !== "POST") throw new GalatApi(405, `Method ${method} tidak didukung`, "APP_001");
+  await waTokenProses(req);
+  return json(200, await sapuProses({ rpc: waRpc, fetch: (u: string, i?: RequestInit) => fetch(u, i), env: waEnv(), ...waSekarang(req) }));
+}
+
 async function waBagi(req: Request, method: string): Promise<Response> {
   if (method !== "POST") throw new GalatApi(405, `Method ${method} tidak didukung`, "APP_001");
   await waTokenProses(req);
@@ -990,6 +997,16 @@ const RUTE: Rute[] = [
     m: "GET", p: /^\/x\/wa\/penugasan$/, perlu: "baca",
     h: (c) => rpc("x_wa_bagi_daftar", { p_aktor: A(c), p: { hari: intQ(c.q, "hari") } }, T(c)),
   },
+  // Sapu sore (20261111200000): setelan {aktif?, jam_mulai?} dan jalankan manual (owner/bot, scope tulis).
+  { m: "GET", p: /^\/x\/wa\/sapu-setel$/, perlu: "baca", h: (c) => rpc("x_wa_sapu_setel", { p_aktor: A(c), p: {} }, T(c)) },
+  { m: "POST", p: /^\/x\/wa\/sapu-setel$/, perlu: "tulis", h: async (c) => rpc("x_wa_sapu_setel", { p_aktor: A(c), p: await c.body() }, T(c)) },
+  {
+    m: "POST", p: /^\/x\/wa\/sapu-jalan$/, perlu: "tulis",
+    h: async (c) => {
+      await rpc("x_wa_sapu_setel", { p_aktor: A(c), p: { jalan: true } }, T(c));   // izin owner/bot + scope tulis
+      return sapuProses({ rpc: waRpc, fetch: (u: string, i?: RequestInit) => fetch(u, i), env: waEnv(), manual: true });
+    },
+  },
   { m: "GET", p: /^\/x\/wa\/bagi-setel$/, perlu: "baca", h: (c) => rpc("x_wa_bagi_setel", { p_aktor: A(c), p: {} }, T(c)) },
   { m: "POST", p: /^\/x\/wa\/bagi-setel$/, perlu: "tulis", h: async (c) => rpc("x_wa_bagi_setel", { p_aktor: A(c), p: await c.body() }, T(c)) },
   // Fakta & contoh balasan bot (wa.pengetahuan, keputusan Hannes 11 Nov): daftar (baca) / simpan (tulis). Teks dicek
@@ -1116,6 +1133,7 @@ async function tangani(req: Request): Promise<Response> {
   if (/^\/x\/iklan\/unggah(?:\.csv)?$/.test(path)) return await iklanUnggah(req, method);
   if (path === "/x/wa/webhook") return await waWebhook(req, method);
   if (path === "/x/wa/bagi") return await waBagi(req, method);
+  if (path === "/x/wa/sapu") return await waSapu(req, method);
   if (path === "/x/wa/proses" || path === "/x/wa/jaga") return await waProsesJaga(req, method, path === "/x/wa/proses" ? "proses" : "jaga");
 
   if (method === "OPTIONS") {

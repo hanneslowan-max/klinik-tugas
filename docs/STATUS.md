@@ -932,4 +932,12 @@ Laporan ke Hannes: angka sensus per list, status lampiran, jawaban probe (termas
   `x_wa_bagi_lead`); `bagi.ts` menilai chat dengan AI lalu membuat lead; baca Kapso dengan field arah/asal; pesan grup memuat kode lead.
 - Tes: `uji/db` 46 berkas 2426 / 0 gagal (baru 46, 38 cek; 09 → 69 fungsi), `uji/wa/bagi.mjs` 45/0, `uji/wa/kontrak.mjs` 84/0
   (7 cek baru ujung-ke-ujung: lead dibuat, nilai ulang), `uji/wa/jalankan.mjs` 124/0, `deno check` OK.
+- DEPLOY 11 Nov 17:38 WIB (rhj-tugas#47), `wa bagi --lead ya --aktor-lead 900000000000`; lead pertama L-02465 17:40.
+
+## Sapu sore 17.10 (11 Nov 2026, Hannes: chat jam kerja yang belum dibalas Riksa/Michael dibalas bot sesudah jam kerja)
+- Migrasi `20261111200000_wa_sapu_sore` (`wa.sapu_setel`, `wa.antrean.sapu`, `inti_ambil` tanpa `chat_berjalan` untuk sapu,
+  `x_wa_sapu_antre/mulai/setel`, cron `wa-sapu` 10 10 * * 1-5); `sapu.ts`, rute `/x/wa/sapu` (token proses), `/x/wa/sapu-setel`,
+  `/x/wa/sapu-jalan`; `wa.ts` konteks sapu di prompt + `nilaiChat`. CLI `wa sapu`.
+- Tes: `uji/db` 47 berkas 2448 / 0 gagal (baru 47, 22 cek; 09 → 72 fungsi, 39 → 13 tabel), `uji/wa/sapu.mjs` 15/0,
+  `uji/wa/bagi.mjs` 45/0, `uji/wa/jalankan.mjs` 124/0, `uji/wa/kontrak.mjs` 84/0, `deno check` OK.
 
