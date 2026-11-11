@@ -373,6 +373,32 @@ try {
   const c3 = JSON.parse(cli(["wa", "diam", "--nomor", "081200000041", "--alasan", "pemasok"]));
   cek("CLI wa saklar / ringkas / diam", c1.saklar === "kirim" && c2.hari === 3 && c3.nomor === NOM(41), { c1, c2, c3 });
 
+  console.log("== fakta & contoh balasan (wa.pengetahuan)");
+  r = await admin("GET", "/x/wa/pengetahuan", TOKEN.baca);
+  cek("GET /x/wa/pengetahuan (bot baca) → 200, 3 fakta isi awal", r.s === 200 && Array.isArray(r.j)
+    && r.j.filter((x) => x.jenis === "fakta" && x.aktif).length >= 3, r.j);
+  r = await admin("POST", "/x/wa/pengetahuan", TOKEN.tulis, { jenis: "fakta", teks: "Harga troli Rp 750.000." });
+  cek("fakta berisi harga → 400 ditolak validator", r.s === 400 && /harga/.test(r.raw), r);
+  r = await admin("POST", "/x/wa/pengetahuan", TOKEN.tulis, { jenis: "contoh", situasi: "Tanya roda", teks: "Siap, bisa dikirim besok." });
+  cek("contoh berisi janji kirim → 400", r.s === 400 && /janji_kirim/.test(r.raw), r);
+  r = await admin("POST", "/x/wa/pengetahuan", TOKEN.tulis, { teks: "Tanpa jenis." });
+  cek("tanpa jenis → 400", r.s === 400, r.s);
+  r = await admin("POST", "/x/wa/pengetahuan", TOKEN.baca, { jenis: "fakta", teks: "Troli platform kapasitas 300 kg." });
+  cek("token baca tidak bisa simpan → 403", r.s === 403, r.s);
+  const cf = JSON.parse(cli(["wa", "fakta", "--teks", "Troli platform kapasitas standar 150 kg dan 300 kg.", "--urutan", "5"]));
+  const cc = JSON.parse(cli(["wa", "contoh", "--situasi", "Pelanggan tanya troli", "--teks", "Baik Bapak/Ibu, troli untuk barang apa dan bebannya berapa kg?"]));
+  const cl = JSON.parse(cli(["wa", "pengetahuan"]));
+  cek("CLI wa fakta / contoh / pengetahuan", cf.jenis === "fakta" && cc.jenis === "contoh" && cl.some((x) => x.id === cc.id), { cf, cc });
+  kosongkan();
+  await webhook(NOM(45), pesanMasuk(NOM(45), "2026-11-06 19:00", "Halo, cari troli"), { sekarang: "2026-11-06 19:00" });
+  await proses("2026-11-06 19:10");
+  const sys = T.ai[0]?.system ?? "";
+  cek("proses: fakta & contoh dari tabel masuk prompt AI", sys.includes("Troli platform kapasitas standar 150 kg dan 300 kg.")
+    && sys.includes("Situasi: Pelanggan tanya troli") && sys.includes("Lemari arsip TIDAK bisa custom."), sys.slice(0, 200));
+  const cn = JSON.parse(cli(["wa", "contoh", "--id", String(cc.id), "--nonaktif"]));
+  const cn2 = JSON.parse(cli(["wa", "fakta", "--id", String(cf.id), "--nonaktif"]));
+  cek("CLI nonaktif contoh & fakta", cn.aktif === false && cn2.aktif === false, { cn, cn2 });
+
   console.log("== pg_cron → pg_net → /x/wa/proses (Vault)");
   kosongkan();
   await webhook(NOM(42), pesanMasuk(NOM(42), "2026-11-06 19:00", "Halo"), { sekarang: "2026-11-06 19:00" });

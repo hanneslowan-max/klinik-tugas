@@ -62,7 +62,11 @@ hari kerja berikutnya ≥ 7 hari lagi → "<Hari> <tgl> <Bulan> pagi".
 `POST /v1/messages` (`anthropic-version: 2026-10-21`, `x-api-key` = `ANTHROPIC_API_KEY_WA`), `model` dari
 `wa.pengaturan` (default `claude-sonnet-5-5`), `max_tokens` 400, `thinking: {type: "between_tools"}` (thinking mati supaya
 400 token cukup), `output_config: {effort: "low", format: {type: "json_schema", schema: {kirim, teks, alasan}}}`. Tanpa alat,
-tanpa data lain. Prompt sistem: `PROMPT_SISTEM` di `wa.ts` (peran, tujuan, fakta terkunci, larangan, bentuk). Transkrip
+tanpa data lain. Prompt sistem: `promptSistem()` di `wa.ts` = aturan tetap di kode (peran, tujuan, larangan, bentuk) +
+FAKTA TERKUNCI dan CONTOH BALASAN dari tabel `wa.pengetahuan` (keputusan Hannes 11 Nov: bisa diubah tanpa deploy; tabel
+kosong/gagal dibaca → `FAKTA_BAKU` di kode). Ubah lewat CLI rhj-brain: `node tools/tugas.mjs wa pengetahuan`,
+`wa fakta --teks "…" [--id n] [--nonaktif|--aktif] [--urutan n]`, `wa contoh --situasi "…" --teks "…" [--id n] [--nonaktif]`;
+teks dicek validator bot (harga, janji, tautan, nomor, dst.) sebelum disimpan. Berlaku di panggilan AI berikutnya. Transkrip
 ≤ 20 pesan terakhir (teks; foto/voice/video/dokumen → label; referral iklan Meta → "[datang dari iklan: …]") dibungkus
 `<data_chat>` sebagai data; tag penutup palsu di isi chat dinetralkan.
 

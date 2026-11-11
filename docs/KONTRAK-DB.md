@@ -818,6 +818,13 @@ nomor/isi chat); `x_wa_saklar(p_aktor, p)` scope tulis `{status mati|kirim, cata
 `x_wa_diam(p_aktor, p)` scope tulis `{nomor, alasan internal|pemasok|ekspedisi|minta_berhenti|lain, catatan?, hapus?}` (nomor → 62…;
 antrean tunggu nomor itu batal).
 
+**Pengetahuan bot (migrasi `20261111100000_wa_pengetahuan`, keputusan Hannes 11 Nov):** tabel `wa.pengetahuan` (jenis
+`fakta`|`contoh`, situasi (wajib untuk contoh), teks ≤ 700, aktif, urutan; RLS ON, tanpa hak tabel). `x_wa_pengetahuan_aktif(p)`
+(service_role, Edge /x/wa/proses) → `{fakta: [teks…], contoh: [{situasi, teks}…]}` aktif urut; `x_wa_pengetahuan_daftar(p_aktor, p)`
+scope baca owner/bot → semua baris; `x_wa_pengetahuan_simpan(p_aktor, p)` scope tulis owner/bot `{id?, jenis, situasi?, teks?,
+aktif?, urutan?}` (tanpa id = baru; batas aktif fakta ≤ 30, contoh ≤ 8, minimal 1 fakta). Isi teks dicek validator bot di Edge
+sebelum fungsi ini dipanggil. Isi awal = 3 fakta terkunci lama.
+
 **Cron:** `wa-proses` tiap menit `wa.picu('proses')` (hanya bila ada antrean jatuh tempo), `wa-jaga` tiap 15 menit, `wa-rawat`
 02.41 WIB. `wa.picu` membaca Vault `wa_api_url` + `wa_token_proses`; tanpa keduanya → null (tidak memanggil apa pun).
 

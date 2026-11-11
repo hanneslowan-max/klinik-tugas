@@ -267,7 +267,16 @@ export function nilaiChat(pesan: PesanKapso[], it: ItemAntrean, kataManusia: str
 }
 
 // ---------------------------------------------------------------- prompt & Claude
-export const PROMPT_SISTEM = `Kamu asisten luar jam kerja PT Roda Hammerindo Jaya (RHJ) di WhatsApp 0878. Pembeli kami B2B (perusahaan, pabrik, gudang, toko, proyek).
+/** Fakta terkunci bawaan (fail-safe bila tabel wa.pengetahuan kosong/tidak terbaca). Isi awal tabel = daftar ini. */
+export const FAKTA_BAKU = [
+  "Pallet mesh: ada ukuran standar Stocky 2, 3, 5, 7, 9 dan BISA custom (dibuat di pabrik RHJ). Finishing standar electroplating.",
+  "Lemari arsip TIDAK bisa custom.",
+  "RHJ TIDAK menjual roda scaffolding, roda teflon, roda pintu geser, roda pagar. Bila ditanya, katakan dengan sopan produk itu tidak tersedia di RHJ, tanpa menyebut merek atau toko lain.",
+];
+
+export interface Pengetahuan { fakta: string[]; contoh: { situasi: string; teks: string }[] }
+
+const PROMPT_AWAL = `Kamu asisten luar jam kerja PT Roda Hammerindo Jaya (RHJ) di WhatsApp 0878. Pembeli kami B2B (perusahaan, pabrik, gudang, toko, proyek).
 Produk RHJ: roda/caster industri, troli dan material handling, shopping cart, airport trolley, lemari arsip, locker, pallet mesh (merek OYAMA).
 
 TUGAS
@@ -277,10 +286,8 @@ TUGAS
 4. Bila data pokok sudah lengkap (produk + ukuran/foto, jumlah, perusahaan atau kota), ucapkan terima kasih dan sampaikan sales akan melanjutkan [HARI]. Bila pesan RHJ terakhir sudah berupa ucapan terima kasih seperti itu dan pelanggan tidak bertanya hal baru, atau pelanggan hanya membalas "ok"/"terima kasih", jawab dengan kirim=false.
 5. Bila pelanggan bertanya harga, diskon, nego, stok, waktu kirim, cara bayar, garansi, alamat atau lokasi gudang: jangan dijawab; katakan pertanyaan itu akan dijawab sales [HARI].
 
-FAKTA TERKUNCI
-- Pallet mesh: ada ukuran standar Stocky 2, 3, 5, 7, 9 dan BISA custom (dibuat di pabrik RHJ). Finishing standar electroplating.
-- Lemari arsip TIDAK bisa custom.
-- RHJ TIDAK menjual roda scaffolding, roda teflon, roda pintu geser, roda pagar. Bila ditanya, katakan dengan sopan produk itu tidak tersedia di RHJ, tanpa menyebut merek atau toko lain.
+`;
+const PROMPT_AKHIR = `
 
 LARANGAN
 - Jangan menyebut harga, angka rupiah, diskon, potongan, promo, nego, stok/ketersediaan barang, waktu atau tanggal kirim, cara bayar, garansi, alamat/lokasi.
@@ -292,6 +299,23 @@ BENTUK
 - Bahasa Indonesia, ringkas, paling banyak 5 baris, tanpa emoji berlebihan, tanpa markdown.
 - Baris terakhir setiap pesan persis: (pesan otomatis)
 - Keluarkan JSON {kirim, teks, alasan}: kirim=true bila pesan perlu dikirim; teks = isi pesan; alasan = alasan singkat keputusanmu (untuk log internal, tidak dikirim).`;
+
+/**
+ * Prompt sistem = aturan tetap (kode) + FAKTA TERKUNCI & CONTOH BALASAN dari tabel wa.pengetahuan (keputusan Hannes
+ * 11 Nov 2026: fakta & contoh bisa diubah tanpa deploy). Fakta kosong → FAKTA_BAKU.
+ */
+export function promptSistem(pg?: Pengetahuan | null): string {
+  const fakta = (pg?.fakta ?? []).map((x) => String(x).trim()).filter(Boolean);
+  const daftar = (fakta.length ? fakta : FAKTA_BAKU).map((x) => `- ${x.replace(/\s+/g, " ")}`).join("\n");
+  const contoh = (pg?.contoh ?? []).filter((c) => c && c.situasi && c.teks).slice(0, 8);
+  const blokContoh = contoh.length
+    ? "\n\nCONTOH BALASAN (acuan nada dan urutan pertanyaan; jangan disalin mentah, sesuaikan dengan chat; [HARI] tetap ditulis [HARI]; larangan tetap berlaku)\n"
+      + contoh.map((c) => `- Situasi: ${c.situasi.replace(/\s+/g, " ")}\n  Balasan: ${c.teks.replace(/\n+/g, " / ")}`).join("\n")
+    : "";
+  return `${PROMPT_AWAL}FAKTA TERKUNCI\n${daftar}${blokContoh}${PROMPT_AKHIR}`;
+}
+
+export const PROMPT_SISTEM = promptSistem();
 
 export const SKEMA_BALASAN = {
   type: "object",
@@ -316,10 +340,10 @@ export function pesanUntukAi(it: ItemAntrean, transkrip: string): string {
   ].join("\n");
 }
 
-export function bodyClaude(model: string, maxToken: number, it: ItemAntrean, transkrip: string): Obj {
+export function bodyClaude(model: string, maxToken: number, it: ItemAntrean, transkrip: string, pg?: Pengetahuan | null): Obj {
   return {
     model, max_tokens: maxToken,
-    system: PROMPT_SISTEM,
+    system: promptSistem(pg),
     // Tanpa thinking (Sonnet 5.5: between_tools = thinking mati) supaya 400 token cukup untuk JSON; effort rendah.
     thinking: { type: "between_tools" },
     output_config: { effort: "low", format: { type: "json_schema", schema: SKEMA_BALASAN } },
@@ -331,14 +355,15 @@ export type HasilAi =
   | { ok: true; kirim: boolean; teks: string; alasan: string; token_masuk: number; token_keluar: number; model: string }
   | { ok: false; sementara: boolean; alasan: string; token_masuk?: number; token_keluar?: number; model?: string };
 
-export async function mintaBalasan(f: Fetch, env: EnvWa, model: string, maxToken: number, it: ItemAntrean, transkrip: string): Promise<HasilAi> {
+export async function mintaBalasan(f: Fetch, env: EnvWa, model: string, maxToken: number, it: ItemAntrean, transkrip: string,
+                                   pg?: Pengetahuan | null): Promise<HasilAi> {
   if (!env.anthropicKey) return { ok: false, sementara: false, alasan: "ai_kunci_kosong" };
   let res: Response;
   try {
     res = await f(`${env.anthropicUrl}/v1/messages`, {
       method: "POST",
       headers: { "x-api-key": env.anthropicKey, "anthropic-version": "2026-10-21", "content-type": "application/json" },
-      body: JSON.stringify(bodyClaude(model, maxToken, it, transkrip)),
+      body: JSON.stringify(bodyClaude(model, maxToken, it, transkrip, pg)),
       signal: AbortSignal.timeout(45_000),
     });
   } catch (e) {
@@ -423,6 +448,23 @@ export function periksaTeks(mentah: string, hari: string, maksKarakter = 700): {
   if (/\b\d{1,2}\s*(jan|feb|mar|apr|mei|jun|jul|agu|agt|sep|okt|nov|des)[a-z]*\b/iu.test(tanpaHari)
       || /\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/.test(tanpaHari)) a.push("janji_kirim");
   return { ok: a.length === 0, teks, alasan: [...new Set(a)] };
+}
+
+/**
+ * Cek teks fakta/contoh sebelum disimpan ke wa.pengetahuan: aturan validator yang sama dengan balasan bot (harga, diskon,
+ * tautan, nomor, janji stok/kirim, distributor, galvanis, lemari custom, produk tidak dijual tanpa penolakan). Contoh
+ * balasan wajib lolos sebagai pesan utuh (penanda ditambahkan bila belum ada). Hasil = daftar alasan tolak (kosong = sah).
+ */
+export function periksaPengetahuan(jenis: string, teks: string, situasi?: string | null): string[] {
+  const t = String(teks ?? "").trim();
+  if (jenis === "contoh") {
+    const utuh = t.endsWith(PENANDA) ? t : `${t}\n${PENANDA}`;
+    const v = periksaTeks(utuh, "besok pagi", 700);
+    const s = situasi ? periksaTeks(`${String(situasi).trim()}\n${PENANDA}`, "besok pagi", 2000).alasan
+      .filter((x) => x !== "placeholder").map((x) => `situasi:${x}`) : [];
+    return [...v.alasan, ...s];
+  }
+  return periksaTeks(`${t}\n${PENANDA}`, "besok pagi", 2000).alasan.filter((x) => x !== "placeholder");
 }
 
 // ---------------------------------------------------------------- Kapso
@@ -540,6 +582,12 @@ export async function prosesAntrean(d: DepsWa): Promise<Obj> {
     items: ItemAntrean[]; batal: Obj;
   };
   const hasil: Obj[] = [];
+  // Fakta & contoh dari wa.pengetahuan (sekali per panggilan); gagal baca → fakta bawaan di kode.
+  let pg: Pengetahuan | null = null;
+  if ((a.items ?? []).length) {
+    try { pg = (await d.rpc("x_wa_pengetahuan_aktif", { p: {} })) as Pengetahuan; }
+    catch (e) { console.error("x_wa_pengetahuan_aktif gagal, pakai fakta bawaan:", (e as Error).message); }
+  }
   for (const it of a.items ?? []) {
     const lapor = async (p: Obj) => {
       try {
@@ -555,7 +603,7 @@ export async function prosesAntrean(d: DepsWa): Promise<Obj> {
     const n = nilaiChat(ap.pesan, it, a.kata_manusia ?? []);
     if (!n.lanjut) { await lapor({ keputusan: n.keputusan, alasan: n.alasan, diam_nomor: n.diam_nomor }); continue; }
 
-    const ai = await mintaBalasan(d.fetch, d.env, a.pengaturan?.model || MODEL_BAKU, a.pengaturan?.max_token || 400, it, n.transkrip);
+    const ai = await mintaBalasan(d.fetch, d.env, a.pengaturan?.model || MODEL_BAKU, a.pengaturan?.max_token || 400, it, n.transkrip, pg);
     const tok = { token_masuk: ai.token_masuk, token_keluar: ai.token_keluar, model: ai.model };
     if (!ai.ok) {
       await lapor({ keputusan: ai.sementara ? "tunda" : (ai.alasan.startsWith("ai_http_4") || ai.alasan === "ai_kunci_kosong" ? "gagal" : "diam"),
