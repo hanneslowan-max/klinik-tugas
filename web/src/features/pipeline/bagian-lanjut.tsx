@@ -3,7 +3,8 @@
 // Dasbor Pipeline Tahap 2 (mockup "Dashboard Pipeline Anvil" bagian 5–10 + kartu sales), data web_pipeline_dasbor_lanjut —
 // dimuat terpisah dari bagian 1–4 supaya skor tampil dulu. Admin/baca: 5 Sumber lead & biaya iklan · 6 Pembayaran belum
 // lunas · 7 Pembatalan · 8 Kualitas data · 9 Produk & pelanggan · 10 Tren. Sales: kartu "Pembayaran order saya" &
-// "Rapikan lead saya" (server hanya mengirim miliknya). Biaya iklan diisi Agen Data Harian; admin bisa tempel dari sheet.
+// "Rapikan lead saya" (server hanya mengirim miliknya). Kartu "Asal lead per situs" (kartu-asal-situs.tsx, data sendiri)
+// di bagian 5 dan, untuk sales, di bawah kartunya (lead miliknya saja). Biaya iklan diisi Agen Data Harian; admin bisa tempel dari sheet.
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -32,6 +33,7 @@ import {
   tglPendek,
 } from "@/features/pipeline/dasbor";
 import { Angka, Besar, Catatan, JudulBagian, Kartu, Label, namaSales, Sub } from "@/features/pipeline/dasbor-ui";
+import { KartuAsalSitus } from "@/features/pipeline/kartu-asal-situs";
 import { BUKTI_SUMBER } from "@/features/pipeline/konstanta";
 import { useBiayaIklanSet } from "@/features/pipeline/mutasi";
 import { pesanGalat } from "@/lib/api/galat";
@@ -210,6 +212,7 @@ function BagianSumber({ d, bolehTempel, tempel }: { d: DasborLanjutPenuh; bolehT
           </p>
         </Kartu>
       </div>
+      <KartuAsalSitus bulan={d.bulan} hariIni={d.hari_ini} />
       <div className="grid gap-2 lg:grid-cols-2">
         <KartuBiayaGoogle d={d} bolehTempel={bolehTempel} tempel={tempel} />
         <KartuKampanye d={d} />
@@ -749,51 +752,54 @@ export function KartuSalesLanjut({ d, saya }: { d: DasborLanjutSales; saya: numb
   const r = d.rapikan;
   const bln = namaBulan(d.bulan, true);
   return (
-    <div className="grid gap-2 lg:grid-cols-2">
-      <Kartu className="space-y-2" uji="sales-bayar">
-        <JudulBagian>Pembayaran order saya</JudulBagian>
-        {b.order ? (
-          <>
-            <Besar>
-              <Angka n={b.order} href={tautanDaftar("bayar_belum_lunas", saya, d.bulan)} uji="bayar-saya" />
-            </Besar>
-            <Sub>
-              order belum LUNAS · {rupiahJuta(b.nilai)} (SP sejak {tglPendek(d.sejak_bayar)})
-            </Sub>
-            <p className="text-sm">
-              {[b.kosong ? `${b.kosong} belum diisi status bayarnya` : "", b.belum ? `${b.belum} belum bayar` : "", b.dp ? `${b.dp} DP` : ""]
-                .filter(Boolean)
-                .join(", ")}
-              . Isi status bayar di tiap order (Belum / DP / Lunas).
-            </p>
-            <Button asChild variant="outline" size="sm">
-              <Link href={tautanDaftar("bayar_belum_lunas", saya, d.bulan)}>Isi status bayar</Link>
-            </Button>
-          </>
-        ) : (
-          <p className="text-sm">Semua order Anda 90 hari terakhir sudah LUNAS.</p>
-        )}
-      </Kartu>
-      <Kartu className="space-y-2" uji="sales-rapikan">
-        <JudulBagian>Rapikan lead {bln} saya</JudulBagian>
-        <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1.5 text-sm">
-          <dt>Nama pelanggan masih &quot;-&quot;</dt>
-          <dd className="text-right font-semibold">
-            <Angka n={r.nama_kosong} href={tautanDaftar("nama_kosong", saya, d.bulan)} uji="rapikan-nama" />
-          </dd>
-          <dt>Sumber &quot;Lainnya&quot;</dt>
-          <dd className="text-right font-semibold">
-            <Angka n={r.sumber_lainnya} href={tautanDaftar("sumber_lainnya", saya, d.bulan)} uji="rapikan-lainnya" />
-          </dd>
-          <dt>Lead {bln} yang BATAL</dt>
-          <dd className="text-right font-semibold">
-            <Angka n={r.batal} href={tautanDaftar("batal_masuk", saya, d.bulan)} uji="rapikan-batal" />
-          </dd>
-        </dl>
-        <Sub>
-          Dari {r.lead} lead masuk {bln}. Sumber = asal pelanggan (Google, iklan, akun Bu Lastri), bukan media chat.
-        </Sub>
-      </Kartu>
-    </div>
+    <>
+      <div className="grid gap-2 lg:grid-cols-2">
+        <Kartu className="space-y-2" uji="sales-bayar">
+          <JudulBagian>Pembayaran order saya</JudulBagian>
+          {b.order ? (
+            <>
+              <Besar>
+                <Angka n={b.order} href={tautanDaftar("bayar_belum_lunas", saya, d.bulan)} uji="bayar-saya" />
+              </Besar>
+              <Sub>
+                order belum LUNAS · {rupiahJuta(b.nilai)} (SP sejak {tglPendek(d.sejak_bayar)})
+              </Sub>
+              <p className="text-sm">
+                {[b.kosong ? `${b.kosong} belum diisi status bayarnya` : "", b.belum ? `${b.belum} belum bayar` : "", b.dp ? `${b.dp} DP` : ""]
+                  .filter(Boolean)
+                  .join(", ")}
+                . Isi status bayar di tiap order (Belum / DP / Lunas).
+              </p>
+              <Button asChild variant="outline" size="sm">
+                <Link href={tautanDaftar("bayar_belum_lunas", saya, d.bulan)}>Isi status bayar</Link>
+              </Button>
+            </>
+          ) : (
+            <p className="text-sm">Semua order Anda 90 hari terakhir sudah LUNAS.</p>
+          )}
+        </Kartu>
+        <Kartu className="space-y-2" uji="sales-rapikan">
+          <JudulBagian>Rapikan lead {bln} saya</JudulBagian>
+          <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1.5 text-sm">
+            <dt>Nama pelanggan masih &quot;-&quot;</dt>
+            <dd className="text-right font-semibold">
+              <Angka n={r.nama_kosong} href={tautanDaftar("nama_kosong", saya, d.bulan)} uji="rapikan-nama" />
+            </dd>
+            <dt>Sumber &quot;Lainnya&quot;</dt>
+            <dd className="text-right font-semibold">
+              <Angka n={r.sumber_lainnya} href={tautanDaftar("sumber_lainnya", saya, d.bulan)} uji="rapikan-lainnya" />
+            </dd>
+            <dt>Lead {bln} yang BATAL</dt>
+            <dd className="text-right font-semibold">
+              <Angka n={r.batal} href={tautanDaftar("batal_masuk", saya, d.bulan)} uji="rapikan-batal" />
+            </dd>
+          </dl>
+          <Sub>
+            Dari {r.lead} lead masuk {bln}. Sumber = asal pelanggan (Google, iklan, akun Bu Lastri), bukan media chat.
+          </Sub>
+        </Kartu>
+      </div>
+      <KartuAsalSitus bulan={d.bulan} hariIni={d.hari_ini} saya />
+    </>
   );
 }

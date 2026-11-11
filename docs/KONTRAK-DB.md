@@ -839,3 +839,46 @@ supaya teks tidak bisa disimpan tanpa validator.
 02.41 WIB. `wa.picu` membaca Vault `wa_api_url` + `wa_token_proses`; tanpa keduanya → null (tidak memanggil apa pun).
 
 Hak: 8 `x_wa_*` → service_role saja. Fungsi `api_/x_/impor_` kini 56 (tes 09); `web_*` tetap 72.
+
+## 16. Pipeline: asal lead per situs (11 Nov 2026)
+Migrasi `20261111150000_pipeline_asal_situs.sql`, tes `uji/db/43_pipeline_asal_situs.sql` + `uji/pipeline/asal-situs-kontrak.mjs`
+(Edge + CLI). Keputusan Hannes 11 Nov (pop-up B24): permintaan Yosie "lead pallet mesh dari website Hammerindo atau Palletmesh
+Indonesia" terlihat langsung di Anvil; routine rhj-brain membaca angka yang sama. Fungsi baru + `inti_pipeline_dasbor_ids`
+diganti (salinan persis 20261029140000 + cabang `asal_situs`); tidak ada perubahan tabel/data.
+
+**Definisi** (WIB): lead = `tanggal_masuk` di `[sejak, sampai]` (semua tahap); produk = lead yang punya `lead_item.produk` itu
+(lead tanpa item hanya ikut "Semua"); order = lead itu yang tahap ORDER sekarang; nilai = Σ `nilai_transaksi` lead ORDER (null = 0).
+Asal = `pipeline_asal_kelompok(sumber_bukti)`; `sumber` isian sales tidak dipakai.
+
+| Kelompok | Kelas `sumber_bukti` | Jalur (`pipeline_asal_jalur`) |
+|---|---|---|
+| `situs_rh` | `web-rh`, `ga-rh`, `situs-rh` | `organik` = `web-*`/`situs-*`, `google_ads` = `ga-*` |
+| `situs_oy` | `web-oy`, `ga-oy`, `situs-oy` | sama |
+| `meta` | `meta` | — |
+| `lain` | `xs-pm`, `tidur`, `lastri`, `katalog-wa`, dan kelas baru yang belum dipetakan | — |
+| `tanpa_kode` | `tanpa-sinyal` | — |
+| `belum` | null | — |
+
+Menambah kelas bukti = petakan juga di `pipeline_asal_kelompok`/`_jalur` (tanpa itu kelas baru jatuh ke `lain`) + label web
+`ASAL_SITUS` (`web/src/features/pipeline/konstanta.ts`).
+
+**`web_pipeline_asal_situs(p)`** (authenticated) / **`x_pipeline_asal_situs(p_aktor, p)`** (service_role, scope `baca`; Edge
+`GET /x/pipeline/asal-situs?produk=&sejak=&sampai=`, CLI `pipeline asal-situs [--produk] [--sejak] [--sampai]`):
+- `p = {produk?, sejak?, sampai?}`. `produk` kosong / `"Semua"` = semua produk, selain itu wajib salah satu produk lead
+  (`PT400`). `sejak` bawaan `pipeline_bukti_mulai()` = 2026-10-21, `sampai` bawaan hari ini WIB; format `YYYY-MM-DD`, tanggal sah,
+  `sejak ≤ sampai`, rentang ≤ 400 hari (`PT400 INPUT_001`).
+- Akses: peran Pipeline admin/baca (owner/bot = admin) → semua lead (`cakupan: "semua"`); rep → hanya lead miliknya
+  (`cakupan: "saya"`); tanpa akses → `PT403 ACCESS_001`.
+- Hasil:
+  `{"cakupan","produk","sejak","sampai","bukti_sejak":"2026-10-21","hari_ini","total":{"lead","order","nilai"},
+  "kelompok":[{"kelompok":"situs_rh","lead","order","nilai","kelas":[{"kelas":"ga-rh","lead","order","nilai"},…],
+  "jalur":[{"jalur":"organik",…},{"jalur":"google_ads",…}]}, …]}`. Enam kelompok selalu ada, urutan tetap (tabel di atas);
+  `jalur` hanya di dua kelompok situs (kedua jalur selalu ada); `kelas` = kelas yang muncul (urut lead terbanyak).
+
+**Klik angka**: `web_pipeline_dasbor_ids({metrik:"asal_situs", kelompok?: <kelompok>|"semua", jalur?: organik|google_ads
+(hanya kelompok situs), produk?, sejak?, sampai?, pemilik?})` → id lead dengan predikat yang sama (`pipeline_asal_lead`), urut
+tanggal masuk terbaru. Web: `/pipeline?kes=asal_situs&ka=<kelompok>&kj=<jalur>&kpr=<produk>&kd=<sejak>&ks=<sampai>`.
+
+Hak: `web_pipeline_asal_situs` → authenticated; `x_pipeline_asal_situs` → service_role; `inti_pipeline_asal_situs`,
+`pipeline_asal_saring`, `pipeline_asal_lead`, `pipeline_asal_kelompok`, `pipeline_asal_jalur`, `pipeline_bukti_mulai` internal.
+Fungsi `web_*` kini 77, `api_/x_/impor_` 61 (tes 09).

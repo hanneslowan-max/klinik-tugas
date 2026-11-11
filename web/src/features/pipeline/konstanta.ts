@@ -8,8 +8,10 @@ import { fmtTanggal, fmtWaktu, selisihHari } from "@/lib/tanggal";
 import type {
   AlasanBatal,
   AlasanDobel,
+  JalurAsal,
   JenisAktivitas,
   KelasBuktiSumber,
+  KelompokAsal,
   LeadDetail,
   ProdukLead,
   SaringPelanggan,
@@ -59,6 +61,23 @@ export const BUKTI_SUMBER: Record<KelasBuktiSumber, string> = {
   tidur: "Kode TIDUR",
   "tanpa-sinyal": "Chat tanpa bukti sumber",
 };
+
+/**
+ * Kartu "Asal lead per situs" (20261111150000_pipeline_asal_situs). Kunci & urutan PERSIS public.pipeline_asal_kelompok /
+ * inti_pipeline_asal_situs: situs_rh = web-rh/ga-rh/situs-rh, situs_oy = web-oy/ga-oy/situs-oy, meta, lain = kelas berkode
+ * lain (xs-pm, tidur, lastri, katalog-wa, kelas baru), tanpa_kode = tanpa-sinyal, belum = belum ada bukti.
+ */
+export const ASAL_SITUS: Record<KelompokAsal, string> = {
+  situs_rh: "Situs Hammerindo",
+  situs_oy: "Situs Palletmesh",
+  meta: "Iklan Meta langsung ke WA",
+  lain: "Lainnya berkode",
+  tanpa_kode: "WA tanpa kode",
+  belum: "Belum ada bukti",
+};
+export const JALUR_ASAL: Record<JalurAsal, string> = { organik: "Organik / form", google_ads: "Google Ads" };
+/** Bukti sumber mulai diisi otomatis dari kode Ref chat WA 0878 (= public.pipeline_bukti_mulai()). */
+export const BUKTI_SEJAK = "2026-10-21";
 
 /**
  * Satu baris bukti sumber untuk detail lead: "Form situs RH · chat 16 Okt 2026, 10.32 WIB", kode bila ada

@@ -8,7 +8,8 @@
 // Tab Order (revisi #3–#7): rekap & tabel order per bulan SP (daftar-order). Saringan status + tanggal (?st, dari, sampai)
 // disaring di klien di atas hasil cari server (saringan-lead).
 // Dari dasbor (?kes=<metrik>&kp=<pemilik|tanpa>&kb=<bulan>): daftar dibatasi ke id lead di balik angka dasbor
-// (web_pipeline_dasbor_ids, predikat sama dengan angkanya); spanduk "Dari dasbor" + × menghapusnya.
+// (web_pipeline_dasbor_ids, predikat sama dengan angkanya); spanduk "Dari dasbor" + × menghapusnya. Kartu "Asal lead per
+// situs": ?kes=asal_situs&ka=<kelompok>&kj=<jalur>&kpr=<produk>&kd=<sejak>&ks=<sampai> (asal-situs.ts).
 // Volume (±2.000 lead): baris dirender bertahap 50-50 (sentinel gulir + tombol cadangan) dengan batas per kunci daftar
 // yang bertahan saat Kembali dari detail; kotak cari terpisah (ketikan tidak merender ulang daftar); baris di-memo.
 // Papan (dnd-kit) dimuat malas: dipramuat saat ?v=papan aktif, saat senggang sesudah daftar tiba, atau tombol Papan
@@ -28,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AksiPipeline } from "@/features/pipeline/aksi-pipeline";
 import { DaftarOrder } from "@/features/pipeline/daftar-order";
+import { bacaSaringAsal, labelSaringAsal } from "@/features/pipeline/asal-situs";
 import { LABEL_METRIK, METRIK_BULANAN, metrikSah, namaBulan } from "@/features/pipeline/dasbor";
 import { DialogGantiSales } from "@/features/pipeline/dialog-ganti-sales";
 import { DialogLeadBaru } from "@/features/pipeline/dialog-lead-baru";
@@ -183,11 +185,13 @@ type PropsSpanduk = {
   /** lead yang sudah dimuat: sumber nama sales (id saja bila belum ada) */
   leads: LeadRingkas[] | undefined;
   total: number | null;
+  /** pengganti "· bulan" (metrik asal_situs: kelompok · jalur · produk · rentang) */
+  rincian?: string;
   hapus: () => void;
 };
 
 /** Spanduk saringan dari dasbor (?kes): metrik · bulan (untuk "disentuh") · sales · jumlah, dan × untuk menghapus. */
-function SpandukDasbor({ metrik, bulan, pemilik, leads, total, hapus }: PropsSpanduk) {
+function SpandukDasbor({ metrik, bulan, pemilik, leads, total, rincian, hapus }: PropsSpanduk) {
   const sales =
     pemilik === "tanpa"
       ? "tanpa pemilik"
@@ -198,7 +202,7 @@ function SpandukDasbor({ metrik, bulan, pemilik, leads, total, hapus }: PropsSpa
     <div className="flex items-center gap-2 rounded-lg border bg-muted/50 py-1 pr-1 pl-3 text-sm" data-uji="saringan-dasbor">
       <p className="min-w-0 flex-1">
         <span className="text-muted-foreground">Dari dasbor:</span> <b>{LABEL_METRIK[metrik]}</b>
-        {METRIK_BULANAN.has(metrik) && bulan ? ` · ${namaBulan(bulan, true)}` : ""}
+        {rincian ? ` · ${rincian}` : METRIK_BULANAN.has(metrik) && bulan ? ` · ${namaBulan(bulan, true)}` : ""}
         {sales ? ` · ${sales}` : ""}
         {total != null ? ` · ${total} lead` : ""}
       </p>
@@ -294,8 +298,11 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
   const kbUrl = sp.get("kb") ?? "";
   const kb = kes && /^\d{4}-(0[1-9]|1[0-2])$/.test(kbUrl) ? kbUrl : "";
   const dariDasbor = kes != null;
+  // kartu asal lead per situs: kelompok/jalur/produk/rentang (bagian tak sah dibuang; kunci query = nilai, bukan identitas)
+  const asal = useMemo(() => (kes === "asal_situs" ? bacaSaringAsal(sp) : null), [kes, sp]);
+  const asalUrl = asal ? JSON.stringify(asal) : "";
   const daftar = usePipelineDaftar({ tab, pemilik, q });
-  const idsDasbor = useDasborIds({ metrik: kes, pemilik: kp, bulan: kb });
+  const idsDasbor = useDasborIds({ metrik: kes, pemilik: kp, bulan: kb, asal });
   const idDasbor = useMemo(() => (dariDasbor && idsDasbor.data ? new Set(idsDasbor.data.ids) : null), [dariDasbor, idsDasbor.data]);
   const memuatIds = dariDasbor && idsDasbor.isPending;
   const galatIds = dariDasbor && idsDasbor.isError ? idsDasbor.error : null;
@@ -334,7 +341,7 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
   // tab Order dikelompokkan & diurutkan di DaftarOrder; daftar lead & papan memakai salinan terurut ini
   const terurut = useMemo(() => urutkan(tersaring, urut, modeOrder), [tersaring, urut, modeOrder]);
   const { batas, tambah } = useBatasTampil(
-    [tab, pemilik ?? "semua", q, stSaring, dariSaring, sampaiSaring, produkSaring, salesSaring, urut, kes, kp, kb].join("|"),
+    [tab, pemilik ?? "semua", q, stSaring, dariSaring, sampaiSaring, produkSaring, salesSaring, urut, kes, kp, kb, asalUrl].join("|"),
   );
   // sama dengan server (web_pipeline_ganti_sales): admin semua lead; rep lead miliknya / tanpa pemilik
   const bisaPindah = (l: LeadRingkas) => akses.peran === "admin" || (akses.peran === "rep" && (l.pemilik == null || Number(l.pemilik) === idSaya));
@@ -445,7 +452,8 @@ function IsiDaftar({ akses }: { akses: AksesPipeline }) {
           pemilik={kp}
           leads={daftar.data?.items}
           total={idsDasbor.data?.total ?? null}
-          hapus={() => gantiParams({ kes: null, kp: null, kb: null })}
+          rincian={asal ? labelSaringAsal(asal) : undefined}
+          hapus={() => gantiParams({ kes: null, kp: null, kb: null, ka: null, kj: null, kpr: null, kd: null, ks: null })}
         />
       ) : null}
 

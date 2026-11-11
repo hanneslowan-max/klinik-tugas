@@ -753,7 +753,9 @@ export type MetrikDasbor =
   | "baru_tanpa_catatan" | "diam_0_7" | "diam_8_14" | "diam_15_30" | "diam_31" | "pm_terbuka"
   // Tahap 2 (20261029140000)
   | "bayar_belum_lunas" | "order_tanpa_bayar" | "nama_kosong" | "sumber_lainnya" | "batal_masuk" | "tanpa_bukti"
-  | "dibatalkan" | "lead_dobel" | "pm_tanpa_nilai";
+  | "dibatalkan" | "lead_dobel" | "pm_tanpa_nilai"
+  // asal lead per situs (20261111150000): + kelompok, jalur, produk, sejak, sampai
+  | "asal_situs";
 /** Satu baris kesehatan follow-up (basis lead terbuka ≤ 90 hari). pemilik null = tanpa pemilik. */
 export type KesehatanSales = {
   pemilik: IdAnggota | null;
@@ -877,6 +879,30 @@ export type ItemBiayaIklan = {
   konversi?: number;
 };
 export type HasilBiayaIklan = { diproses: number; baru: number; diubah: number; sama: number; dihapus: number; dari: string; sampai: string };
+
+// -------------------------------------------------------------------- asal lead per situs (20261111150000)
+/** Kelompok asal dari sumber_bukti (= public.pipeline_asal_kelompok). */
+export type KelompokAsal = "situs_rh" | "situs_oy" | "meta" | "lain" | "tanpa_kode" | "belum";
+/** Jalur di kelompok situs: organik = tombol WA / form situs (web-*, situs-*), google_ads = ga-*. */
+export type JalurAsal = "organik" | "google_ads";
+export type AngkaAsal = { lead: number; order: number; nilai: number };
+/** Hasil web_pipeline_asal_situs / x_pipeline_asal_situs. cakupan 'saya' = rep (hanya lead miliknya). */
+export type AsalSitus = {
+  cakupan: "semua" | "saya";
+  produk: ProdukLead | null;
+  sejak: string;
+  sampai: string;
+  /** tanggal bukti sumber mulai dicatat otomatis (2026-10-21) */
+  bukti_sejak: string;
+  hari_ini: string;
+  total: AngkaAsal;
+  kelompok: (AngkaAsal & {
+    kelompok: KelompokAsal;
+    kelas: (AngkaAsal & { kelas: KelasBuktiSumber | null })[];
+    /** hanya kelompok situs_rh / situs_oy */
+    jalur?: (AngkaAsal & { jalur: JalurAsal })[];
+  })[];
+};
 
 /** Hasil web_pipeline_dasbor_ids: id lead di balik satu angka bagian 2 (urut paling lama diam). */
 export type IdsDasbor = { metrik: MetrikDasbor; total: number; ids: string[] };
@@ -1112,6 +1138,7 @@ export type HasilRpc = {
   web_pipeline_dasbor_ids: IdsDasbor;
   web_pipeline_dasbor_lanjut: DasborLanjut;
   web_pipeline_biaya_iklan_set: HasilBiayaIklan;
+  web_pipeline_asal_situs: AsalSitus;
   web_iklan_ringkas: RingkasKlikIklan;
   web_berita: DataBerita;
   web_berita_semua: SemuaBerita;

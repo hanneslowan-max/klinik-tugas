@@ -894,6 +894,14 @@ const RUTE: Rute[] = [
     h: (c) => rpc("x_pipeline_ringkas", { p_aktor: A(c), p: {
       dasar: c.q.get("dasar") ?? undefined, bulan: c.q.get("bulan") ?? undefined } }, T(c)),
   },
+  // Asal lead per situs (20261111150000_pipeline_asal_situs): lead masuk [sejak, sampai] per kelompok sumber_bukti (situs RH /
+  // situs OY / Meta / lain / tanpa kode / belum) + organik vs Google Ads; produk = lead yang punya item itu. Angka = kartu
+  // dasbor. Bawaan sejak = 2026-10-21 (bukti mulai dicatat), sampai = hari ini WIB. Cakupan peran ditegakkan DB.
+  {
+    m: "GET", p: /^\/x\/pipeline\/asal-situs$/, perlu: "baca",
+    h: (c) => rpc("x_pipeline_asal_situs", { p_aktor: A(c), p: {
+      produk: c.q.get("produk") || undefined, sejak: c.q.get("sejak") || undefined, sampai: c.q.get("sampai") || undefined } }, T(c)),
+  },
   // Ringkasan keutuhan kode klik iklan (admin/baca Pipeline, ditegakkan DB): klik 7/30 hari per domain, kode yang muncul
   // di lead, order + nilai, gbraid/wbraid dilewati, isi CSV unggah saat ini.
   { m: "GET", p: /^\/x\/iklan\/ringkas$/, perlu: "baca", h: (c) => rpc("x_iklan_ringkas", { p_aktor: A(c) }, T(c)) },

@@ -752,6 +752,28 @@ Brief rhj-brain `deliverables/anvil/BRIEF-WA-BOT-AI.md`. Rincian `docs/WA-BOT.md
   urut: `docs/WA-BOT.md` § Deploy.
 - Tes lokal: lihat deskripsi PR.
 
+## Asal lead per situs (11 Nov 2026, keputusan Hannes 11 Nov pop-up B24; BELUM DEPLOY)
+Brief rhj-brain `deliverables/anvil/BRIEF-ASAL-LEAD-PER-SITUS.md` (permintaan Yosie: lead Pallet Mesh dari website Hammerindo
+atau Palletmesh Indonesia). Kontrak `docs/KONTRAK-DB.md` §16, rute `supabase/functions/api/README.md`.
+- DB `20261111150000_pipeline_asal_situs.sql` (aditif; tanpa perubahan tabel/data): `web_/x_pipeline_asal_situs` (lead masuk di
+  rentang per kelompok `sumber_bukti`: situs Hammerindo / situs Palletmesh dengan jalur organik vs Google Ads, Meta, lainnya
+  berkode, WA tanpa kode, belum ada bukti; order & nilai order), pembantu `pipeline_asal_kelompok/_jalur/_saring/_lead`,
+  `pipeline_bukti_mulai()` = 2026-10-21. `inti_pipeline_dasbor_ids` diganti (salinan persis + metrik `asal_situs`).
+  Akses: admin/baca semua lead, rep lead miliknya.
+- Edge `api`: `GET /x/pipeline/asal-situs?produk=&sejak=&sampai=` (scope baca). CLI `cli/tugas.mjs`: `pipeline asal-situs
+  [--produk] [--sejak] [--sampai]`. Salinan rhj-brain `tools/tugas.mjs` BELUM diperbarui.
+- Web: kartu "Asal lead per situs" (`kartu-asal-situs.tsx`) di **Dasbor Pipeline bagian 5**, di bawah kartu "Bukti sumber dari
+  chat WA 0878" (brief menyebut "Ringkasan Pipeline"; kartu bukti sumber dan pemilih bulan ada di Dasbor, layar Ringkasan
+  tidak punya pemilih bulan). Sales melihat versi "Asal lead saya" di bawah kartu pembayaran/rapikan. Saringan produk (Semua
+  + 8 kategori) dan rentang (bulan dasbor / "Sejak bukti dicatat (21 Okt 2026)"). Angka lead → `/pipeline?kes=asal_situs&ka=
+  &kj=&kpr=&kd=&ks=` (spanduk "Dari dasbor: Asal lead per situs · …", × menghapus). Pembantu murni `asal-situs.ts`.
+- Cek angka: data uji `uji/db/43` meniru cek manual 11 Nov (PM 21 Okt–11 Nov: 63 lead = situs RH 12 (WEB-RH 6, GA-RH 6; 2 order
+  Rp4.747.500), situs OY 1, Meta 34, tanpa kode 15 (2 order Rp24.214.818), belum ada bukti 1 (order Rp7.260.000)) → fungsi
+  memberi kelompok yang sama. Data produksi TIDAK dibaca/dihitung di sesi ini.
+- Deploy (belum, tunggu ACC): migrasi `20261111150000` lewat `alat/sql-proyek.sh --migrasi`, lalu Edge `api` (rute baru),
+  lalu merge → web otomatis. Urutan penting: web sebelum migrasi = kartu galat (fungsi belum ada).
+- Tes lokal: lihat deskripsi PR.
+
 ## LANGKAH SESI BERIKUTNYA (deploy F5 → mulai paralel)
 Prasyarat dari Hannes: project Supabase baru `rhj-tugas` (akun/org baru, Sydney `ap-southeast-2` per keputusan 30/9, Free); env cloud `SUPABASE_ACCESS_TOKEN` (PAT akun baru) + `SUPABASE_PROJECT_REF`; `CLICKUP_API_TOKEN` (sudah ada); sesi baru supaya env terbaca. Semua langkah ke ClickUp **GET saja**. Tidak memakai MCP Supabase (itu ERP).
 
