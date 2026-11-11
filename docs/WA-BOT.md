@@ -47,7 +47,7 @@ Pelanggan → 0878 (HP sales + Kapso coexistence) → webhook Kapso (whatsapp.me
 | ambil | sales mengirim ≥ pesan pertama / < 24 jam sebelumnya (log webhook) | `sales_membalas` / `chat_berjalan` |
 | ambil | > 24 jam sejak pesan pelanggan terakhir (aturan Meta) | `jendela_24jam` |
 | ambil | ≥ 100 pesan bot dalam 24 jam (dan ≥ 100 per periode), dihitung sejak pesan sales terakhir (revisi Hannes 10 Nov malam; dulu 3/periode & 4/24 jam, migrasi `20261110220000_wa_batas_100.sql`) | `batas_periode` / `batas_24jam` |
-| cek ulang API | pesan keluar manusia di API pesan Kapso (bukan id bot, tidak diakhiri "(pesan otomatis)", bukan teks otomatis aplikasi "Terima kasih telah/sudah menghubungi…") | `sales_membalas` / `chat_berjalan` |
+| cek ulang API | pesan keluar manusia di API pesan Kapso (bukan id bot, bukan pesan lama berakhiran "(pesan otomatis)", bukan teks otomatis aplikasi "Terima kasih telah/sudah menghubungi…") | `sales_membalas` / `chat_berjalan` |
 | cek ulang API | pesan pelanggan periode ini cocok `wa.kata_manusia` (regex, tanpa beda huruf) | diam `manusia_saja` |
 | cek ulang API | lawan tampak balasan otomatis: ≥ 3 pesan masuk ber-teks identik dalam 24 jam, atau ≥ 3 kali pesan masuk < 5 detik sesudah pesan bot → masuk `wa.diam` (alasan `lain`) | diam `auto_reply` |
 | cek ulang API | API belum memuat pesan pelanggan (coexistence terlambat) → coba lagi 2 mnt, maks 3 kali | `tunda` → `tunda_habis` |
@@ -82,8 +82,14 @@ diskon/potongan/promo/cashback/nego, `http`/`www`/domain, "distributor", "galvan
 "tidak (bisa) custom" di kalimat itu), teflon /
 scaffolding / pintu geser / pagar dalam kalimat tanpa penolakan (tidak/belum/bukan), nomor telepon, email, rekening/bank,
 janji stok (ready, stok ada, "tersedia" tanpa "tidak/tdk/tak"; "belum tersedia" ditolak), janji kirim/tanggal (dicek
-SESUDAH label `[HARI]` dibuang, jadi "membalas besok pagi, … kota pengiriman?" / "Senin 17 November pagi" lolos), > 700 karakter, tidak diakhiri
-"(pesan otomatis)", sisa placeholder `[…]`.
+SESUDAH label `[HARI]` dibuang, jadi "membalas besok pagi, … kota pengiriman?" / "Senin 17 November pagi" lolos), > 700 karakter,
+sisa placeholder `[…]`.
+
+**Tanpa penanda, perkenalan di balasan pertama (Hannes 11 Nov):** baris "(pesan otomatis)" DIHAPUS (bila AI masih menulisnya,
+server membuangnya). Balasan bot PERTAMA per chat (belum ada pesan bot di riwayat Kapso dan tidak ada id bot di `wa.log` 30 hari)
+wajib memperkenalkan diri sebagai asisten RHJ di luar jam kerja; AI lupa → server menambah baris "Saya asisten RHJ di luar jam
+kerja." di depan (tidak ditolak, supaya pemutus tidak terpicu). Balasan berikutnya tanpa perkenalan. Pesan bot dikenali dari id
+pesan yang tercatat (penanda lama tetap dikenali untuk pesan lama).
 
 ## Data (skema `wa`, RLS ON, tanpa hak tabel/skema untuk role API)
 
