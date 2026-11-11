@@ -28,6 +28,11 @@ export const kunci = {
   beritaEdisi: (edisi: number | null) => ["berita", "edisi", edisi ?? "terbaru"] as const,
   beritaSemua: (wilayah: string, sumber: string, q: string) => ["berita", "semua", wilayah, sumber, q] as const,
   beritaTersimpan: ["berita", "tersimpan"] as const,
+  // Bot WA (owner): akar invalidasi; ringkasan per hari, log per saringan, fakta & contoh
+  botWa: ["bot-wa"] as const,
+  botWaRingkas: (hari: number) => ["bot-wa", "ringkas", hari] as const,
+  botWaLog: (keputusan: string, hari: number) => ["bot-wa", "log", keputusan, hari] as const,
+  botWaPengetahuan: ["bot-wa", "pengetahuan"] as const,
   adminTokens: ["admin", "tokens"] as const,
   adminSinkron: ["admin", "sinkron"] as const,
   adminLibur: ["admin", "libur"] as const,

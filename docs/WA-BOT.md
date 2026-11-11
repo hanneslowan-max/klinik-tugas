@@ -8,6 +8,12 @@ acuan nada `deliverables/growth/BEBAN-WA-NASKAH-FASE2-21Okt.md` §3 Jalur B.
 Migrasi `supabase/migrations/20261110180000_wa_bot.sql`, logika Edge `supabase/functions/api/wa.ts` (rute di `index.ts`),
 kontrak `docs/KONTRAK-DB.md` §15, tes `uji/db/39_wa_bot.sql`, `uji/wa/jalankan.mjs`, `uji/wa/kontrak.mjs`.
 
+**Mode uji (saklar `uji`, migrasi `20261111130000_wa_mode_uji.sql`, keputusan Hannes 11 Nov):** bot HANYA membalas nomor di
+`wa.uji`, kapan saja (termasuk jam kerja; [HARI] tetap dihitung dari waktu kirim); nomor lain → batal `saklar_uji`. Jalur sama
+dengan produksi (webhook, AI, validator, kirim Kapso), pemutus & jaga aktif. CLI: `wa uji --nomor 0812… [--catatan]`,
+`wa uji` (lihat, nomor disamarkan), `wa uji --nomor … --hapus` (daftar kosong → saklar mati), `wa saklar uji`. Catatan: nomor uji
+yang dichat sales < 24 jam terakhir tetap batal `chat_berjalan` (aturan sama).
+
 **Saklar default `mati`.** Selama mati, semua logika jalan (antrean tercatat, lalu batal `saklar_mati`), tidak ada AI
 dan tidak ada kiriman.
 
@@ -98,6 +104,21 @@ aktif (`GET /platform/v1/whatsapp/phone_numbers/{id}/webhooks`), tidak ada webho
 pesan masuk baru, pemutus. Ke Hannes (`TELEGRAM_CHAT_HANNES`). Mati karena pemutus ≥ 1 jam di Sabtu/Minggu → juga grup
 marketing (`TELEGRAM_CHAT_MARKETING`) format URGENT B22 (baris 1 `URGENT · Bot WA`, ≤ 6 baris, tanpa nomor/nama
 pelanggan). Satu masalah = satu pesan per 3 jam.
+
+## Halaman web Bot WA (owner)
+
+Menu **Bot WA** (`/bot-wa`, khusus owner; keputusan Hannes 11 Nov 2026), tiga tab:
+- **Ringkasan**: saklar (nyalakan/matikan dengan konfirmasi yang mengingatkan A2 di HP), chat masuk / terkirim / ditolak /
+  gagal, biaya AI, antrean, daftar diam, detak webhook/proses/jaga, alasan bot tidak membalas terbanyak.
+- **Keputusan**: daftar keputusan terbaru (saringan keputusan, muat lagi) dengan teks balasan bot lengkap, alasan, token/biaya,
+  8 karakter hash nomor untuk mengelompokkan satu chat, tombol salin id percakapan Kapso.
+- **Pengetahuan**: fakta terkunci & contoh balasan (tambah, ubah, aktifkan/nonaktifkan), disimpan lewat Edge
+  `/x/admin/wa-pengetahuan` (validator bot; ditolak → pesan alasan).
+
+Halaman TIDAK menampilkan isi chat pelanggan atau nomor telepon (memang tidak disimpan). Isi chat lengkap: HP 0878 atau
+inbox Kapso (tombol "Inbox Kapso" → `https://inbox.kapso.ai`; dokumentasi Kapso tidak memuat format tautan per percakapan,
+jadi id percakapan disalin lalu dicari di inbox). Data: `web_wa_ringkas`, `web_wa_log`, `web_wa_saklar`,
+`web_wa_pengetahuan_daftar` (migrasi `20261111120000_wa_web.sql`, KONTRAK-DB §15).
 
 ## Deploy (sesi rhj-brain, sesudah ACC Hannes)
 

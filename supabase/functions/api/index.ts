@@ -10,7 +10,7 @@
 //   rpc api_token_cek → {member_id, scope, token_id, role}. Scope: baca = GET; tulis = + POST/PUT;
 //   impor = + /x/impor/* dan /x/export. DELETE hanya role owner. token_id diteruskan ke DB lewat header
 //   x-token-id (activity.token_id + cek scope lapis kedua).
-// Auth sesi (UI owner, hanya /x/admin/*, termasuk /x/admin/berita-tarik): header `x-sesi: <access_token>` → GoTrue /auth/v1/user.
+// Auth sesi (UI owner, hanya /x/admin/*, termasuk /x/admin/berita-tarik & /x/admin/wa-pengetahuan): header `x-sesi: <access_token>` → GoTrue /auth/v1/user.
 // Rute TANPA token app (iklan.ts, migrasi 20261108120000_iklan_klik): POST /x/iklan/klik (publik, CORS khusus dua situs,
 //   batas laju per origin) dan GET /x/iklan/unggah.csv (token env TOKEN_UNGGAH_IKLAN: Bearer atau Basic password).
 // Rute bot WA 0878 (wa.ts, migrasi 20261110180000_wa_bot): POST /x/wa/webhook (publik, tanda tangan Kapso
@@ -494,6 +494,26 @@ async function beritaTarik(aktor: number, tokenId?: string): Promise<Obj> {
   return { ...simpan, per_sumber: ringkasTarik(hasil) };
 }
 
+// Simpan fakta/contoh balasan bot WA dari halaman web Bot WA (sesi owner). Teks dicek validator bot yang sama dengan
+// /x/wa/pengetahuan SEBELUM disimpan; web tidak punya fungsi web_* simpan (supaya validator tidak bisa dilewati).
+async function adminWaPengetahuan(req: Request): Promise<unknown> {
+  const { member } = await ownerDariSesi(req);
+  const b = await bacaBody(req);
+  validasiPengetahuan(b);
+  return await rpc("x_wa_pengetahuan_simpan", { p_aktor: Number(member.id), p: b });
+}
+
+/** Validator isi fakta/contoh bot (dipakai /x/wa/pengetahuan dan /x/admin/wa-pengetahuan). */
+function validasiPengetahuan(b: Obj) {
+  if (typeof b.teks !== "string" && typeof b.situasi !== "string") return;
+  // jenis wajib bila mengirim teks/situasi (juga saat ubah), supaya validator memakai aturan yang benar
+  if (b.jenis !== "fakta" && b.jenis !== "contoh") throw new GalatApi(400, "jenis harus fakta|contoh", "INPUT_001");
+  const alasan = typeof b.teks === "string"
+    ? periksaPengetahuan(b.jenis, b.teks, typeof b.situasi === "string" ? b.situasi : null)
+    : periksaPengetahuan(b.jenis, "Situasi saja.", b.situasi as string).filter((x) => x.startsWith("situasi:"));
+  if (alasan.length) throw new GalatApi(400, `ditolak validator: ${[...new Set(alasan)].join(", ")}`, "INPUT_001");
+}
+
 async function adminBeritaTarik(req: Request): Promise<unknown> {
   const { member } = await ownerDariSesi(req);
   return await beritaTarik(Number(member.id));
@@ -937,6 +957,8 @@ const RUTE: Rute[] = [
   },
   { m: "POST", p: /^\/x\/wa\/saklar$/, perlu: "tulis", h: async (c) => rpc("x_wa_saklar", { p_aktor: A(c), p: await c.body() }, T(c)) },
   { m: "POST", p: /^\/x\/wa\/diam$/, perlu: "tulis", h: async (c) => rpc("x_wa_diam", { p_aktor: A(c), p: await c.body() }, T(c)) },
+  // Mode uji (saklar 'uji', migrasi 20261111130000): daftar nomor uji {nomor?, hapus?, catatan?}; tanpa nomor = lihat daftar.
+  { m: "POST", p: /^\/x\/wa\/uji$/, perlu: "tulis", h: async (c) => rpc("x_wa_uji", { p_aktor: A(c), p: await c.body() }, T(c)) },
   // Fakta & contoh balasan bot (wa.pengetahuan, keputusan Hannes 11 Nov): daftar (baca) / simpan (tulis). Teks dicek
   // validator yang sama dengan balasan bot SEBELUM disimpan; ditolak → 400 dengan daftar alasan.
   { m: "GET", p: /^\/x\/wa\/pengetahuan$/, perlu: "baca", h: (c) => rpc("x_wa_pengetahuan_daftar", { p_aktor: A(c), p: {} }, T(c)) },
@@ -944,14 +966,7 @@ const RUTE: Rute[] = [
     m: "POST", p: /^\/x\/wa\/pengetahuan$/, perlu: "tulis",
     h: async (c) => {
       const b = await c.body();
-      if (typeof b.teks === "string" || typeof b.situasi === "string") {
-        // jenis wajib bila mengirim teks/situasi (juga saat ubah), supaya validator memakai aturan yang benar
-        if (b.jenis !== "fakta" && b.jenis !== "contoh") throw new GalatApi(400, "jenis harus fakta|contoh", "INPUT_001");
-        const alasan = typeof b.teks === "string"
-          ? periksaPengetahuan(b.jenis, b.teks, typeof b.situasi === "string" ? b.situasi : null)
-          : periksaPengetahuan(b.jenis, "Situasi saja.", b.situasi as string).filter((x) => x.startsWith("situasi:"));
-        if (alasan.length) throw new GalatApi(400, `ditolak validator: ${[...new Set(alasan)].join(", ")}`, "INPUT_001");
-      }
+      validasiPengetahuan(b);
       return rpc("x_wa_pengetahuan_simpan", { p_aktor: A(c), p: b }, T(c));
     },
   },
@@ -1082,6 +1097,7 @@ async function tangani(req: Request): Promise<Response> {
   }
 
   if (method === "POST" && path === "/x/admin/berita-tarik") return json(200, await adminBeritaTarik(req));
+  if (method === "POST" && path === "/x/admin/wa-pengetahuan") return json(200, await adminWaPengetahuan(req));
   if (method === "POST" && /^\/x\/admin\/(akun|reset|purge)$/.test(path)) {
     const aksi = path.slice("/x/admin/".length);
     return json(200, aksi === "akun" ? await adminAkun(req) : aksi === "reset" ? await adminReset(req) : await adminPurge(req));

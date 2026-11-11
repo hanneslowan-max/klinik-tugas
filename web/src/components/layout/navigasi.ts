@@ -1,4 +1,4 @@
-import { Bell, CheckSquare, LayoutGrid, Newspaper, Search, Settings, Target, Trash2, type LucideIcon } from "lucide-react";
+import { Bell, Bot, CheckSquare, LayoutGrid, Newspaper, Search, Settings, Target, Trash2, type LucideIcon } from "lucide-react";
 
 export type ItemNav = {
   href: string;
@@ -22,6 +22,8 @@ export const NAV_UTAMA: ItemNav[] = [
 
 export const NAV_LAIN: ItemNav[] = [
   { href: "/notif", label: "Notifikasi", Ikon: Bell, cocok: (p) => p.startsWith("/notif") },
+  // Bot WA 0878 (11 Nov 2026): pemantau bot luar jam, khusus owner (hak sebenarnya dicek web_wa_* di DB)
+  { href: "/bot-wa", label: "Bot WA", Ikon: Bot, ownerSaja: true, cocok: (p) => p.startsWith("/bot-wa") },
   { href: "/admin", label: "Admin", Ikon: Settings, ownerSaja: true, cocok: (p) => p.startsWith("/admin") },
   { href: "/sampah", label: "Sampah", Ikon: Trash2, ownerSaja: true, cocok: (p) => p.startsWith("/sampah") },
 ];

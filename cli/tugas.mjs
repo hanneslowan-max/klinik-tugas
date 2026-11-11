@@ -40,7 +40,8 @@
 //   node tools/tugas.mjs pipeline tautan [--jenis erp_sp|wa] [--sejak YYYY-MM-DD] [--batas n]   audit sinkron (tanpa nomor HP)
 //   node tools/tugas.mjs wa ringkas [--hari 7]                         bot WA 0878 luar jam: masuk/kirim/diam per alasan,
 //                                                                     biaya AI, contoh teks bot (tanpa isi chat/nomor); owner/bot
-//   node tools/tugas.mjs wa saklar <mati|kirim> [--catatan "..."]      nyalakan/matikan bot (scope tulis, owner/bot)
+//   node tools/tugas.mjs wa saklar <mati|uji|kirim> [--catatan "..."]  matikan / mode uji (hanya nomor uji, kapan saja) / nyalakan
+//   node tools/tugas.mjs wa uji [--nomor 0812… [--hapus] [--catatan "..."]]   daftar nomor uji (tanpa --nomor = lihat, disamarkan)
 //   node tools/tugas.mjs wa diam --nomor 0812… --alasan internal|pemasok|ekspedisi|minta_berhenti|lain [--hapus]
 //                                                                     daftar nomor yang tidak dibalas bot (scope tulis)
 //   node tools/tugas.mjs wa pengetahuan                                fakta + contoh balasan bot (aktif & nonaktif)
@@ -332,7 +333,7 @@ const EKSTRA = {
     }
     if (sub === "saklar") {
       const status = pos[1];
-      if (!["mati", "kirim"].includes(status)) throw new Error("wa saklar: <mati|kirim> wajib");
+      if (!["mati", "kirim", "uji"].includes(status)) throw new Error("wa saklar: <mati|uji|kirim> wajib");
       return api("POST", `${BASE_X}/wa/saklar`, { status, catatan: wajibNilai("wa saklar", "catatan") });
     }
     if (sub === "diam") {
@@ -345,6 +346,12 @@ const EKSTRA = {
     }
     // Fakta & contoh balasan bot (tabel wa.pengetahuan, migrasi 20261111100000): tanpa deploy; teks dicek validator bot.
     if (sub === "pengetahuan") return api("GET", `${BASE_X}/wa/pengetahuan`);
+    // Mode uji: nomor yang dibalas bot saat saklar 'uji' (kapan saja); tanpa --nomor = lihat daftar (nomor disamarkan).
+    if (sub === "uji") {
+      const nomor = wajibNilai("wa uji", "nomor");
+      if (!nomor) return api("POST", `${BASE_X}/wa/uji`, {});
+      return api("POST", `${BASE_X}/wa/uji`, opt.hapus ? { nomor, hapus: true } : { nomor, catatan: wajibNilai("wa uji", "catatan") });
+    }
     if (sub === "fakta" || sub === "contoh") {
       const id = wajibNilai(`wa ${sub}`, "id");
       if (id && !/^\d+$/.test(id)) throw new Error(`wa ${sub}: --id harus angka`);
