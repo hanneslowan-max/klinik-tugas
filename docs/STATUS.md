@@ -918,4 +918,11 @@ Laporan ke Hannes: angka sensus per list, status lampiran, jawaban probe (termas
   `uji/wa/bagi.mjs` 20/0, `uji/wa/jalankan.mjs` 124/0, `uji/wa/kontrak.mjs` 77/0 (14 cek baru ujung-ke-ujung), `deno check index.ts`.
 - Deploy BUTUH ACC Hannes: migrasi, secret Edge `TELEGRAM_CHAT_SALES`, deploy Edge dari branch yang sudah memuat main
   terbaru, lalu `wa bagi --sales 240260558,240260567 --aktif`.
+- DEPLOY 11 Nov 16:51 WIB (ACC Hannes "Deploy + nyalakan sekarang"): merge bf44642, migrasi diterapkan, secret `TELEGRAM_CHAT_SALES`,
+  Edge dari main; cek 401 webhook/bagi/v2; `wa bagi --sales 240260558,240260567 --aktif`.
+
+## Pembagian seketika juga luar jam (11 Nov 2026, Hannes: "bagiin juga yang luar jam langsung aja")
+- Migrasi `20261111180000_wa_bagi_luar_jam` (`wa.bagi_setel.luar_jam`, bawaan false); bagi.ts: balasan bot tidak dihitung balasan
+  sales, baris luar jam bertanda. CLI `wa bagi --luar-jam ya|tidak`. Tes: `uji/db` 45 berkas 2388 / 0 gagal (baru 45, 11 cek),
+  `uji/wa/bagi.mjs` 22/0, `uji/wa/kontrak.mjs` 77/0, `uji/wa/jalankan.mjs` 124/0, `deno check` OK.
 

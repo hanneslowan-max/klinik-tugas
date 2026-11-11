@@ -51,7 +51,8 @@
 //   node tools/tugas.mjs wa pengetahuan                                fakta + contoh balasan bot (aktif & nonaktif)
 //   node tools/tugas.mjs wa penugasan [--hari 3]                       pembagian seketika chat baru jam kerja: nomor, pemilik,
 //                                                                     status (MEMUAT nomor HP: hanya ke /tmp, jangan ke repo/memori)
-//   node tools/tugas.mjs wa bagi [--aktif|--mati] [--sales id,id] [--jeda detik]   setelan pembagian seketika (tanpa opsi = lihat)
+//   node tools/tugas.mjs wa bagi [--aktif|--mati] [--sales id,id] [--jeda detik] [--luar-jam ya|tidak]   setelan pembagian
+//                                                                     seketika (tanpa opsi = lihat; --luar-jam ya = chat luar jam juga)
 //   node tools/tugas.mjs wa fakta --teks "..." [--urutan n]            tambah fakta terkunci (ubah: --id n [--teks] [--nonaktif|--aktif])
 //   node tools/tugas.mjs wa contoh --situasi "..." --teks "..."        tambah contoh balasan (ubah: --id n …); teks dicek validator bot
 //   audit-free tidak berlaku di mode tugas.
@@ -401,6 +402,11 @@ const EKSTRA = {
         const ids = sales.split(",").map((x) => x.trim());
         if (!ids.every((x) => /^\d{1,18}$/.test(x))) throw new Error("wa bagi: --sales = id anggota dipisah koma");
         body.sales = ids.map(Number);
+      }
+      const luar = wajibNilai("wa bagi", "luar-jam");
+      if (luar) {
+        if (!["ya", "tidak"].includes(luar)) throw new Error("wa bagi: --luar-jam ya|tidak");
+        body.luar_jam = luar === "ya";
       }
       const jeda = wajibNilai("wa bagi", "jeda");
       if (jeda) {
