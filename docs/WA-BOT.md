@@ -174,6 +174,13 @@ dan diumumkan ke grup Telegram RHJ Online Sales dalam ±1–2 menit; lead Anvil 
   → diulang ≤ 4x dalam 30 menit.
 - Luar jam (20261111180000, Hannes 11 Nov ±17:20): `wa bagi --luar-jam ya` → chat malam/akhir pekan/libur juga ditunjuk
   seketika (baris pengumuman bertanda "(luar jam)"); balasan bot (origin `cloud_api`) tidak dihitung balasan sales.
+- Lead langsung (20261111190000, Hannes 11 Nov: "AI nilai dulu, lalu langsung buat"): sesudah ditugaskan, Edge menilai chat
+  dengan Claude (`ANTHROPIC_API_KEY_WA`, Sonnet 5.5, json_schema; prompt pemilah sama dengan PROMPT KLASIFIKASI routine).
+  calon_pembeli → `inti_pipeline_lead_otomatis` sebagai `lead_aktor` (hp & pemilik dari penugasan, kunci tautan sama dengan
+  routine per jam, sumber dari pola Ref/iklan/template) → kode lead ikut di pesan grup; lain (sapaan) → `tunggu`, dinilai ulang
+  saat pelanggan menulis lagi (≤ 6x, ≤ 24 jam); jenis lain → `bukan`; galat AI sementara → ulang 5 menit (≤ 4x). Routine per jam
+  tetap cadangan. Setelan `wa bagi --lead ya|tidak --aktor-lead <id agent>`. Kapso dibaca dengan field
+  `kapso(direction,origin,contact_name,content)` (field `kapso()` kosong tidak memuat arah/asal).
 - Saklar & setelan: `wa.bagi_setel` (bawaan MATI). CLI `wa bagi [--aktif|--mati] [--sales id,id] [--jeda detik]`, lihat
   `wa bagi`; daftar `wa penugasan [--hari 3]` (MEMUAT nomor, owner/bot; jangan disalin ke repo/memori). Retensi 30 hari.
 - Deploy: migrasi `20261111170000_wa_bagi_seketika`, secret Edge `TELEGRAM_CHAT_SALES` (id grup RHJ Online Sales), deploy
