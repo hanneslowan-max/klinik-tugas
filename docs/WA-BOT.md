@@ -172,6 +172,8 @@ dan diumumkan ke grup Telegram RHJ Online Sales dalam ±1–2 menit; lead Anvil 
 - Pengumuman: satu pesan Telegram ke `TELEGRAM_CHAT_SALES` ("Chat baru masuk, mohon langsung dibalas oleh:" + baris
   `08xx… → Nama`). Nomor chat boleh di grup sales (keputusan Hannes 29 Okt); isi chat dan nama pelanggan tidak ikut. Gagal
   → diulang ≤ 4x dalam 30 menit.
+- Luar jam (20261111180000, Hannes 11 Nov ±17:20): `wa bagi --luar-jam ya` → chat malam/akhir pekan/libur juga ditunjuk
+  seketika (baris pengumuman bertanda "(luar jam)"); balasan bot (origin `cloud_api`) tidak dihitung balasan sales.
 - Saklar & setelan: `wa.bagi_setel` (bawaan MATI). CLI `wa bagi [--aktif|--mati] [--sales id,id] [--jeda detik]`, lihat
   `wa bagi`; daftar `wa penugasan [--hari 3]` (MEMUAT nomor, owner/bot; jangan disalin ke repo/memori). Retensi 30 hari.
 - Deploy: migrasi `20261111170000_wa_bagi_seketika`, secret Edge `TELEGRAM_CHAT_SALES` (id grup RHJ Online Sales), deploy

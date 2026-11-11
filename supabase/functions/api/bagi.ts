@@ -17,7 +17,7 @@ export interface DepsBagi {
 }
 
 interface Calon { id: number; nomor: string; percakapan: string | null; masuk_pada: string }
-interface Umum { id: number; nomor: string; pemilik_nama: string }
+interface Umum { id: number; nomor: string; pemilik_nama: string; luar_jam?: boolean }
 interface Sales { id: number; nama: string }
 
 const MENIT = 60_000;
@@ -38,7 +38,7 @@ export function nomorLokal(n: string): string {
 
 /**
  * Keputusan satu calon dari pesan Kapso: batal percakapan_berjalan (ada pesan > 1 menit sebelum pesan pertama dan
- * ≤ hariBaru hari), sales sudah membalas → tugaskan ke sales yang namanya disebut (satu nama saja), selain itu batal
+ * ≤ hariBaru hari), sales sudah membalas (pesan keluar selain origin cloud_api = bot) → tugaskan ke sales yang namanya disebut (satu nama saja), selain itu batal
  * sudah_dibalas; belum dibalas → tugaskan bergiliran.
  */
 export function putuskan(c: Calon, pesan: Obj[], sales: Sales[], hariBaru: number): Obj {
@@ -52,6 +52,7 @@ export function putuskan(c: Calon, pesan: Obj[], sales: Sales[], hariBaru: numbe
   const balas = pesan.filter((m) => {
     const k = (m.kapso ?? {}) as Obj;
     if (String(k.direction ?? "") !== "outbound") return false;
+    if (String(k.origin ?? "") === "cloud_api") return false;   // balasan bot / API, bukan sales dari HP
     const t = waktu(m);
     if (!Number.isFinite(t) || t < masuk - MENIT) return false;
     const x = teks(m);
@@ -71,7 +72,7 @@ export function putuskan(c: Calon, pesan: Obj[], sales: Sales[], hariBaru: numbe
 }
 
 export function teksUmum(u: Umum[]): string {
-  const baris = u.slice(0, 25).map((x) => `- ${nomorLokal(x.nomor)} → ${x.pemilik_nama}`);
+  const baris = u.slice(0, 25).map((x) => `- ${nomorLokal(x.nomor)} → ${x.pemilik_nama}${x.luar_jam ? " (luar jam)" : ""}`);
   return ["Chat baru masuk, mohon langsung dibalas oleh:", ...baris, "Lead dicatat otomatis di Anvil bila calon pembeli."].join("\n");
 }
 

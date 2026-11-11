@@ -39,6 +39,10 @@ cek("teks otomatis aplikasi tidak dihitung balasan",
     && putuskan(calon, [msk(MASUK), klr("2026-11-12T02:00:05Z", "Terima kasih telah menghubungi Roda Hammerindo")], SALES, 7).sales === undefined);
 cek("nama di dalam kata lain tidak cocok (Michaela)",
     putuskan(calon, [msk(MASUK), klr("2026-11-12T02:00:40Z", "Dengan Michaela")], SALES, 7).alasan === "sudah_dibalas");
+cek("balasan bot (origin cloud_api) bukan balasan sales → giliran",
+    (() => { const b = klr("2026-11-12T02:01:00Z", "Halo Bapak/Ibu, saya asisten RHJ"); b.kapso.origin = "cloud_api";
+             const r = putuskan(calon, [msk(MASUK), b], SALES, 7); return r.keputusan === "tugaskan" && r.sales === undefined; })());
+cek("teks grup menandai luar jam", teksUmum([{ id: 1, nomor: "6281200000701", pemilik_nama: "Riksa", luar_jam: true }]).includes("081200000701 → Riksa (luar jam)"));
 cek("nomorLokal 62 → 0", nomorLokal("6281200000701") === "081200000701");
 const t = teksUmum([{ id: 1, nomor: "6281200000701", pemilik_nama: "Riksa" }, { id: 2, nomor: "6281200000702", pemilik_nama: "Michael" }]);
 cek("teks grup: nomor lokal + nama sales, tanpa nomor 62", t.includes("- 081200000701 → Riksa") && t.includes("- 081200000702 → Michael") && !t.includes("62812"), t);
