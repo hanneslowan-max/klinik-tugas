@@ -49,6 +49,8 @@
 //   node tools/tugas.mjs wa diam --nomor 0812… --alasan internal|pemasok|ekspedisi|minta_berhenti|lain [--hapus]
 //                                                                     daftar nomor yang tidak dibalas bot (scope tulis)
 //   node tools/tugas.mjs wa pengetahuan                                fakta + contoh balasan bot (aktif & nonaktif)
+//   node tools/tugas.mjs wa sapu [--aktif|--mati] [--mulai 16:00] [--jalan]   sapu sore 17.10: chat jam kerja belum dibalas
+//                                                                     sales → dibalas bot (tanpa opsi = lihat; --jalan = sekarang)
 //   node tools/tugas.mjs wa penugasan [--hari 3]                       pembagian seketika chat baru jam kerja: nomor, pemilik,
 //                                                                     status (MEMUAT nomor HP: hanya ke /tmp, jangan ke repo/memori)
 //   node tools/tugas.mjs wa bagi [--aktif|--mati] [--sales id,id] [--jeda detik] [--luar-jam ya|tidak]   setelan pembagian
@@ -426,7 +428,21 @@ const EKSTRA = {
       }
       return Object.keys(body).length ? api("POST", `${BASE_X}/wa/bagi-setel`, body) : api("GET", `${BASE_X}/wa/bagi-setel`);
     }
-    throw new Error("wa: subperintah harus ringkas | saklar <mati|kirim> | diam --nomor --alasan | pengetahuan | fakta | contoh | penugasan | bagi");
+    // Sapu sore 17.10 (migrasi 20261111200000): chat jam kerja yang belum dibalas sales → dibalas bot.
+    if (sub === "sapu") {
+      if (opt.jalan) return api("POST", `${BASE_X}/wa/sapu-jalan`, {});
+      const body = {};
+      if (opt.aktif && opt.mati) throw new Error("wa sapu: pilih --aktif atau --mati");
+      if (opt.aktif) body.aktif = true;
+      if (opt.mati) body.aktif = false;
+      const mulai = wajibNilai("wa sapu", "mulai");
+      if (mulai) {
+        if (!/^\d{2}:\d{2}$/.test(mulai)) throw new Error("wa sapu: --mulai HH:MM");
+        body.jam_mulai = mulai;
+      }
+      return Object.keys(body).length ? api("POST", `${BASE_X}/wa/sapu-setel`, body) : api("GET", `${BASE_X}/wa/sapu-setel`);
+    }
+    throw new Error("wa: subperintah harus ringkas | saklar <mati|kirim> | diam --nomor --alasan | pengetahuan | fakta | contoh | penugasan | bagi | sapu");
   },
 };
 

@@ -186,9 +186,19 @@ dan diumumkan ke grup Telegram RHJ Online Sales dalam ±1–2 menit; lead Anvil 
 - Deploy: migrasi `20261111170000_wa_bagi_seketika`, secret Edge `TELEGRAM_CHAT_SALES` (id grup RHJ Online Sales), deploy
   Edge `api`, lalu `wa bagi --sales <Riksa>,<Michael> --aktif` (ACC Hannes).
 
+## Sapu sore 17.10 (20261111200000, keputusan Hannes 11 Nov 2026)
+
+Hari kerja 17.10 WIB (cron `wa-sapu`, hari libur dilewati, hanya bila `wa.sapu_setel.aktif` dan saklar bot `kirim`): Edge
+`sapu.ts` membaca semua pesan sejak `jam_mulai` (bawaan 16.00) lewat API Kapso (field arah/asal/percakapan, maks 20 halaman),
+mencari nomor yang pesan pelanggannya (sesudah balasan sales terakhir) berakhir di [jam_mulai, 17.00) tanpa balasan sales/bot,
+lalu `x_wa_sapu_antre` membuat baris `wa.antrean` `sapu=true` jatuh tempo sekarang. Bot membalas lewat `wa-proses` dengan aturan
+biasa, kecuali `chat_berjalan` tidak berlaku (chatnya memang percakapan hari ini); sales yang membalas sesudah pesan pelanggan
+tetap membatalkan. Prompt sapu: minta maaf belum terbalas, sekarang di luar jam kerja, info lengkap disampaikan sales [HARI].
+CLI `wa sapu [--aktif|--mati] [--mulai HH:MM] [--jalan]` (`--jalan` = jalankan sekarang, tanpa menunggu 17.10).
+
 ## Tes lokal
 
 `supabase start` + `supabase db reset` + `supabase functions serve --env-file uji/wa/serve.env`, lalu:
-`bash uji/db/jalankan.sh` · `node uji/wa/jalankan.mjs` (murni Node, tiruan Kapso/Claude/Telegram/DB) · `node uji/wa/bagi.mjs` (pembagian seketika) ·
+`bash uji/db/jalankan.sh` · `node uji/wa/jalankan.mjs` (murni Node, tiruan Kapso/Claude/Telegram/DB) · `node uji/wa/bagi.mjs` (pembagian seketika) · `node uji/wa/sapu.mjs` (sapu sore) ·
 `node uji/wa/kontrak.mjs` (Edge + DB lokal, server tiruan 0.0.0.0:54398 lewat `host.docker.internal`, termasuk
 pg_net → Edge lewat Vault lokal). Tidak ada panggilan ke Kapso, Anthropic, atau Telegram sungguhan.
