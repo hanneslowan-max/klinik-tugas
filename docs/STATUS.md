@@ -738,6 +738,12 @@ routine rhj-brain (token app scope tulis, role bot). Kontrak `docs/KONTRAK-DB.md
   3/4). Tes lokal: `uji/wa/jalankan.mjs` 111/111, `uji/wa/kontrak.mjs` 53/53, `uji/db` 2222 cek, `deno check wa.ts`. Edge `api`
   dari `main` b71466e. Cek tanpa menulis: webhook tanpa tanda tangan 401, proses tanpa token 401, `/v2/user` 401,
   `wa ringkas` 200 saklar mati. Rollback: Edge dari 8b17db0 + `update wa.pengaturan set maks_per_periode=3, maks_per_24jam=4`.
+- **PR #39 DEPLOY 11 Nov (ACC Hannes):** fakta & contoh balasan bot di tabel `wa.pengetahuan` (migrasi `20261111100000`); cek:
+  `wa pengetahuan` = 3 fakta, webhook 401.
+- **PR #41 DEPLOY 11 Nov ±13.06 WIB (ACC Hannes; memuat #40 halaman Bot WA):** migrasi `20261111120000_wa_web` +
+  `20261111130000_wa_mode_uji`, Edge `api` dari main 58beaa1, web `/bot-wa` (owner) lewat Hostinger. **Mode uji NYALA** (saklar `uji`,
+  1 nomor uji Hannes); jeda balasan sementara 1/1 menit (kembalikan 10/2 sebelum `kirim`). Uji pertama 13.11 WIB: AI + validator +
+  kirim Kapso sukses (balasan 13.13, 2346/313 token, $0,0078), kunci `ANTHROPIC_API_KEY_WA` sah.
 Brief rhj-brain `deliverables/anvil/BRIEF-WA-BOT-AI.md`. Rincian `docs/WA-BOT.md`, kontrak `docs/KONTRAK-DB.md` §15, rute
 `supabase/functions/api/README.md`.
 - DB `20261110180000_wa_bot.sql` (aditif): ekstensi `pg_net` + `pg_cron`, skema `wa` (8 tabel, tertutup untuk role API),
@@ -886,3 +892,12 @@ Sumber: `docs/riset/baca-pagar.md` §2. Email Michael & Rengga = asumsi yang bis
 
 ### 9. Tutup sesi
 Laporan ke Hannes: angka sensus per list, status lampiran, jawaban probe (termasuk anggota space privat hasil `/list/{id}/member`), keputusan privasi space. Mode tetap `cermin`; routine tetap memakai ClickUp sampai cutover (F7).
+
+## Bot WA: gratis ongkir khusus Jabodetabek (11 Nov 2026, keputusan Hannes; PR #43, DEPLOY 11 Nov)
+- Validator `wa.ts`: "gratis ongkir" keluar dari daftar diskon; aturan per kalimat `ongkir_luar_jabodetabek` (gratis/free/bebas
+  ongkir wajib menyebut "Jabodetabek" di kalimat yang sama). Prompt LARANGAN: satu pengecualian gratis ongkir Jabodetabek.
+  Tes `uji/wa/jalankan.mjs` 122/0. Edge `api` di-deploy 11 Nov dari `claude/wa-ongkir-jabodetabek`; cek: webhook tanpa
+  tanda tangan 401, `/x/wa/ringkas` 200, `/v2/user` 401, `/x/iklan/ringkas` 200; `POST /x/wa/pengetahuan` "Gratis ongkir
+  ke seluruh Indonesia." → 400 `ongkir_luar_jabodetabek`. Fakta id 18 (urutan 45) "Gratis ongkir untuk pengiriman area
+  Jabodetabek, semua produk, tanpa minimal pembelian…" ditambahkan lewat API.
+
