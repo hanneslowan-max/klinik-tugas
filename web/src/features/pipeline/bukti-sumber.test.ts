@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { BUKTI_SUMBER, teksBuktiSumber } from "@/features/pipeline/konstanta";
+import { BUKTI_SUMBER, teksBuktiSumber, teksSumberRingkas } from "@/features/pipeline/konstanta";
 import { fmtWaktu } from "@/lib/tanggal";
 import type { KelasBuktiSumber } from "@/types/domain";
 
@@ -35,5 +35,15 @@ describe("BUKTI_SUMBER", () => {
       "lastri", "katalog-wa", "xs-pm", "tidur", "tanpa-sinyal",
     ]);
     expect(Object.values(BUKTI_SUMBER).every((l) => l.trim().length > 0)).toBe(true);
+  });
+});
+
+describe("teksSumberRingkas (chip Sumber di daftar & papan, 12 Nov 2026)", () => {
+  it("sumber saja bila tanpa kode bukti", () => {
+    expect(teksSumberRingkas({ sumber: "WA langsung", sumber_bukti_kode: null })).toBe("WA langsung");
+  });
+  it("sumber + kode iklan/situs dari bukti chat", () => {
+    expect(teksSumberRingkas({ sumber: "Meta Ads", sumber_bukti_kode: "PM-06" })).toBe("Meta Ads · PM-06");
+    expect(teksSumberRingkas({ sumber: "Google Ads", sumber_bukti_kode: "GA-OY-7K3F" })).toBe("Google Ads · GA-OY-7K3F");
   });
 });

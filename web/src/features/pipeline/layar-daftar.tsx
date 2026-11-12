@@ -34,7 +34,7 @@ import { LABEL_METRIK, METRIK_BULANAN, metrikSah, namaBulan } from "@/features/p
 import { DialogGantiSales } from "@/features/pipeline/dialog-ganti-sales";
 import { DialogLeadBaru } from "@/features/pipeline/dialog-lead-baru";
 import { GerbangPipeline, type AksesPipeline } from "@/features/pipeline/gerbang";
-import { infoFu, PRODUK, ringkasProduk, rupiah, TAB_DAFTAR } from "@/features/pipeline/konstanta";
+import { infoFu, PRODUK, ringkasProduk, rupiah, TAB_DAFTAR, teksSumberRingkas } from "@/features/pipeline/konstanta";
 import { ChipRepeat } from "@/features/pipeline/chip-repeat";
 import { KotakCari } from "@/features/pipeline/kotak-cari";
 import {
@@ -100,6 +100,9 @@ function IsiBarisLead({ lead, hariIni, kategori }: PropsBaris) {
         </div>
         <div className="flex items-center gap-2">
           <span className="min-w-0 truncate text-sm text-muted-foreground">{ringkasProduk(lead.produk)}</span>
+          <Chip nada="garis" className="min-w-0 shrink truncate" title={`Sumber: ${teksSumberRingkas(lead)}`} data-uji="chip-sumber">
+            {teksSumberRingkas(lead)}
+          </Chip>
           <ChipRepeat n={lead.order_sebelumnya} />
         </div>
         <div className="truncate text-xs text-muted-foreground">
