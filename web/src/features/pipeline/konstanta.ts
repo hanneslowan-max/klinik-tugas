@@ -13,6 +13,7 @@ import type {
   KelasBuktiSumber,
   KelompokAsal,
   LeadDetail,
+  LeadRingkas,
   ProdukLead,
   SaringPelanggan,
   SatuanItem,
@@ -83,6 +84,14 @@ export const BUKTI_SEJAK = "2026-10-21";
  * Satu baris bukti sumber untuk detail lead: "Form situs RH · chat 16 Okt 2026, 10.32 WIB", kode bila ada
  * ("Google Ads · situs OYAMA (GA-OY-7K3F) · chat …"). null bila belum ada bukti (baris tidak ditampilkan).
  */
+/**
+ * Teks chip Sumber di daftar/papan lead (Hannes 12 Nov 2026: sumber terlihat tanpa membuka kartu): kolom Sumber,
+ * plus kode iklan/situs dari bukti chat WA bila ada ("Meta Ads · PM-06", "Google Ads · GA-OY-7K3F").
+ */
+export function teksSumberRingkas(l: Pick<LeadRingkas, "sumber" | "sumber_bukti_kode">): string {
+  return l.sumber_bukti_kode ? `${l.sumber} · ${l.sumber_bukti_kode}` : l.sumber;
+}
+
 export function teksBuktiSumber(
   b: Pick<LeadDetail, "sumber_bukti" | "sumber_bukti_kode" | "sumber_bukti_chat_pada">,
 ): string | null {

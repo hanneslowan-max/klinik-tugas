@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { ChipRepeat } from "@/features/pipeline/chip-repeat";
-import { infoFu, ringkasProduk, rupiah } from "@/features/pipeline/konstanta";
+import { infoFu, ringkasProduk, rupiah, teksSumberRingkas } from "@/features/pipeline/konstanta";
 import { useKategoriPindah, useKategoriSimpan } from "@/features/pipeline/mutasi";
 import { PilTahap } from "@/features/pipeline/pil-tahap";
 import { useProfil } from "@/features/profil/penyedia-profil";
@@ -618,7 +618,12 @@ function IsiKartu({
         )}
         <PilTahap tahap={l.tahap} className="shrink-0" />
       </div>
-      <div className="truncate text-xs text-muted-foreground">{ringkasProduk(l.produk)}</div>
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="min-w-0 truncate text-xs text-muted-foreground">{ringkasProduk(l.produk)}</span>
+        <Chip nada="garis" className="min-w-0 shrink truncate" title={`Sumber: ${teksSumberRingkas(l)}`} data-uji="chip-sumber">
+          {teksSumberRingkas(l)}
+        </Chip>
+      </div>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
         <span>{l.kode}</span>
         <span className="min-w-0 truncate">{l.pemilik_nama ?? "tanpa pemilik"}</span>
