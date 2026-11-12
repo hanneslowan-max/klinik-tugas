@@ -1,0 +1,24 @@
+{
+  "name": "rhj-tugas",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Aplikasi tugas internal PT RHJ (pengganti ClickUp). Web Next.js di web/ (web statis lama di web-lama/ sampai web baru lulus paritas), tes di uji/.",
+  "type": "module",
+  "scripts": {
+    "dev": "npm --prefix web run dev",
+    "build": "npm --prefix web run build",
+    "start": "npm --prefix web run start",
+    "cek": "npm --prefix web run cek",
+    "web:vendor": "node uji/web/salin-vendor.mjs",
+    "web:vendor:cek": "node uji/web/salin-vendor.mjs --cek",
+    "web:serve": "node uji/web/server.mjs",
+    "uji:web": "playwright test -c uji/web/playwright.config.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@supabase/supabase-js": "2.117.2",
+    "dompurify": "3.4.16",
+    "markdown-it": "15.0.2",
+    "sortablejs": "1.15.7"
+  }
+}

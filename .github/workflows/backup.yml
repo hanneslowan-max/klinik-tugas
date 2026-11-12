@@ -1,0 +1,105 @@
+# Backup aplikasi Tugas RHJ (impor/cadangan.mjs).
+#   Harian 03:15 WIB (20:15 UTC): GET /api/x/export → gzip → enkripsi age (BACKUP_AGE_PUBKEY) → artifact 30 hari.
+#   Mingguan Minggu 04:15 WIB (Sabtu 21:15 UTC) atau manual (input lampiran): salin berkas lampiran → tar.gz → age → artifact.
+# HANYA jalan bila Variables repo BACKUP_AKTIF == '1'.
+# Secrets: TUGAS_API_URL (…/functions/v1/api/v2), TUGAS_EXPORT_TOKEN, BACKUP_AGE_PUBKEY (recipient age1…, BUKAN kunci privat).
+#   PENTING: dengan kontrak saat ini /x/export butuh token scope 'impor' (Edge + DB x_export). Token 'baca' → 403.
+#   Kunci privat age disimpan Hannes di luar GitHub; tanpa itu backup tidak bisa dibuka.
+# Plaintext tidak pernah di-upload: hanya berkas .age. Log hanya berisi angka.
+name: Backup Tugas
+
+on:
+  schedule:
+    - cron: "15 20 * * *" # harian 03:15 WIB: ekspor data
+    - cron: "15 21 * * 6" # mingguan Minggu 04:15 WIB: ekspor + salin lampiran
+  workflow_dispatch:
+    inputs:
+      lampiran:
+        description: "Ikut salin berkas lampiran"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-tugas
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    if: ${{ vars.BACKUP_AKTIF == '1' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TUGAS_API_URL: ${{ secrets.TUGAS_API_URL }}
+      TUGAS_EXPORT_TOKEN: ${{ secrets.TUGAS_EXPORT_TOKEN }}
+      BACKUP_AGE_PUBKEY: ${{ secrets.BACKUP_AGE_PUBKEY }}
+      DENGAN_LAMPIRAN: ${{ (github.event.schedule == '15 21 * * 6' || inputs.lampiran) && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Cek secrets
+        run: |
+          set -euo pipefail
+          kurang=0
+          for v in TUGAS_API_URL TUGAS_EXPORT_TOKEN BACKUP_AGE_PUBKEY; do
+            if [ -z "${!v:-}" ]; then echo "::error::secret $v kosong"; kurang=1; fi
+          done
+          if [ "$kurang" = 0 ] && ! printf '%s' "$BACKUP_AGE_PUBKEY" | grep -Eq '^(age1[0-9a-z]{58}|ssh-(ed25519|rsa) [A-Za-z0-9+/=]+.*)$'; then
+            echo "::error::BACKUP_AGE_PUBKEY bukan recipient age (age1…) / kunci publik ssh"; kurang=1
+          fi
+          exit "$kurang"
+
+      - name: Pasang age
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age
+          age --version
+
+      - name: Ekspor + enkripsi
+        run: |
+          set -euo pipefail
+          umask 077
+          kerja="$RUNNER_TEMP/cadangan"
+          mkdir -p "$kerja" keluaran
+          node impor/cadangan.mjs ekspor --keluar "$kerja" > "$kerja/ringkas.json"
+          node -e 'const j=require(process.argv[1]); console.log(JSON.stringify({byte:j.byte, sha256:j.sha256, hitungan:j.hitungan}))' "$kerja/ringkas.json"
+          f=$(ls "$kerja"/ekspor-*.json)
+          gzip -9 "$f"
+          age -r "$BACKUP_AGE_PUBKEY" -o "keluaran/$(basename "$f").gz.age" "$f.gz"
+          test -s "keluaran/$(basename "$f").gz.age"
+
+      - name: Salin lampiran + enkripsi
+        if: ${{ env.DENGAN_LAMPIRAN == '1' }}
+        run: |
+          set -euo pipefail
+          umask 077
+          kerja="$RUNNER_TEMP/cadangan"
+          f=$(ls "$kerja"/ekspor-*.json.gz)
+          gunzip -k "$f"
+          kode=0
+          node impor/cadangan.mjs lampiran --ekspor "${f%.gz}" --keluar "$kerja/lampiran" || kode=$?
+          if [ "$kode" = 1 ]; then exit 1; fi
+          if [ "$kode" = 2 ]; then echo "::warning::Sebagian lampiran gagal disalin (lihat ringkasan di atas)."; fi
+          tgl=$(TZ=Asia/Jakarta date +%F)
+          mkdir -p "$kerja/lampiran"
+          tar -C "$kerja" -czf "$kerja/lampiran-$tgl.tar.gz" lampiran
+          age -r "$BACKUP_AGE_PUBKEY" -o "keluaran/lampiran-$tgl.tar.gz.age" "$kerja/lampiran-$tgl.tar.gz"
+
+      - name: Hapus plaintext
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/cadangan"
+
+      - name: Upload artifact terenkripsi
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-tugas-${{ github.run_id }}
+          path: keluaran/*.age
+          retention-days: 30
+          if-no-files-found: error

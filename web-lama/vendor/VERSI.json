@@ -1,0 +1,33 @@
+{
+  "catatan": "Dibuat uji/web/salin-vendor.mjs",
+  "paket": [
+    {
+      "paket": "@supabase/supabase-js",
+      "versi": "2.117.2",
+      "berkas": "supabase-js-2.117.2.umd.js",
+      "sha256": "59d39487c3589843b410322d8a3d562ce022aba1e5ccb16898ef3fb2a0da2ecd",
+      "catatan": "UMD → window.supabase (dimuat <script> di index.html)"
+    },
+    {
+      "paket": "markdown-it",
+      "versi": "15.0.2",
+      "berkas": "markdown-it-15.0.2.esm.min.mjs",
+      "sha256": "528b68ea3be3ed86be7bc9ed2b99e21a4f51d9afcfb01330d0393abe04070f32",
+      "catatan": "ESM"
+    },
+    {
+      "paket": "dompurify",
+      "versi": "3.4.16",
+      "berkas": "purify-3.4.16.es.mjs",
+      "sha256": "9c52577e368cdc6f3fb2bc87de222c8139e30655eef54a2bebde6d4b0a85ccb8",
+      "catatan": "ESM"
+    },
+    {
+      "paket": "sortablejs",
+      "versi": "1.15.7",
+      "berkas": "sortable-1.15.7.esm.js",
+      "sha256": "a48a4ec931f04c50a1b80c095d0610dc2ec2014d001d4f083405f808fc9be251",
+      "catatan": "ESM"
+    }
+  ]
+}
